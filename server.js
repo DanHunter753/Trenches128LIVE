@@ -309,6 +309,8 @@ function explode(x, z, by, pow, src) {   // pow: 1 = artillery shell / grenade; 
   NAV.rebuild(x - cr - 1, z - cr - 1, x + cr + 1, z + cr + 1);
   bcast({ t: 'cr', c: craters[craters.length - 1] });
   if (VEHM) VEHM.blast(x, z, by, pow, src);
+  for (let i = 0; i < BASE_NESTS; i++) { const n = NESTS[i]; if (n.dead || (by && by.team === n.team)) continue;   // v0.31: a grenade in the nest or a shell beside it wrecks the gun
+    const Rn = 3.4 * Math.sqrt(pow), d = Math.hypot(n.x - x, n.z - z); if (d < Rn) { n.hp = (n.hp == null ? 100 : n.hp) - 130 * pow * (1 - d / Rn); if (n.hp <= 0) nestWreck(i, by); } }
   if (pow >= 1 && (src === 'shell' || !by || by.cmd)) blowBay(x, z, by);
   if (pow >= 1 && (src === 'shell' || !by || by.cmd)) raiseAlarm(x, z, 12, 4, null);   // shells bursting close: get under cover   // artillery, bombs and field-gun shells can bring a trench bay down
   for (const e of ents.values()) if (e.alive && !e.manned && !e.cmd && !e.inV) { const d = Math.hypot(e.x - x, e.z - z); if (d < R) {
@@ -543,9 +545,37 @@ function buildAct(p, k) {
 }
 function nearestFort(p, test) { let b = null, bd = 1e9; for (const f of T.FORTS.values()) { if (!test(f)) continue; const R = T.FORT[f.k].small ? 2.6 : 5.5, d = Math.hypot(f.x - p.x, f.z - p.z); if (d < R && d < bd) { bd = d; b = f; } } return b; }
 // hold E: build up your own unfinished building, or tear down enemy structures
+// v0.31 wrecked guns: trench MG nests can be knocked out; a wreck is repaired by hand (hold E beside it: a sapper about 8 s,
+// anyone else about 20 s) or comes back on its own after NEST_AUTOFIX seconds. Field guns and mortars repair the same way.
+const NEST_AUTOFIX = 90, FIX_S = { sapper: 8, other: 20 };
+function nestWreck(i, by) {
+  const n = NESTS[i]; if (!n || n.dead) return;
+  n.dead = true; n.hp = 0; n.fix = 0; n.fixAt = tickNo + NEST_AUTOFIX * TICK;
+  if (n.bot) leaveFortNest(n.bot);
+  for (const p of humans) if (p.mg === n.idx) { dismount(p, false); tell(p, 'Your machine gun was knocked out'); }
+  if (by && by.team !== n.team) { addXp(by, 30); if (!by.bot) tell(by, 'Enemy machine gun knocked out (+30 XP)'); }
+  killFeedRaw(by, n.team, 'MG nest', 'grenade');
+  bcast({ t: 'nd', i, d: 1 }); teamTell(n.team, 'An MG nest is down: hold E beside it to repair');
+}
+function nestFixed(i, by) {
+  const n = NESTS[i]; if (!n || !n.dead) return;
+  n.dead = false; n.hp = 100; n.fix = 0; n.fixAt = 0; n.occ = null; n.bot = null;
+  bcast({ t: 'nd', i, d: 0 });
+  if (by) { addXp(by, 15); if (!by.bot) tell(by, 'Machine gun repaired (+15 XP)'); }
+}
+function nestAutofix() { for (let i = 0; i < BASE_NESTS; i++) { const n = NESTS[i]; if (n.dead && n.fixAt && tickNo >= n.fixAt) nestFixed(i, null); } }
+function fixAct(p, dt) {   // hands on a wreck of your own side within reach: progress, true if this was a repair
+  const rate = dt / (p.cls === 'sapper' ? FIX_S.sapper : FIX_S.other);
+  for (let i = 0; i < BASE_NESTS; i++) { const n = NESTS[i];
+    if (n.dead && n.team === p.team && Math.hypot(p.x - n.x, p.z - n.z) < 3) { n.fix = Math.min(1, (n.fix || 0) + rate); send(p, { t: 'wk', p: n.fix, n: 'Repairing machine gun' }); if (n.fix >= 1) nestFixed(i, p); return true; } }
+  const v = VEHM && VEHM.V.find(q => q.k !== 'tank' && q.dead && !q.lost && q.team === p.team && Math.hypot(p.x - q.x, p.z - q.z) < 3.2);
+  if (v) { v.fix = Math.min(1, (v.fix || 0) + rate); send(p, { t: 'wk', p: v.fix, n: 'Repairing ' + T.VEH[v.k].n.toLowerCase() }); if (v.fix >= 1) { VEHM.fixNow(v); v.fix = 0; addXp(p, 15); if (!p.bot) tell(p, T.VEH[v.k].n + ' repaired (+15 XP)'); } return true; }
+  return false;
+}
 function workAct(p) {
   if (!p.alive || p.mg != null || p.cmd || p.cl) return;
   const gap = tickNo - (p.wkLast || -99); p.wkLast = tickNo; const dt = Math.min(gap, 6) * DT;
+  if (fixAct(p, dt)) return;
   const own = nearestFort(p, f => f.team === p.team && f.done < 1);
   if (own) {
     const D = T.FORT[own.k]; own.done = Math.min(1, own.done + dt / D.work * (p.cls === 'sapper' ? 1 : .5)); own.helpers = own.helpers || new Set(); own.helpers.add(p);
@@ -1223,7 +1253,7 @@ function switchMap() {
   terr = T.makeTerrain();
   OB.forEach((o, i) => { o.x = T.OBJ[i].x; o.z = T.OBJ[i].z; });
   DP.forEach((d, i) => Object.assign(d, { n: T.DEPOTS[i].n, x: T.DEPOTS[i].x, z: T.DEPOTS[i].z }));
-  for (let i = 0; i < BASE_NESTS; i++) Object.assign(NESTS[i], T.NEST[i], { dead: false, bot: null, occ: null });
+  for (let i = 0; i < BASE_NESTS; i++) Object.assign(NESTS[i], T.NEST[i], { dead: false, bot: null, occ: null, hp: 100, fix: 0, fixAt: 0 });
   console.log('[map] round map ' + mapSeed + ' (' + (Date.now() - t0) + ' ms)'); return true;
 }
 function resetRound() {
@@ -1649,6 +1679,7 @@ function guard(name, fn, a) { try { fn(a); } catch (e) { const n = guardAt.get(n
 function tickBody() {
   const t0 = process.hrtime.bigint(); tickNo++;
   if (round.state === 'ended') { round.t -= DT; if (round.t <= 0) resetRound(); }
+  if (tickNo % TICK === 0) guard('nestfix', nestAutofix);
   buildGrid(); computeLeaders(); guard('nav', () => NAV.tick()); if (tickNo % 20 === 0) guard('squads', squadTick);
   { const due = sched.filter(s => s.at <= tickNo); if (due.length) { sched = sched.filter(s => s.at > tickNo); for (const s of due) { try { s.fn(); } catch (e) { console.error(e); } } } }
   for (const p of humans) guard('human', humanTick, p);
@@ -1712,7 +1743,7 @@ function onText(c, txt) {
     if (l.cls === 'officer') sq = -1;
     if (!p.deployed) {
       p.cls = l.cls; p.w = l.w; p.u = l.u; p.sq = sq; p.deployed = true; p.alive = false; p.down = 0; p.rt = .3; p.sent = new Map();   // the client drops its entity copies on 'w'; resend everything
-      send(p, { t: 'w', id: p.id, team: p.team, sq, cls: l.cls, w: l.w, u: l.u, wx: T.WX.k, craters, tick: TICK, state: round.state, crates: crates.filter(c => c.team === p.team).map(crateMsg), forts: [...T.FORTS.values()].map(fortMsg) });
+      send(p, { t: 'w', id: p.id, team: p.team, sq, cls: l.cls, w: l.w, u: l.u, wx: T.WX.k, craters, tick: TICK, state: round.state, crates: crates.filter(c => c.team === p.team).map(crateMsg), forts: [...T.FORTS.values()].map(fortMsg), nd: NESTS.slice(0, BASE_NESTS).map((n, i) => n.dead ? i : -1).filter(i => i >= 0) });
       if (sq >= 0) sendOrderTo(p); else sendOrders(p.team);
       send(p, VEHM.fullMsg()); send(p, eliteMsg()); for (const f of fires) if (f.until > tickNo) send(p, { t: 'fi', x: +f.x.toFixed(1), z: +f.z.toFixed(1), r: f.r, s: Math.ceil((f.until - tickNo) / TICK) });
       for (const f of flares) if (f.until > tickNo) send(p, { t: 'flr', x: +f.x.toFixed(1), z: +f.z.toFixed(1), s: Math.ceil((f.until - tickNo) / TICK), tm: f.team });
@@ -1904,4 +1935,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
