@@ -366,6 +366,16 @@ function climbAt(c, t) {
   if (u < a) { const k = ease3(u / a); return { x: c.x0 + (c.wx - c.x0) * k, z: c.z0 + (c.wz - c.z0) * k, y: c.y0 + (c.y1 + .15 - c.y0) * k }; }
   const k = ease3((u - a) / (1 - a)); return { x: c.wx + (c.x1 - c.wx) * k, z: c.wz + (c.z1 - c.wz) * k, y: c.y1 + .15 * (1 - k) };
 }
+// v0.31 mud and flooding: in rain, trench floors flood (wading), shell holes fill with water and no-man's-land churns to
+// mud. wetCell(k): 0 dry, 1 mud, 2 flooded trench floor, 3 water-filled shell hole. Dugouts stay dry. Same on server and client.
+const WET_SPD = [1, .88, .78, .72];
+function wetCell(k, H, x, z) {
+  if (WX.k !== 'rain' || !H) return 0;
+  if (FLOOR && FLOOR[k]) return roomAt(x, z) ? 0 : 2;
+  if (PRISTINE && H[k] < PRISTINE[k] - .6) return 3;
+  return Math.abs(z) < 26 ? 1 : 0;
+}
+function wetAt(H, x, z) { const i = Math.round((x + W) / ST), j = Math.round((z + W) / ST); if (i < 0 || j < 0 || i > N || j > N) return 0; return wetCell(j * (N + 1) + i, H, x, z); }
 function step(p, cmd, H, spdMul) {
   if (p.cl) { p.cl.t += cmd.dt; const c = p.cl, q = climbAt(c, c.t); p.x = q.x; p.y = q.y; p.z = q.z; p.vy = 0; if (c.t >= c.dur) { p.x = c.x1; p.y = c.y1; p.z = c.z1; p.cl = null; } return; }
   if ((cmd.bits & 16) && p.y <= groundAt(H, p.x, p.z, p.y) + .1 && !(p.vy > 0)) {
@@ -378,7 +388,7 @@ function step(p, cmd, H, spdMul) {
   const wb = WPN[p.w], chg = (bits & 64) && (bits & 1) && f > 0 && wb && wb.bay && p.chg > .05 && !(bits & 2);
   p.charging = !!chg; p.chg = chg ? Math.max(0, p.chg - dt) : Math.min(CHG_MAX, p.chg + dt * .4);
   const mud = (WXS[WX.k] || WXS.overcast).mud;
-  const sp = (chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul;
+  const sp = (chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul * WET_SPD[wetAt(H, p.x, p.z)];
   const l = Math.hypot(f, s) || 1, yaw = cmd.yaw;
   const mx = (-Math.sin(yaw) * f + Math.cos(yaw) * s) / l, mz = (-Math.cos(yaw) * f - Math.sin(yaw) * s) / l;
   const nx = p.x + mx * sp * dt, nz = p.z + mz * sp * dt, sl = (groundAt(H, nx, nz, p.y) - groundAt(H, p.x, p.z, p.y)) / Math.max(.01, sp * dt);
@@ -522,7 +532,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);

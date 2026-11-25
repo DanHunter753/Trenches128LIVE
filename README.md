@@ -73,6 +73,15 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.31 - gameplay round 1
+- **Wrecked guns and repairs:** an enemy grenade in a trench MG nest or a shell beside it knocks the gun out (the gunner
+  is thrown off, +30 XP, kill feed). Anti-tank rifle rounds now damage field guns and mortars too. Any wreck of your
+  own side is repaired by holding E beside it: a sapper takes about 8 s, anyone else about 20 s (+15 XP). An
+  unrepaired MG nest comes back on its own after 90 s. Test: `wrecks`.
+- **Mud and flooding:** in rain, trench floors flood (wading, about 22% slower), shell holes fill with water (about
+  28% slower) and no-man's-land turns to mud (about 12% slower); dugouts stay dry. The rule lives in the shared
+  movement code, so prediction stays exact; the ground looks dark and wet where it applies. Test: `mud`.
+
 ## v0.30.1 - phones, the rifle, the minimap, the launcher goes live
 - **Touch controls** (Settings > Controls; on by default on touch-only devices): a floating stick on the left half (push
   to the edge to sprint), drag on the right half to look, and buttons for fire, aim, jump, crouch, reload, grenade, heal,
