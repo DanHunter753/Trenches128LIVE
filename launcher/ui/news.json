@@ -1,5 +1,14 @@
 [
   {
+    "title": "v0.30.1 — Phones, rifles and the minimap",
+    "date": "2026-11-25",
+    "body": [
+      "Touch controls: play on a phone or tablet with an on-screen stick, drag-to-look and buttons (Settings > Controls; on by default on touch screens).",
+      "Every soldier has the minimap again, not only squad leaders and officers.",
+      "The rifle's first-person arms are cleaner: no more pouches or sleeve bulge under the forearm."
+    ]
+  },
+  {
     "title": "v0.30 — A new front every round",
     "date": "2026-11-25",
     "body": [

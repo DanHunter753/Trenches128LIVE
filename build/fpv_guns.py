@@ -82,9 +82,10 @@ class View:
 # R: the chest cut away. fills: (F polygon, fold directions, arm-sample polygon, options) where the arm is continued in
 # sleeve cloth so no hole is left (see fpv_fill.py)
 BODY = {
- 'd4deb927': dict(R=[(120,1024),(150,940),(185,925),(200,905),(235,850),(330,830),(460,815),(560,815),(650,830),(700,845),(760,862),(800,900),(830,960),(855,1024)],
-   fills=[([(100,1024),(140,920),(200,860),(260,826),(400,800),(500,785),(560,775),(615,778),(670,805),(760,860),(815,905),(850,962),(880,1024)],
-           [(.47,.88),(.8,.6),(1,.1)], [(0,620),(560,620),(560,1024),(0,1024)], dict(P=110, shade=.4))]),
+ 'd4deb927': dict(   # v0.30.1: pouches covered with sleeve, then one straight cut under the forearm (open space between the arms, as on the shotgun)
+   pre=[([(100,1024),(140,935),(215,850),(330,810),(440,755),(530,700),(560,700),(560,760),(240,1024)],
+         [(.47,.88),(.8,.6),(1,.1)], [(0,560),(560,560),(560,1024),(0,1024)], dict(P=110, shade=.1, reach=300, over=10, cover=True))],
+   R=[(545,690),(605,790),(650,830),(700,845),(760,862),(800,900),(830,960),(855,1024),(205,1024)], fills=[], edge=True),
  '309195b2': dict(R=[(160,1024),(180,935),(420,915),(640,925),(705,945),(750,972),(775,1010),(780,1024)],
    fills=[([(60,1024),(90,930),(170,880),(300,860),(375,850),(352,950),(330,1024)], [(-.4,.92),(0,1)], [(0,720),(420,720),(420,1024),(0,1024)],
            dict(P=100, shade=.15, reach=200, over=10))]),
@@ -95,9 +96,11 @@ BODY = {
 def body_off(name, rgba):
     if name not in BODY: return rgba
     import fpv_fill as ff
-    b = ff.remove(rgba, BODY[name]['R'])
+    b = rgba
+    for F, dirs, A, kw in BODY[name].get('pre', []): b = ff.sleeve_fill(b, F, dirs, A, **kw)
+    b = ff.remove(b, BODY[name]['R'])
     for F, dirs, A, kw in BODY[name]['fills']: b = ff.sleeve_fill(b, F, dirs, A, **kw)
-    return b
+    return ff.dark_edge(b) if BODY[name].get('edge') else b
 
 HIP_H, AIM_K, ITEM_H = 86, .19, 80   # v0.29 sizes: hip content height (frame rows), aiming scale, item content height
 def hip_view(rgba, h=HIP_H, xr=None):

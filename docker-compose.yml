@@ -14,6 +14,7 @@ services:
       T128_SLOTS: ${T128_SLOTS:-128}
       T128_REGION: ${T128_REGION:-}
       T128_MAPS: ${T128_MAPS:-random}
+      T128_LAUNCHER_URL: ${T128_LAUNCHER_URL:-https://github.com/DanHunter753/Trenches128LIVE/releases/latest/download/Trench128-Setup.exe}
       T128_ORIGINS: ${T128_ORIGINS:-}
       T128_TRUST_PROXY: "1"   # players arrive through Caddy: read their real address from its headers
     volumes:

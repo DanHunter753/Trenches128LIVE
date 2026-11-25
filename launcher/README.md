@@ -21,21 +21,14 @@ launcher only has to update itself, and only when you change the launcher.
 | `test/` | `npm test` (logic) and `node test/ui.browser.js` (the page in a real browser) |
 | `../.github/workflows/launcher.yml` | Builds the installer on GitHub and publishes the release that updates come from |
 
-## One-time setup
+## Set up (done for Trenches 128 LIVE)
 
-1. **Point it at your servers.** Edit `defaults.json`:
-   - `masterUrl`: a server started with `--registry` (its `/servers` list fills the browser), e.g. `https://play.example.com`
-   - `servers`: addresses always listed, e.g. `["https://play.example.com"]`
-   - `site`, `discord`: optional https links shown in Settings
-2. **Choose where updates live** (`build.publish` in `package.json`):
-   - **GitHub Releases (set up already):** check the owner (`DanHunter753`) and set the repository name. Players' launchers
-     download releases without logging in, so that repository must be **public**. Your code can stay private: make a
-     small public repository just for releases, add a personal access token (scope `repo`) as the secret
-     `GH_RELEASE_TOKEN` in the private one, and point `publish` at the public one.
-   - **Your own web server instead:** use
-     `"publish": [{ "provider": "generic", "url": "https://play.example.com/launcher/" }]`
-     and after each build upload `dist/latest.yml`, `dist/Trench128-Setup-<version>.exe` and its `.blockmap` to that
-     folder. (The game server serves everything in `public/`, so `public/launcher/` on your server works.)
+- `defaults.json` points at `https://trenches128.duckdns.org` (server list, featured server, website link).
+- Updates are published as GitHub releases of the public repository `DanHunter753/Trenches128LIVE` (`build.publish`
+  in `package.json`); the installer is always named `Trench128-Setup.exe`, so
+  `https://github.com/DanHunter753/Trenches128LIVE/releases/latest/download/Trench128-Setup.exe` is the newest one.
+- The game server's `/download` sends players there (`T128_LAUNCHER_URL` in `.env`), and the web connect screen shows a
+  "Download the Windows launcher" link. Copying installer files into `public/launcher/` on a server still works and wins.
 
 ## Build the installer
 
@@ -45,7 +38,7 @@ Needs Node 20+ on Windows.
 cd launcher
 npm install
 npm test
-npm run dist        → dist\Trench128-Setup-1.0.0.exe
+npm run dist        → dist\Trench128-Setup.exe
 ```
 
 `npm start` runs it from source (updates are off when not installed).

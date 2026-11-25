@@ -38,7 +38,7 @@
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
       "icon": "build/icon.ico",
-      "artifactName": "Trench128-Setup-${version}.${ext}"
+      "artifactName": "Trench128-Setup.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -51,6 +51,6 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"
     },
-    "publish": [{ "provider": "github", "owner": "DanHunter753", "repo": "trench128-launcher", "releaseType": "release" }]
+    "publish": [{ "provider": "github", "owner": "DanHunter753", "repo": "Trenches128LIVE", "releaseType": "release" }]
   }
 }

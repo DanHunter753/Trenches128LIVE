@@ -68,6 +68,13 @@ body.menu #item,body.menu #fx,body.menu #mud,body.menu #supv,body.menu #chgv,bod
 #hurt{position:fixed;inset:0;background:radial-gradient(transparent 40%,#a00 100%);opacity:0;pointer-events:none}
 #vv{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;pointer-events:none;display:none}body.menu #vv{display:none!important}
 #item{display:none}#gun,#item{--gw:max(150vh,100vw);position:fixed;top:50%;left:50%;width:var(--gw);height:calc(var(--gw) / 1.5);margin-left:calc(var(--gw) / -2);margin-top:calc(var(--gw) / -3);image-rendering:pixelated;pointer-events:none}   /* v0.29: always as wide as the screen (hands and stocks reach the edges), centre on the screen centre */
+#tc{position:fixed;inset:0;display:none;z-index:14;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none}
+#tc button{pointer-events:auto;position:absolute;border-radius:50%;background:rgba(20,18,14,.42);border:2px solid rgba(222,204,150,.55);color:#efe3c0;font:bold 11px monospace;letter-spacing:.04em;padding:0;touch-action:none}
+#tc button.on{background:rgba(196,156,72,.55);color:#111}#tc button:active{background:rgba(196,156,72,.4)}
+#tcs{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid rgba(222,204,150,.4);background:rgba(20,18,14,.25);display:none}#tcs i{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(222,204,150,.45)}
+body.touch{touch-action:none;overscroll-behavior:none}body.touch #c{touch-action:none}
+body.touch #mm{right:auto;left:10px;top:34px;width:96px!important;height:96px!important}body.touch #kf{top:138px}body.touch #tabh{display:none}   /* phones: the buttons own the right side */
+#ovb .dl{margin:10px 0 0}#ovb .dl a{color:#e0bb66}#ovb .dl small{opacity:.7}
 #mm{position:fixed;right:12px;top:58px;border:2px solid #5a4e34;image-rendering:pixelated;pointer-events:none}
 #ov{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(14,12,8,.9);overflow:auto}
 #ov .box{max-width:880px;width:92%;padding:22px;line-height:1.6}
@@ -87,7 +94,7 @@ body.off #hb,body.off #gun,body.off #cross{display:none}
 body.menu #off{display:none!important}
 body.menu #scope,body.menu #dn,body.menu #ch,body.menu #hud,body.menu #hb,body.menu #tabh,body.menu #stat,body.menu #hint,body.menu #banner,body.menu #oob,body.menu #opbar,body.menu #bm,body.menu #gun,body.menu #cross,body.menu #msg,body.menu #hurt,body.menu #mm{display:none}
 </style></head><body class="menu">
-<canvas id="c"></canvas><canvas id="gun" width="360" height="240"></canvas><canvas id="item" width="360" height="240"></canvas><canvas id="mm" width="170" height="170"></canvas>
+<canvas id="c"></canvas><canvas id="gun" width="360" height="240"></canvas><canvas id="item" width="360" height="240"></canvas><canvas id="mm" width="170" height="170"></canvas><div id="tc"><div id="tcs"><i></i></div></div>
 <div id="bm"></div><div id="banner"></div><div id="oob"></div><div id="opbar"><i></i></div><div id="spk"></div><div id="hurt"></div><div id="supv"></div><div id="chgv"></div><canvas id="mud" width="180" height="120"></canvas><canvas id="fx" width="360" height="240"></canvas><canvas id="vv" width="360" height="240"></canvas><div id="cross"></div><div id="hm"><i></i><i></i><i></i><i></i></div><div id="chg"><b></b></div><div id="kn"></div><div id="chat"><div id="chatl"></div><input id="chati" maxlength="120" autocomplete="off" spellcheck="false"></div><div id="kf"></div><div id="sb"></div><div id="wheel"></div><div id="maskv"></div><div id="dpb"><span></span><i><b></b></i></div><div id="gasv"></div><div id="swt"></div><div id="brt"><span></span><i><b></b></i></div><div id="alf"></div><div id="selbox"></div><div id="hud"></div><div id="hb"><canvas id="wi" width="75" height="31"></canvas><div class="am"></div><div class="ul"><i></i></div><div class="sp"></div><div class="it"></div></div><div id="tabh">Hold TAB for controls</div><div id="stat"></div><div id="hint"></div><div id="scope"></div><div id="dn"></div><canvas id="ch" width="160" height="64"></canvas><div id="msg"></div>
 <div id="off"></div>
 <div id="ov"><div class="box" id="ovb"></div></div>
@@ -105,7 +112,7 @@ const cam=new THREE.PerspectiveCamera(75,1,.1,400);cam.rotation.order='YXZ';
 /* ------------------------------------------------------------------ settings (saved in localStorage) */
 const DEFK={fwd:'KeyW',back:'KeyS',left:'KeyA',right:'KeyD',sprint:'ShiftLeft',crouch:'KeyC',jump:'Space',leanL:'KeyQ',leanR:'KeyZ',reload:'KeyR',grenade:'KeyG',heal:'KeyH',dig:'KeyX',mg:'KeyF',fob:'KeyB',postToggle:'KeyP',use:'KeyE',melee:'KeyV',mark:'KeyT',ping:'KeyY',mask:'KeyM',chat:'Enter',teamchat:'KeyU'};
 const KLAB={fwd:'Move forward',back:'Move back',left:'Move left',right:'Move right',sprint:'Sprint',crouch:'Crouch',jump:'Jump',leanL:'Lean left',leanR:'Lean right',reload:'Reload / new belt',grenade:'Throw grenade',heal:'Bandage / smoke, gas grenade or flare (utility)',dig:'Dig (tool)',mg:'Man / leave MG',fob:'Build menu',postToggle:'Toggle post respawn',use:'Use / revive / hold to respawn',melee:'Bayonet / melee (hold while sprinting: charge)',mark:'Spot enemies (tap; marks a target for the officer when nobody is in view)',ping:'Quick chat / ping wheel (hold, flick the mouse, let go)',mask:'Gas mask (on / off)',chat:'Chat to everyone',teamchat:'Chat to your side'};
-const DEFS={master:.8,sfx:1,sens:1,invY:false,raw:true,fov:85,scale:1.5,fog:1,cross:'dot',crossSize:4,crossColor:'#ffffff',bob:true,vig:true,fps:false,togCrouch:false,togSprint:false,togAds:false,pix:360,retro:true,grit:.5,mm:1.5};
+const DEFS={touch:(()=>{try{return matchMedia('(pointer:coarse)').matches&&!matchMedia('(pointer:fine)').matches}catch(e){return false}})(),master:.8,sfx:1,sens:1,invY:false,raw:true,fov:85,scale:1.5,fog:1,cross:'dot',crossSize:4,crossColor:'#ffffff',bob:true,vig:true,fps:false,togCrouch:false,togSprint:false,togAds:false,pix:360,retro:true,grit:.5,mm:1.5};
 const S=Object.assign({},DEFS,{binds:Object.assign({},DEFK)});
 try{const j=JSON.parse(localStorage.getItem('t128set')||'null');if(j&&typeof j==='object'){for(const k in DEFS)if(typeof j[k]===typeof DEFS[k])S[k]=j[k];if(j.binds)for(const a in DEFK)if(typeof j.binds[a]==='string'&&j.binds[a])S.binds[a]=j.binds[a]}}catch(e){}
 const saveS=()=>{try{localStorage.setItem('t128set',JSON.stringify(S))}catch(e){}};
@@ -134,7 +141,7 @@ let retroChecked=false;function draw(){if(!retroOn()||!RQ||!RT){renderer.render(
  if(!retroChecked){console.error=ce;retroChecked=true}if(bad){retroBad=true;renderer.setRenderTarget(null);renderer.render(scene,cam)}}
 function sizeR(){const cv=$('c');if(S.pix>=120){const Hh=S.pix,Ww=Math.round(innerWidth*Hh/innerHeight);renderer.setPixelRatio(1);renderer.setSize(Ww,Hh,false);cv.style.imageRendering='pixelated'}else{renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,S.scale));renderer.setSize(innerWidth,innerHeight,false);cv.style.imageRendering='auto'}retroSize()}
 function applyS(){cam.fov=S.fov;cam.updateProjectionMatrix();sizeR();
- const c=$('cross');c.className=S.cross;c.style.setProperty('--cs',S.crossSize+'px');c.style.setProperty('--cc',S.crossColor);$('fps').style.display=S.fps?'block':'none';{const c=$('mm'),px=Math.round(170*Math.max(1,Math.min(3,S.mm||1.5)));if(c&&c.width!==px){c.width=c.height=px;try{mmDirty=true}catch(e){}}}}   /* (applyS first runs before the minimap state exists; resizing clears the canvas, the next frame redraws it) */
+ document.body.classList.toggle('touch',!!S.touch);const c=$('cross');c.className=S.cross;c.style.setProperty('--cs',S.crossSize+'px');c.style.setProperty('--cc',S.crossColor);$('fps').style.display=S.fps?'block':'none';{const c=$('mm'),px=Math.round(170*Math.max(1,Math.min(3,S.mm||1.5)));if(c&&c.width!==px){c.width=c.height=px;try{mmDirty=true}catch(e){}}}}   /* (applyS first runs before the minimap state exists; resizing clears the canvas, the next frame redraws it) */
 applyS();
 const hemi=new THREE.HemisphereLight(0xc4c4bc,0x403a30,.95);scene.add(hemi);const sun=new THREE.DirectionalLight(0xe8e4d8,.5);sun.position.set(50,80,30);scene.add(sun);
 const pxTex=(cv,rep)=>{const t=new THREE.CanvasTexture(cv);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;if(rep){t.wrapS=t.wrapT=THREE.RepeatWrapping}return t};
@@ -568,9 +575,9 @@ function syncBeams(){const want=new Map();if(me.officer)offOrders.forEach(o=>wan
 const crateSM=(()=>{const t=new THREE.TextureLoader().load('assets/crate.png');t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;return new THREE.SpriteMaterial({map:t,alphaTest:.5})})();
 function addCrate(c){const m=new THREE.Sprite(crateSM);m.scale.set(1.9,1.9,1);scene.add(m);crateM.set(c.id,{m,x:c.x,z:c.z,left:c.left})}
 /* ------------------------------------------------------------------ input */
-function lockedNow(){return document.pointerLockElement===$('c')}
+function lockedNow(){return document.pointerLockElement===$('c')||(!!S.touch&&deployed&&!me.officer&&$('ov').style.display==='none'&&$('set').style.display!=='flex'&&!chatOpen)}   /* touch controls stand in for a locked mouse */
 let hudLast='',rebinding=null,tCrouch=false,tSprint=false,fpsT=0,fpsN=0,fpsMs=0;
-function lockMouse(){const c=$('c');try{const p=S.raw?c.requestPointerLock({unadjustedMovement:true}):c.requestPointerLock();if(p&&p.catch)p.catch(()=>{try{c.requestPointerLock()}catch(e){}})}catch(e){}}
+function lockMouse(){if(S.touch)return;const c=$('c');try{const p=S.raw?c.requestPointerLock({unadjustedMovement:true}):c.requestPointerLock();if(p&&p.catch)p.catch(()=>{try{c.requestPointerLock()}catch(e){}})}catch(e){}}
 addEventListener('keyup',e=>{if(e.code==='Tab')document.body.classList.remove('tab');if(e.code===S.binds.ping&&wheelOn){wheelOn=false;$('wheel').style.display='none';const k=wheelPick();if(k)sendJ({t:'act',a:'ping',k})}});
 addEventListener('blur',()=>document.body.classList.remove('tab'));
 /* ---- v0.29 text chat. Enter: to everyone, U: to your side (rebindable). Messages are shown as text only, never as HTML. */
@@ -599,6 +606,38 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>K[e.code]=0);
 addEventListener('mousemove',e=>{if(me.officer&&deployed)ofMouse=[e.clientX,e.clientY];if(ofRot&&me.officer&&deployed){ofyaw-=e.movementX*.006;ofpit=Math.max(-Math.PI/2,Math.min(-.5,ofpit-e.movementY*.005));return}if(!lockedNow())return;if(wheelOn){wheelV[0]+=e.movementX;wheelV[1]+=e.movementY;const l=Math.hypot(wheelV[0],wheelV[1]);if(l>120){wheelV[0]*=120/l;wheelV[1]*=120/l}wheelDraw();return}const k=.0022*S.sens/(1+((ZOOM[me.w]||1.3)-1)*adsT);me.yaw-=e.movementX*k;me.pitch=Math.max(-1.45,Math.min(1.45,me.pitch-e.movementY*k*(S.invY?-1:1)))});
 addEventListener('mousedown',e=>{if(e.button===2&&me.officer&&deployed){ofRot=true;e.preventDefault();return}if(!lockedNow())return;if(ghostK){if(e.button===0){if(ghostOk)sendJ({t:'act',a:'build',k:ghostK});else say('Can\'t build here');endPlace()}else if(e.button===2)endPlace();return}if(e.button===2){S.togAds?adsHeld=!adsHeld:adsHeld=true}else if(e.button===0){fireHeld=true;fireLatch=true}});addEventListener('mouseup',e=>{if(e.button===2)ofRot=false;if(e.button===0)fireHeld=false;else if(e.button===2&&!S.togAds)adsHeld=false});addEventListener('contextmenu',e=>e.preventDefault());
+/* ---- v0.30.1 touch controls (Settings > Controls). Left half: a floating stick (push to the edge to sprint). Right half: drag to
+   look. Buttons send the same key presses and mouse buttons the keyboard does, so every action works as it does on a PC. */
+const TCH={stick:null,look:null,built:false,fs:false};
+const tcKey=(a,down)=>{const code=S.binds[a];if(!code)return;dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{code,bubbles:true}))};
+const tcTap=a=>{tcKey(a,true);setTimeout(()=>tcKey(a,false),70)};
+const TCB=[   /* label, action, kind (hold = held while touched, tap = one press, toggle = on/off), right px, bottom px, size px */
+ ['FIRE','fire','fire',26,92,96],['AIM','ads','ads',140,58,66],['JUMP','jump','hold',30,206,64],['CROUCH','crouch','toggle',140,138,62],
+ ['RELOAD','reload','tap',216,52,56],['GREN','grenade','tap',216,122,56],['HEAL','heal','tap',216,192,56],['USE\nF','mg','tap',142,214,56],
+ ['E','use','tap',70,282,48],['SPOT','mark','tap',128,288,48],['MELEE','melee','tap',186,282,48],['MASK','mask','tap',244,262,46]];
+function tcBuild(){if(TCH.built)return;TCH.built=true;const root=$('tc');
+ for(const [lab,a,kind,r,b,z] of TCB){const el=document.createElement('button');el.textContent=lab;el.style.cssText=`right:${r}px;bottom:${b}px;width:${z}px;height:${z}px;white-space:pre`;el.dataset.a=a;
+  el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();
+   if(kind==='fire'){fireHeld=true;fireLatch=true}else if(kind==='ads'){adsHeld=!adsHeld;el.classList.toggle('on',adsHeld)}
+   else if(kind==='hold')tcKey(a,true);else if(kind==='toggle'){const on=!el.classList.contains('on');el.classList.toggle('on',on);tcKey(a,on)}else tcTap(a)},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();e.stopPropagation();if(kind==='fire')fireHeld=false;else if(kind==='hold')tcKey(a,false)},{passive:false});
+  el.addEventListener('touchcancel',()=>{if(kind==='fire')fireHeld=false;else if(kind==='hold')tcKey(a,false)});root.appendChild(el)}
+ for(const [lab,fn,r] of [['☰',()=>{if(typeof pauseScreen==='function')pauseScreen()},12],['TAB',()=>document.body.classList.toggle('tab'),62],['⛶',()=>{try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}catch(e){}},112]]){
+  const el=document.createElement('button');el.textContent=lab;el.style.cssText=`right:${r+50}px;top:10px;width:44px;height:36px;border-radius:8px`;el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();fn()},{passive:false});root.appendChild(el)}}
+function tcStick(dx,dy){const l=Math.hypot(dx,dy),nx=l?dx/l:0,ny=l?dy/l:0,m=Math.min(1,l/55);const on=(a,v)=>{const c=S.binds[a];if(c&&!!K[c]!==v)K[c]=v?1:0};
+ on('fwd',m>.3&&ny<-.38);on('back',m>.3&&ny>.38);on('left',m>.3&&nx<-.38);on('right',m>.3&&nx>.38);on('sprint',m>.95&&ny<-.7);
+ const k=$('tcs').firstChild;k.style.transform=`translate(${nx*Math.min(l,50)}px,${ny*Math.min(l,50)}px)`}
+function tcActive(){return !!S.touch&&deployed&&me.alive&&!me.officer&&$('ov').style.display==='none'}
+addEventListener('touchstart',e=>{if(!tcActive())return;if(e.target&&e.target.closest&&e.target.closest('#tc button,#set,#gear,#ov,#chat,#chati'))return;
+ if(!TCH.fs&&document.documentElement.requestFullscreen&&!document.fullscreenElement){TCH.fs=true;try{document.documentElement.requestFullscreen().catch(()=>{})}catch(x){}}
+ for(const t of e.changedTouches){if(t.clientX<innerWidth*.42&&!TCH.stick){TCH.stick={id:t.identifier,x:t.clientX,y:t.clientY};const b=$('tcs');b.style.left=t.clientX+'px';b.style.top=t.clientY+'px';b.style.display='block';tcStick(0,0)}
+  else if(!TCH.look)TCH.look={id:t.identifier,x:t.clientX,y:t.clientY}}e.preventDefault()},{passive:false});
+addEventListener('touchmove',e=>{if(!TCH.stick&&!TCH.look)return;for(const t of e.changedTouches){
+ if(TCH.stick&&t.identifier===TCH.stick.id)tcStick(t.clientX-TCH.stick.x,t.clientY-TCH.stick.y);
+ else if(TCH.look&&t.identifier===TCH.look.id){const dx=t.clientX-TCH.look.x,dy=t.clientY-TCH.look.y;TCH.look.x=t.clientX;TCH.look.y=t.clientY;const k=.0055*S.sens/(1+((ZOOM[me.w]||1.3)-1)*adsT);me.yaw-=dx*k;me.pitch=Math.max(-1.45,Math.min(1.45,me.pitch-dy*k*(S.invY?-1:1)))}}e.preventDefault()},{passive:false});
+function tcEnd(e){for(const t of e.changedTouches){if(TCH.stick&&t.identifier===TCH.stick.id){TCH.stick=null;tcStick(0,0);$('tcs').style.display='none'}else if(TCH.look&&t.identifier===TCH.look.id)TCH.look=null}}
+addEventListener('touchend',tcEnd);addEventListener('touchcancel',tcEnd);
+function tcTick(){const on=tcActive();if(on)tcBuild();const r=$('tc');if(r.style.display!==(on?'block':'none')){r.style.display=on?'block':'none';if(!on){TCH.stick=TCH.look=null;tcStick(0,0);$('tcs').style.display='none';fireHeld=false;for(const b of r.querySelectorAll('button.on')){b.classList.remove('on');if(b.dataset.a==='crouch')tcKey('crouch',false)}if(adsHeld&&S.touch)adsHeld=false}}}
 document.addEventListener('pointerlockchange',()=>{locked=lockedNow();if(deployed&&!locked&&roundState==='play'&&!me.officer)pauseScreen();if(locked)$('ov').style.display='none'});
 addEventListener('click',e=>{if(e.target&&e.target.closest&&e.target.closest('#set,#gear'))return;if(deployed&&!me.officer&&!lockedNow()&&$('ov').style.display==='none')lockMouse()});
 function resize(){sizeR();cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}addEventListener('resize',resize);resize();
@@ -623,6 +662,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  overlay(`<h1>TRENCH 128 · ONLINE</h1>Authoritative server · 128 v 128 · AI fills empty slots<br><br><div class="acct" id="acct"></div><input id="nm" maxlength="16" placeholder="Callsign or account name" value="${escA(nm)}"> <input id="pw" type="password" maxlength="128" placeholder="Password (accounts only)" style="width:190px"> <input id="host" value="${escA(defHost())}" placeholder="server address" style="width:220px">
  <br><button id="cn">Play</button> <button id="lg">Log in</button> <button id="rg">Create account</button>
  <div id="srv" class="srv"></div>
+ ${!LNCH&&!S.touch&&defHost()===location.host?'<p class="dl"><a href="/download">⬇ Download the Windows launcher</a> <small>(server browser, fullscreen, updates itself)</small></p>':''}
  <details class="how"><summary>How to play</summary><div>
  <b>Operations.</b> One side attacks, the other defends, and the sides swap each round. Attackers take the enemy's three trench lines one at a time; every respawn costs a ticket, and a fresh battalion (with a barrage) arrives when one runs dry. Three battalions lost and the attack has failed.<br>
  <b>Squads.</b> Join a squad; your leader gets the officer's orders. Follow them for bonus XP. Medics revive, sappers build cover, buildings and respawn points.<br>
@@ -634,7 +674,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wounded.</b> When you're knocked down, press Y to shout for a medic; bot medics come running. Medics can revive anyone, bots included.<br>
  <b>Weather.</b> Each round is overcast, foggy, rainy or at night. In the dark, flares (a utility, or the officer's star shells) light up the field.<br>
  <b>Fighting.</b> Bullets drop and take time to arrive. Sprinting lowers the gun; V stabs, sprint + hold V to charge with the bayonet. Being shot at near-misses suppresses you. TAB shows the full controls in game.
- </div></details><div class="ver">v0.30</div>`,'');
+ </div></details><div class="ver">v0.30.1</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -676,7 +716,7 @@ const SL=(k,l,mn,mx,st,f)=>`<div class="row"><label>${l}</label><input type="ran
 const CK=(k,l)=>`<div class="row"><label>${l}</label><input type="checkbox" data-c="${k}" ${S[k]?'checked':''}></div>`;
 function renderSet(){const tabs=[['audio','Audio'],['controls','Controls'],['video','Video'],['hud','HUD']];let body='';
  if(setTab==='audio')body=SL('master','Master volume',0,1,.01,'pct')+SL('sfx','Effects (gunfire, blasts)',0,1,.01,'pct')+'<small>A test sound plays when you let go of a slider.</small>';
- else if(setTab==='controls')body=SL('sens','Mouse sensitivity',.2,3,.05,'x')+CK('invY','Invert vertical look')+CK('raw','Raw mouse input (no OS acceleration)')+CK('togAds','Aim down sights: toggle instead of hold')+CK('togCrouch','Crouch: toggle instead of hold')+CK('togSprint','Sprint: toggle instead of hold')
+ else if(setTab==='controls')body=SL('sens','Mouse sensitivity',.2,3,.05,'x')+CK('invY','Invert vertical look')+CK('raw','Raw mouse input (no OS acceleration)')+CK('togAds','Aim down sights: toggle instead of hold')+CK('togCrouch','Crouch: toggle instead of hold')+CK('togSprint','Sprint: toggle instead of hold')+CK('touch','Touch controls: on-screen stick and buttons (phones and tablets)')
   +'<div class="kbs">'+Object.keys(DEFK).map(a=>`<div><span>${KLAB[a]}</span><button data-b="${a}" class="${rebinding===a?'on':''}">${rebinding===a?'Press a key…':kn(a)}</button></div>`).join('')+'</div><small>Fire is the left mouse button. Esc cancels a rebind.</small>';
  else if(setTab==='video')body=SL('fov','Field of view',60,110,1,'deg')+SL('pix','Retro pixel render height (0 = smooth)',0,720,120,'px')+CK('retro','Retro dithered colour palette (pixel mode)')+SL('grit','Film grit: grain, cold drained grade, vignette (pixel mode)',0,1,.1,'pct')+SL('scale','Resolution scale (smooth mode)',.5,1.5,.25,'pct')+SL('fog','Fog density (lower = see farther)',.2,2,.1,'n')+CK('fps','Show FPS counter');
  else body=`<div class="row"><label>Crosshair</label><select data-s="cross">${['dot','plus','none'].map(o=>`<option value="${o}" ${S.cross===o?'selected':''}>${{dot:'Dot',plus:'Cross',none:'None'}[o]}</option>`).join('')}</select></div>`+SL('crossSize','Crosshair size',2,10,1,'px')+`<div class="row"><label>Crosshair colour</label><input type="color" data-col="1" value="${S.crossColor}"></div>`+CK('bob','Weapon sway while moving')+CK('vig','Red damage vignette')+SL('mm','Minimap size',1,3,.1,'x');
@@ -1169,7 +1209,7 @@ function frame(){
  cam.rotation.x+=punch;punch*=Math.max(0,1-dt*18);cam.updateMatrixWorld();soldiersDraw();
  if(shake>0){shake=Math.max(0,shake-dt*1.6);cam.position.x+=(Math.random()-.5)*shake*.25;cam.position.y+=(Math.random()-.5)*shake*.25}
  draw();
- const showMM=deployed&&(me.lead||me.officer);mm.style.display=showMM?'block':'none';if(showMM){mmT-=dt;if(mmT<=0){mmT=.08;drawMM()}}
+ tcTick();const showMM=deployed&&S.mm>0;   /* v0.30.1: every soldier has the minimap (was squad leaders and officers only) */mm.style.display=showMM?'block':'none';if(showMM){mmT-=dt;if(mmT<=0){mmT=.08;drawMM()}}
  hudT-=dt;if(hudT<=0&&deployed){hudT=.1;
   const bar=o=>{const n=Math.round((o.p+1)*5);return '█'.repeat(n)+'░'.repeat(10-n)},w=WPN[me.w];
   let h=RK[me.rank][0]+' · '+me.xp+' XP · '+(me.team?'GREEN':'BLUE')+' · '+(me.officer?'OFFICER':me.sq>=0?T.SQUADS[me.sq]+(me.lead?' (SQUAD LEADER)':''):'no squad')+'\n';
