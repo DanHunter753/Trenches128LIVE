@@ -23,6 +23,12 @@ const raw = p => new Promise(res => { const s = net.connect(PORT, 'localhost', (
   const bad = ['/launcher/../server.js', '/launcher/..%2Fserver.js', '/launcher/%2e%2e/server.js', '/launcher/', '/launcher/x/latest.yml', '/launcher/server.js', '/launcher/.latest.yml', '/launcher/..yml'];
   const codes = []; for (const p of bad) codes.push(await raw(p)); ck('nothingElse', codes.every(c => c === '404')); R.codes = codes.join(',');
   ck('gameStillServed', (await fetch(B + '/')).status === 200);
+  // with no installer of its own, /download sends players to the published one (T128_LAUNCHER_URL)
+  for (const f of ours) try { fs.unlinkSync(path.join(DIR, f)); } catch (e) { }
+  const s2 = spawn(process.execPath, [path.join(__dirname, '..', 'server.js'), '--port', String(PORT + 1), '--fill', '0', '--no-fetch', '--launcher-url', 'https://github.com/x/y/releases/latest/download/Trench128-Setup.exe', '--data', fs.mkdtempSync(path.join(require('os').tmpdir(), 't128lf-'))]);
+  for (let i = 0; i < 60; i++) { try { if ((await fetch('http://localhost:' + (PORT + 1) + '/health')).ok) break; } catch (e) { } await sleep(250); }
+  if (!fs.existsSync(path.join(DIR, 'latest.yml'))) { const r = await fetch('http://localhost:' + (PORT + 1) + '/download', { redirect: 'manual' }); ck('downloadFallsBackToRelease', r.status === 302 && /github\.com\/x\/y\/releases\/latest/.test(r.headers.get('location'))); }
+  s2.kill();
   ck('noErrors', !/error/i.test(errs));
   srv.kill(); cleanup(); console.log(JSON.stringify(R)); const f = Object.keys(R).filter(k => R[k] === false); console.log(f.length ? 'FAILED: ' + f.join(', ') : 'ALL ' + (Object.keys(R).length - 1) + ' CHECKS PASSED'); process.exit(f.length ? 1 : 0);
 })().catch(e => { console.log('TEST ERROR', e); srv.kill(); cleanup(); process.exit(1); });

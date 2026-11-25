@@ -19,6 +19,7 @@ const BROWSER = [['browser'], ['browser_ads'], ['browser_audio'], ['browser_clim
   ['browser_v27', { args: ['--registry', '--public', 'http://localhost:8099', '--name', 'BTest'] }],
   ['browser_v29'],
   ['browser_maps', { targs: ['--own-server'] }],
+  ['browser_touch'],
   ['browser_soak', { env: { T128_WX: 'night' }, args: ['--fill', '40'], targs: ['http://localhost:8099', '90'] }]];
 
 function run(file, args = [], env = {}, ms = 600000) {

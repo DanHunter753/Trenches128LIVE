@@ -27,6 +27,8 @@ const CFG = {
   region: sarg('region', process.env.T128_REGION || '').slice(0, 16),
   // v0.30 maps: 'random' (a new layout every round), 'classic' (the original map), or a number (always that layout).
   // Default random when run as a server; classic for tests (T128_TEST, or loaded in-process).
+  // v0.30.1: where /download sends players when this server holds no installer of its own (public/launcher/latest.yml)
+  launcherUrl: (v => /^https:\/\/[^\s"'<>]+$/.test(v) ? v : '')(String(sarg('launcher-url', process.env.T128_LAUNCHER_URL || ''))),
   maps: (v => v === 'random' || v === 'classic' || /^\d{1,10}$/.test(v) ? v : 'random')(String(sarg('maps', process.env.T128_MAPS || (require.main === module && !process.env.T128_TEST ? 'random' : 'classic')))),
 };
 fs.mkdirSync(CFG.data, { recursive: true });
@@ -1793,7 +1795,7 @@ const originOk = o => !CFG.origins.length || !o || CFG.origins.includes(String(o
 function cors(req, res) { const o = req.headers.origin; if (o && originOk(o)) { res.setHeader('access-control-allow-origin', o); res.setHeader('vary', 'origin'); } else if (!CFG.origins.length) res.setHeader('access-control-allow-origin', '*'); res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS'); res.setHeader('access-control-allow-headers', 'content-type'); }
 const json = (res, code, o) => { res.statusCode = code; res.setHeader('content-type', 'application/json'); res.setHeader('cache-control', 'no-store'); res.end(JSON.stringify(o)); };
 function body(req, max) { return new Promise((ok, no) => { let n = 0; const b = []; req.on('data', d => { n += d.length; if (n > max) { no(new Error('too big')); req.destroy(); } else b.push(d); }); req.on('end', () => { try { ok(JSON.parse(Buffer.concat(b).toString('utf8') || '{}')); } catch (e) { no(e); } }); req.on('error', no); }); }
-const info = () => ({ t128: 1, name: CFG.name, version: VERSION, map: mapSeed, players: [...humans].filter(p => p.deployed).length, max: SLOTS * 2, bots: [...ents.values()].filter(e => e.bot && !e.mg).length,
+const info = () => ({ t128: 1, name: CFG.name, version: VERSION, map: mapSeed, launcher: !!CFG.launcherUrl, players: [...humans].filter(p => p.deployed).length, max: SLOTS * 2, bots: [...ents.values()].filter(e => e.bot && !e.mg).length,
   accounts: CFG.accounts, wx: T.WX.k, op: op ? [op.att, op.sector, OPS.nsec] : null, region: CFG.region, url: CFG.pub || null, humans: humans.size, ents: ents.size, tick: tickNo, round: round.state });
 // server list (registry): game servers announce themselves every 30 s; each is checked (GET <url>/health) before it is listed; silent ones drop off after 90 s
 const listed = new Map(), annAt = new Map();
@@ -1859,6 +1861,7 @@ function launcherFile(req, res, nm) {
   if (nm == null) {   // newest installer, named in latest.yml
     return fs.readFile(path.join(dir, 'latest.yml'), 'utf8', (err, y) => {
       const m = !err && /^path:\s*([A-Za-z0-9][A-Za-z0-9._-]*\.exe)\s*$/m.exec(y);
+      if (!m && CFG.launcherUrl) { res.statusCode = 302; res.setHeader('location', CFG.launcherUrl); res.setHeader('cache-control', 'no-cache'); return res.end(); }   // the installer published on GitHub
       if (!m) { res.statusCode = 404; return res.end('no launcher published yet'); }
       res.statusCode = 302; res.setHeader('location', '/launcher/' + m[1]); res.setHeader('cache-control', 'no-cache'); res.end();
     });

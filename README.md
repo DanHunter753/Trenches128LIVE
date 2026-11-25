@@ -73,6 +73,20 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.30.1 - phones, the rifle, the minimap, the launcher goes live
+- **Touch controls** (Settings > Controls; on by default on touch-only devices): a floating stick on the left half (push
+  to the edge to sprint), drag on the right half to look, and buttons for fire, aim, jump, crouch, reload, grenade, heal,
+  use (F), E, spot, melee and gas mask, plus fullscreen, scoreboard and menu. Buttons send the same key presses as the
+  keyboard. On phones the minimap moves to the top left. Officers still need a mouse.
+- **Minimap for every soldier** (was squad leaders and officers only).
+- **Rifle first-person arms:** pouches covered with sleeve cloth and one clean cut under the forearm (bolt rifle,
+  carbine, anti-tank rifle); the shotgun and bandage poses are unchanged.
+- **Launcher points at the live server** (`https://trenches128.duckdns.org`) and publishes to this repository's
+  releases. `/download` on the server sends players to the newest installer (`T128_LAUNCHER_URL`), and the web
+  connect screen links to it.
+- **Tests:** `browser_touch` (a phone: stick walks, drag turns, buttons fire/aim/crouch/reload); `launcherfiles`
+  covers the `/download` fallback.
+
 ## v0.30 - a new map every round
 - **Procedural maps:** each round is played on a new layout, rolled from a seed (`T.setMap(seed)` in `shared.js`; seed 0
   is the classic map). The six trench lines stay at their depths, so Operations, spawns and ranges are unchanged. What varies:

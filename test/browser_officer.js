@@ -33,6 +33,6 @@ const INIT = `(()=>{const o=WebSocket.prototype.send;WebSocket.prototype.send=fu
   await O.waitForFunction(() => crateM.size === 1, null, { timeout: 4000 }); R.crateOnOfficer = true;
   await L.waitForFunction(() => crateM.size >= 0); await L.waitForTimeout(500); R.crateOnLeader = await L.evaluate(() => crateM.size);
   R.errors = errors; console.log(JSON.stringify(R, null, 1)); await browser.close();
-  const ok = R.officer.off && R.officer.panel === 'flex' && R.officer.mm === 'block' && R.leader.lead && R.leader.mm === 'block' && !R.grunt.lead && R.grunt.mm === 'none' && R.order.hudHasOrder && R.order.beams === 1 && R.officerOrders.list >= 1 && R.crateOnLeader === 1 && !errors.length;
+  const ok = R.officer.off && R.officer.panel === 'flex' && R.officer.mm === 'block' && R.leader.lead && R.leader.mm === 'block' && !R.grunt.lead && R.grunt.mm === 'block' && R.order.hudHasOrder && R.order.beams === 1 && R.officerOrders.list >= 1 && R.crateOnLeader === 1 && !errors.length;
   console.log(ok ? 'BROWSER OFFICER TEST PASSED' : 'BROWSER OFFICER TEST FAILED'); process.exit(ok ? 0 : 1);
 })().catch(e => { console.error('TEST ERROR', e); process.exit(1); });
