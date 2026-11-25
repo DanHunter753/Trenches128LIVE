@@ -15,7 +15,7 @@ body.tab #kf,body.tab #chat{opacity:0}
 #ch{position:fixed;left:50%;bottom:-6px;width:960px;height:384px;margin-left:-480px;image-rendering:pixelated;pointer-events:none;display:none}
 #dn{position:fixed;left:50%;top:38%;transform:translateX(-50%);text-align:center;color:#fff;font:700 24px 'Courier New',monospace;text-shadow:0 2px 4px #000;pointer-events:none;display:none;white-space:pre;line-height:1.5}#dn small{font-weight:400;font-size:15px}#dn i{display:block;height:5px;background:#ffffff40;margin:8px auto 0;width:240px}#dn i b{display:block;height:100%;background:#e8c36a;width:0}
 #scope{position:fixed;inset:0;pointer-events:none;display:none;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 27vmin,#000 27.6vmin)}#scope:before{content:'';position:absolute;left:50%;top:50%;width:54vmin;height:1px;margin-left:-27vmin;background:#000c}#scope:after{content:'';position:absolute;top:50%;left:50%;height:54vmin;width:1px;margin-top:-27vmin;background:#000c}
-#spk{position:fixed;left:50%;top:56%;transform:translateX(-50%);display:none;background:#000c;color:#fff;font:14px 'Courier New',monospace;padding:8px 14px;border:1px solid #5a4e34;white-space:pre;line-height:1.7;z-index:4}#spk span{cursor:pointer;padding:0 4px}#spk span:hover,#spk span.on{background:#e8c070;color:#000}#spk small{opacity:.7}
+#spk{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;display:none;background:#000c;color:#fff;font:14px 'Courier New',monospace;padding:8px 14px;border:1px solid #5a4e34;white-space:pre;line-height:1.7;z-index:4}#spk span{cursor:pointer;padding:0 4px}#spm{display:block;margin:6px auto;width:min(400px,72vmin);height:min(400px,72vmin);cursor:pointer;border:1px solid #5a4e34;touch-action:manipulation}#spn{min-height:1.4em;color:#e9c46a}#spk small{display:block;white-space:normal;max-width:min(400px,72vmin);margin:0 auto;opacity:.7;line-height:1.3}#spk span:hover,#spk span.on{background:#e8c070;color:#000}#spk small{opacity:.7}
 #banner{position:fixed;left:50%;top:22%;transform:translateX(-50%);color:#f2e6c8;font:700 30px 'Courier New',monospace;text-align:center;text-shadow:0 3px 6px #000,0 0 2px #000;white-space:pre;pointer-events:none;opacity:0;transition:opacity .6s;letter-spacing:2px}#banner small{display:block;font-size:17px;font-weight:400;letter-spacing:0;margin-top:6px}
 #oob{position:fixed;left:50%;top:34%;transform:translateX(-50%);color:#ff5a48;font:700 22px 'Courier New',monospace;text-shadow:0 2px 4px #000;display:none;pointer-events:none;text-align:center}
 #opbar{position:fixed;top:52px;left:50%;transform:translateX(-50%);width:240px;height:6px;background:#0008;border:1px solid #000;display:none;pointer-events:none}#opbar i{display:block;height:100%;width:100%;background:#e8c070}
@@ -342,11 +342,31 @@ const nearLine=(x,z)=>{let b=0,d=1e9;T.OBJ.forEach((q,i)=>{const k=Math.hypot(q.
 /* where the server stages each side in Operations (mirrors server homeZ): attackers behind their own front line or the last trench they took, defenders behind the next line they still hold */
 function stageZ(){if(!opS)return{n:'Home base',z:me.team?-T.HOME_Z:T.HOME_Z};const att=opS[0],sec=opS[1],sd=att===0?1:-1,L=att===0?[3,4,5]:[2,1,0],z=(i,off)=>T.trenchC(T.FL[i],0)+off;
  if(me.team===att)return sec>0?{n:'Forward HQ',z:z(L[sec-1],sd*9)}:{n:'Jump-off trench',z:z(att===0?2:3,sd*14)};const nx=L[sec+1];return nx!=null?{n:'Reserve position',z:z(nx,-sd*25)}:{n:'Last-ditch position',z:z(L[Math.min(sec,2)],-sd*35)}}
-function spawnList(){const st=stageZ();const L=[{id:0,n:st.n,x:0,z:st.z}];for(const [id,q] of fposts)if(q.team===me.team)L.push({id,n:(q.rally?'Rally point ('+q.rally+'s)':q.hp>1e6?'Building respawn point':'Field post')+' · '+nearLine(q.x,q.z),x:q.x,z:q.z});return L}
-function pickSpawn(i){const L=spawnList(),it=L[i===0?0:i];if(!it)return;spawnSel=it.id;sendJ({t:'act',a:'spawnAt',id:it.id});spawnDraw()}
-function spawnDraw(){const el=$('spk');if(!deployed||me.alive||me.down||me.officer){el.style.display='none';return}const L=spawnList();
- el.style.display='block';let h='<b>CHOOSE WHERE TO RESPAWN</b>\n';L.forEach((it,i)=>{let li=0;T.FL.forEach((fz,k)=>{if(Math.abs(fz-it.z)<Math.abs(T.FL[li]-it.z))li=k});const line={n:T.LINES[li]};h+='<span data-i="'+i+'" class="'+(it.id===spawnSel?'on':'')+'">['+i+'] '+it.n+(it.id?' · near '+(line?line.n:'')+' ('+Math.round(it.x)+', '+Math.round(it.z)+')':'')+'</span>\n'});
- el.innerHTML=h+'<small>Click or press the number. Without a choice you spawn at a random post, or home if there are none.</small>';el.querySelectorAll('span').forEach(sp=>sp.onclick=()=>pickSpawn(+sp.dataset.i))}
+/* v0.31.1 spawn map: when dead, a map of the battlefield. Click your home base, a field post / rally point / building
+   respawn point, or a flag your side fully holds (greyed out while it is being taken or enemies are near it). */
+function spawnList(){const st=stageZ();const L=[{id:0,k:'home',n:st.n,x:0,z:st.z,ok:1}];
+ T.OBJ.forEach((q,i)=>{if(obj[i].owner===me.team)L.push({id:-(i+1),k:'flag',n:'Flag: '+T.LINES[i],x:q.x,z:q.z,ok:Math.abs(obj[i].p)>=.99&&!flagHot(i)})});
+ for(const [id,q] of fposts)if(q.team===me.team)L.push({id,k:q.rally?'rally':'post',n:(q.rally?'Rally point ('+q.rally+'s)':q.hp>1e6?'Building respawn point':'Field post')+' · '+nearLine(q.x,q.z),x:q.x,z:q.z,ok:1});return L}
+function flagHot(i){const q=T.OBJ[i];for(const e of ents.values())if(e.team!==me.team&&e.alive&&e.vis!==false&&Math.hypot(e.x-q.x,e.z-T.trenchC(T.FL[i],e.x))<25)return true;return false}
+function pickSpawn(i){const L=spawnList(),it=L[i];if(!it||!it.ok)return;spawnSel=it.id;sendJ({t:'act',a:'spawnAt',id:it.id});spawnDraw()}
+let spHover=-1;
+function spawnXY(cv){const s=cv.width/T.S,f=me.team===1;return[(x)=>f?cv.width-(x+W)*s:(x+W)*s,(z)=>f?cv.height-(z+W)*s:(z+W)*s]}
+function spawnBuild(){const el=$('spk');if(el.dataset.v==='map')return;el.dataset.v='map';
+ el.innerHTML='<b>CHOOSE WHERE TO RESPAWN</b><canvas id="spm" width="400" height="400"></canvas><div id="spn"></div><small>Click a flag, post or your base on the map (or press its number). No choice: a random post, or home.</small>';
+ const cv=$('spm'),hit=ev=>{const r=cv.getBoundingClientRect(),mx=(ev.clientX-r.left)*cv.width/r.width,my=(ev.clientY-r.top)*cv.height/r.height,[X,Y]=spawnXY(cv);let b=-1,bd=22;spawnList().forEach((it,i)=>{const d=Math.hypot(X(it.x)-mx,Y(it.z)-my);if(d<bd){bd=d;b=i}});return b};
+ cv.onmousemove=ev=>{spHover=hit(ev)};cv.onmouseleave=()=>{spHover=-1};cv.onclick=ev=>{const i=hit(ev);if(i>=0)pickSpawn(i)}}
+function spawnDraw(){const el=$('spk');if(!deployed||me.alive||me.down||me.officer){el.style.display='none';return}spawnBuild();el.style.display='block';
+ const cv=$('spm'),g=cv.getContext('2d'),[X,Y]=spawnXY(cv),L=spawnList();if(mmDirty)mmTerrain();g.save();g.imageSmoothingEnabled=false;if(me.team===1){g.translate(cv.width,cv.height);g.rotate(Math.PI)}g.drawImage(mt,0,0,cv.width,cv.height);g.restore();
+ g.fillStyle='#0003';g.fillRect(0,0,cv.width,cv.height);
+ T.OBJ.forEach((q,i)=>{if(obj[i].owner===me.team)return;g.fillStyle='#c84a3a';g.beginPath();g.arc(X(q.x),Y(q.z),6,0,7);g.fill();g.fillStyle='#ddd';g.font='10px monospace';g.textAlign='center';g.fillText(T.LINES[i],X(q.x),Y(q.z)-10)});
+ if(me.x!=null){g.strokeStyle='#ff4030';g.lineWidth=2;const x=X(me.x),y=Y(me.z);g.beginPath();g.moveTo(x-5,y-5);g.lineTo(x+5,y+5);g.moveTo(x+5,y-5);g.lineTo(x-5,y+5);g.stroke()}
+ L.forEach((it,i)=>{const x=X(it.x),y=Y(it.z),sel=it.id===spawnSel,hov=i===spHover;const col=!it.ok?'#777':it.k==='flag'?(me.team===0?'#7aa8e0':'#62d66a'):it.k==='home'?'#e9c46a':it.k==='rally'?'#ffd24a':'#4cff9a';
+  g.fillStyle=col;g.strokeStyle='#000';g.lineWidth=1.5;g.beginPath();if(it.k==='flag')g.arc(x,y,8,0,7);else if(it.k==='home')g.rect(x-9,y-6,18,12);else g.rect(x-6,y-6,12,12);g.fill();g.stroke();
+  if(sel||hov){g.strokeStyle=sel?'#fff':'#ffffffaa';g.lineWidth=2;g.beginPath();g.arc(x,y,14,0,7);g.stroke()}
+  g.fillStyle='#000';g.font='bold 10px monospace';g.textAlign='center';g.fillText(i<10?String(i):'',x,y+3.5);
+  if(it.k==='flag'||it.k==='home'||hov||sel){g.fillStyle=it.ok?'#fff':'#999';g.font='10px monospace';g.fillText(it.k==='flag'?T.LINES[-it.id-1]:it.k==='home'?it.n:'',x,y-13)}});
+ const s=L.find(it=>it.id===spawnSel),h=L[spHover],t=(s?'Respawning at: '+s.n:'No choice yet: a random post, or home')+(h&&h!==s?'  ›  '+(h.ok?'click: '+h.n:h.n+' (under attack)'):'');
+ const n=$('spn');if(n.textContent!==t)n.textContent=t}
 /* Operations HUD: role, sector, tickets, battalions; announcer banners; out-of-bounds countdown */
 let opS=null,oobUntil=0,bannerT=0;
 function opBanner(m){const att=m.att===me.team,el=$('banner');let a,b='';
@@ -628,7 +648,7 @@ function chatOpenBox(team){chatOpen=true;chatTeam=team;for(const k in K)K[k]=0;c
 function chatClose(){chatOpen=false;const i=$('chati');i.blur();i.style.display='none';i.value=''}
 $('chati').addEventListener('keydown',e=>{e.stopPropagation();if(e.code==='Enter'||e.code==='NumpadEnter'){const v=$('chati').value.trim();if(v)sendJ({t:'chat',m:v.slice(0,120),team:chatTeam});chatClose()}else if(e.code==='Escape')chatClose()});
 $('chati').addEventListener('blur',()=>{if(chatOpen)setTimeout(()=>{if(chatOpen&&document.activeElement!==$('chati'))chatClose()},50)});
-addEventListener('keydown',e=>{if(e.code==='End'&&TUT.i>=0&&$('tut').style.display==='block'){tutEnd();return}
+addEventListener('keydown',e=>{if(deployed&&!me.alive&&!me.down&&!me.officer&&/^Digit[0-9]$/.test(e.code)&&$('spk').style.display==='block'&&!chatOpen){pickSpawn(+e.code.slice(5));return}if(e.code==='End'&&TUT.i>=0&&$('tut').style.display==='block'){tutEnd();return}
  if(rebinding){e.preventDefault();if(e.code!=='Escape'){for(const o in S.binds)if(o!==rebinding&&S.binds[o]===e.code)S.binds[o]=S.binds[rebinding];S.binds[rebinding]=e.code;saveS()}rebinding=null;renderSet();return}
  if(chatOpen){if(e.target!==$('chati')){const i=$('chati');if(e.key&&e.key.length===1&&!e.ctrlKey&&!e.metaKey){e.preventDefault();if(i.value.length<120)i.value+=e.key;i.focus();return}   /* a key that beat the focus: keep it */
   if(e.code==='Escape')chatClose();else if(e.code==='Enter'||e.code==='NumpadEnter'){const v=$('chati').value.trim();if(v)sendJ({t:'chat',m:v.slice(0,120),team:chatTeam});chatClose()}}return}   /* typing: the chat box has the keyboard */
@@ -675,7 +695,7 @@ addEventListener('touchmove',e=>{if(!TCH.stick&&!TCH.look)return;for(const t of 
 function tcEnd(e){for(const t of e.changedTouches){if(TCH.stick&&t.identifier===TCH.stick.id){TCH.stick=null;tcStick(0,0);$('tcs').style.display='none'}else if(TCH.look&&t.identifier===TCH.look.id)TCH.look=null}}
 addEventListener('touchend',tcEnd);addEventListener('touchcancel',tcEnd);
 function tcTick(){const on=tcActive();if(on)tcBuild();const r=$('tc');if(r.style.display!==(on?'block':'none')){r.style.display=on?'block':'none';if(!on){TCH.stick=TCH.look=null;tcStick(0,0);$('tcs').style.display='none';fireHeld=false;for(const b of r.querySelectorAll('button.on')){b.classList.remove('on');if(b.dataset.a==='crouch')tcKey('crouch',false)}if(adsHeld&&S.touch)adsHeld=false}}}
-document.addEventListener('pointerlockchange',()=>{locked=lockedNow();if(deployed&&!locked&&roundState==='play'&&!me.officer)pauseScreen();if(locked)$('ov').style.display='none'});
+document.addEventListener('pointerlockchange',()=>{locked=lockedNow();if(deployed&&!locked&&roundState==='play'&&!me.officer&&(me.alive||me.down))pauseScreen();   /* (dead: the spawn map stays clickable) */if(locked)$('ov').style.display='none'});
 addEventListener('click',e=>{if(e.target&&e.target.closest&&e.target.closest('#set,#gear'))return;if(deployed&&!me.officer&&!lockedNow()&&$('ov').style.display==='none')lockMouse()});
 function resize(){sizeR();cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}addEventListener('resize',resize);resize();
 /* ------------------------------------------------------------------ menus */

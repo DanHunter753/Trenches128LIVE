@@ -100,6 +100,10 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
   each side has two AA guns between its HQ dugouts that fire flak at enemy planes within 110 m. A plane shot down
   stops its job and crashes. AA guns are wrecked by enemy shells and repaired by holding E, like MG nests; knocking
   out their AA first makes air support safer. Test: `planes`.
+- **Spawn map:** when you die, a map of the battlefield replaces the text list. Click your base, a field post, rally
+  point or building respawn point, or any flag your side fully holds (you respawn in that trench). A flag that is
+  being taken or has an enemy within 25 m is greyed out; if it falls before you respawn you go elsewhere and are
+  told. Number keys still work. The pause menu no longer pops over the map when you die. Test: `spawnmap`.
 - Fix: wrecked MG nests now reset at the start of every round even when the map doesn't change.
 
 ## v0.30.1 - phones, the rifle, the minimap, the launcher goes live
