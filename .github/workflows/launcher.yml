@@ -26,6 +26,13 @@ jobs:
           [ "${GITHUB_REF_NAME}" = "launcher-v$v" ] || { echo "tag ${GITHUB_REF_NAME} but package.json says $v"; exit 1; }
       - run: npm install --no-audit --no-fund
       - run: npm test
+      - name: Create the release first (uploads all go into one release)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          gh release view "v$v" >/dev/null 2>&1 || gh release create "v$v" --title "$v" --notes "Trench 128 launcher $v" --repo "$GITHUB_REPOSITORY"
       - name: Build and publish
         run: npx electron-builder --win --x64 --publish always
         env:
