@@ -70,7 +70,7 @@ let sched = [], leaders = new Map(), crateId = 1, ordId = 1;
 const SUP = { barrage: { cost: 15, cd: 30, r: 13, tier: 1 }, drop: { cost: 10, cd: 20, r: 4, tier: 1 }, smoke: { cost: 8, cd: 25, r: 12, tier: 1 }, recon: { cost: 10, cd: 40, r: 50, tier: 1 },
   rally: { cost: 20, cd: 90, r: 3, tier: 1 }, para: { cost: 25, cd: 75, r: 8, tier: 1 },
   bomb: { cost: 30, cd: 60, r: 30, tier: 2 }, gas: { cost: 25, cd: 70, r: 11, tier: 2 }, creep: { cost: 30, cd: 90, r: 15, tier: 2 }, whistle: { cost: 15, cd: 120, r: 20, tier: 2 },
-  heavy: { cost: 45, cd: 150, r: 30, tier: 3 }, star: { cost: 8, cd: 25, r: 30, tier: 1 }, tank: { cost: 50, cd: 150, r: 8, tier: 2 } };
+  heavy: { cost: 45, cd: 150, r: 30, tier: 3 }, star: { cost: 8, cd: 25, r: 30, tier: 1 }, tank: { cost: 50, cd: 150, r: 8, tier: 2 }, strafe: { cost: 20, cd: 60, r: 6, tier: 2 } };
 const SUPK = Object.keys(SUP), supZero = () => Object.fromEntries(SUPK.map(k => [k, 0]));
 // side objectives: depots on the flanks. CP: +1 per 4 s base, +3 per 4 s per depot held; captures pay +10
 const DP = T.DEPOTS.map(d => ({ ...d, owner: -1, p: 0 })), CP_MAX = 250, CP_START = 30, RAID_MAX = 8;
@@ -309,6 +309,8 @@ function explode(x, z, by, pow, src) {   // pow: 1 = artillery shell / grenade; 
   NAV.rebuild(x - cr - 1, z - cr - 1, x + cr + 1, z + cr + 1);
   bcast({ t: 'cr', c: craters[craters.length - 1] });
   if (VEHM) VEHM.blast(x, z, by, pow, src);
+  AAS.forEach((a, i) => { if (a.dead || (by && by.team === a.team)) return; const R = 3.4 * Math.sqrt(pow), d = Math.hypot(a.x - x, a.z - z); if (d < R) { a.hp -= 130 * pow * (1 - d / R); if (a.hp <= 0) aaWreck(i, by); } });
+  if (pow >= .75) T.PHONES.forEach((L, l) => { for (let s = 0; s < L.pts.length - 1; s++) if (T.phoneDist(l, s, x, z) < 3 * pow) phoneSet(l, s, true, by); });   // v0.31: shells cut telephone wire
   for (let i = 0; i < BASE_NESTS; i++) { const n = NESTS[i]; if (n.dead || (by && by.team === n.team)) continue;   // v0.31: a grenade in the nest or a shell beside it wrecks the gun
     const Rn = 3.4 * Math.sqrt(pow), d = Math.hypot(n.x - x, n.z - z); if (d < Rn) { n.hp = (n.hp == null ? 100 : n.hp) - 130 * pow * (1 - d / Rn); if (n.hp <= 0) nestWreck(i, by); } }
   if (pow >= 1 && (src === 'shell' || !by || by.cmd)) blowBay(x, z, by);
@@ -367,7 +369,8 @@ function bulletStep(b, dt) {   // true when the bullet is spent
     const x = b.x, y = b.y, z = b.z;
     if (b.d > b.rng || Math.abs(x) > T.W || Math.abs(z) > T.W) return true;
     if (y < hAt(terr.H, x, z) || T.inRoof(x, y, z) || T.sbHit(terr.H, x, y, z) || T.fortSeg(px, py, pz, x, y, z) >= 0) return true;   // walls clipped exactly: no tunnelling through 0.45 m logs
-    if (VEHM && VEHM.bulletHit(b, x, y, z)) return true;   // armour stops bullets (anti-tank rounds hurt it)
+    if (VEHM && VEHM.bulletHit(b, x, y, z)) return true;
+    if (y > 15) { const pl = planes.find(q => q.team !== b.team && q.ph !== 'down' && Math.abs(q.y - y) < 3 && Math.hypot(q.x - x, q.z - z) < 3.5); if (pl) { planeHurt(pl, b.dmg * .5, b.by); return true; } }   // armour stops bullets (anti-tank rounds hurt it)
     const pq = posts.find(q => !q.fort && q.team !== b.team && Math.abs(q.x - x) < 1.5 && Math.abs(q.z - z) < 1.5 && y < hAt(terr.H, q.x, q.z) + 1.4);
     if (pq) { damagePost(pq, b.dmg * .6, b.by); return true; }
     for (const e of cand) {
@@ -548,6 +551,111 @@ function nearestFort(p, test) { let b = null, bd = 1e9; for (const f of T.FORTS.
 // v0.31 wrecked guns: trench MG nests can be knocked out; a wreck is repaired by hand (hold E beside it: a sapper about 8 s,
 // anyone else about 20 s) or comes back on its own after NEST_AUTOFIX seconds. Field guns and mortars repair the same way.
 const NEST_AUTOFIX = 90, FIX_S = { sapper: 8, other: 20 };
+// v0.31 field telephone lines (T.PHONES): artillery needs a line to the batteries. Shells and enemy hands cut segments; holding
+// E at a break splices it (sapper 2.5 s, others 5 s); a break nobody splices is mended by the linesmen after PHONE_AUTOFIX s.
+const PHONE_AUTOFIX = 120, PHONE_K = ['barrage', 'smoke', 'gas', 'creep', 'heavy'], phoneCut = new Map(), phoneTold = [];   // 'l:s' -> tick it was cut
+const phoneUp = team => T.PHONES.filter((L, l) => L.team === team && !L.pts.slice(1).some((_, s) => phoneCut.has(l + ':' + s))).length;
+const phoneTotal = team => T.PHONES.filter(L => L.team === team).length;
+function phoneSet(l, s, cut, by) {
+  const k = l + ':' + s, L = T.PHONES[l]; if (!L || cut === phoneCut.has(k)) return;
+  if (cut) phoneCut.set(k, tickNo); else phoneCut.delete(k);
+  bcast({ t: 'ph', l, s, c: cut ? 1 : 0 });
+  if (cut) { if (tickNo - (phoneTold[L.team] || -1e9) > 5 * TICK) { phoneTold[L.team] = tickNo; teamTell(L.team, 'A telephone line is cut (' + phoneUp(L.team) + '/' + phoneTotal(L.team) + ' working): hold E at the break to splice it'); }
+    if (by && by.team !== L.team) { addXp(by, 15); if (!by.bot) tell(by, 'Enemy telephone line cut (+15 XP)'); } }
+  else if (by) { addXp(by, 10); if (!by.bot) tell(by, 'Telephone line spliced (+10 XP)'); }
+}
+function phoneNear(x, z, r, pick) { let best = null, bd = r; T.PHONES.forEach((L, l) => { for (let s = 0; s < L.pts.length - 1; s++) { if (!pick(L, l, s)) continue; const d = T.phoneDist(l, s, x, z); if (d < bd) { bd = d; best = [l, s]; } } }); return best; }
+function phoneAct(p, dt) {   // splice your own line or cut the enemy's: true if this E press was used for that
+  const own = phoneNear(p.x, p.z, 2.5, (L, l, s) => L.team === p.team && phoneCut.has(l + ':' + s));
+  const en = own ? null : phoneNear(p.x, p.z, 2, (L, l, s) => L.team !== p.team && !phoneCut.has(l + ':' + s));
+  const tg = own || en; if (!tg) return false; const key = tg.join(':') + (own ? '+' : '-');
+  if (p.phK !== key) { p.phK = key; p.phP = 0; }
+  p.phP += dt / (own ? (p.cls === 'sapper' ? 2.5 : 5) : (p.cls === 'sapper' ? 1.5 : 3));
+  send(p, { t: 'wk', p: Math.min(1, p.phP), n: own ? 'Splicing the telephone line' : 'Cutting the enemy telephone line', x: own ? 0 : 1 });
+  if (p.phP >= 1) { p.phP = 0; p.phK = null; phoneSet(tg[0], tg[1], !own, p); }
+  return true;
+}
+// v0.31 tunnel mines (T.TUNNELS): hold E at your shaft head to dig a gallery under the enemy front trench (sappers 75 s of
+// work, others 3x slower; diggers stack). Half-way the enemy hears it near the charge spot and can countermine there by
+// holding E (sapper 5 s, others 10 s), collapsing the gallery. A finished gallery blows a line of craters under their trench.
+const TUN_S = { sapper: 75, other: 225 }, TUN_CD = 60, TUN = [];
+function tunReset() { TUN.length = 0; T.TUNNELS.forEach(() => TUN.push({ p: 0, cm: 0, by: new Set(), cd: 0, sent: -1, heard: false })); }
+function tunSend(i) { const u = TUN[i], q = T.TUNNELS[i], pq = Math.floor(u.p * 20);
+  if (pq === u.sent) return; u.sent = pq;
+  for (const h of humans) send(h, { t: 'tn', i, p: h.team === q.team || u.heard ? +u.p.toFixed(2) : 0 }); }
+function tunBlow(i) {
+  const q = T.TUNNELS[i], u = TUN[i], dig = [...u.by].map(id => [...humans].find(h => h.id === id) || ents.get(id)).filter(Boolean), by = dig[0] || { team: q.team, bot: true, id: -1 };
+  for (const dx of [-5, 0, 5]) explode(q.tx + dx, q.tz, by, 1.8, 'mine');
+  for (const h of dig) { addXp(h, 50); if (!h.bot) tell(h, 'The mine went up under their trench (+50 XP)'); }
+  teamTell(q.team, 'Our mine has gone up under the enemy trench: go now!'); teamTell(1 - q.team, 'An enemy mine exploded under our trench!');
+  bcast({ t: 'tb', i }); u.p = 0; u.cm = 0; u.by.clear(); u.heard = false; u.cd = tickNo + TUN_CD * TICK; tunSend(i);
+}
+function tunnelAct(p, dt) {
+  for (let i = 0; i < T.TUNNELS.length; i++) { const q = T.TUNNELS[i], u = TUN[i];
+    if (q.team === p.team && Math.hypot(p.x - q.x, p.z - q.z) < 3) {
+      if (u.cd > tickNo) { send(p, { t: 'wk', p: 0, n: 'The shaft is being shored up (' + Math.ceil((u.cd - tickNo) / TICK) + ' s)' }); return true; }
+      u.p += dt / (p.cls === 'sapper' ? TUN_S.sapper : TUN_S.other); u.by.add(p.id);
+      if (u.p >= .5 && !u.heard) { u.heard = true; for (const h of humans) if (h.team !== q.team && h.deployed) tell(h, 'Digging heard under our front trench! Hold E at the listening post to countermine'); }
+      send(p, { t: 'wk', p: Math.min(1, u.p), n: 'Digging the mine gallery' }); tunSend(i);
+      if (u.p >= 1) tunBlow(i); return true;
+    }
+    if (q.team !== p.team && Math.hypot(p.x - q.tx, p.z - q.tz) < 4) {
+      if (!u.heard) { send(p, { t: 'wk', p: 0, n: 'Listening... all quiet below' }); return true; }
+      u.cm += dt / (p.cls === 'sapper' ? 5 : 10); send(p, { t: 'wk', p: Math.min(1, u.cm), n: 'Countermining the enemy gallery' });
+      if (u.cm >= 1) { u.p = 0; u.cm = 0; u.by.clear(); u.heard = false; u.cd = tickNo + TUN_CD * TICK; tunSend(i); addXp(p, 30); if (!p.bot) tell(p, 'Camouflet: the enemy gallery collapsed (+30 XP)');
+        teamTell(q.team, 'The enemy blew in our mine gallery'); bcast({ t: 'tc', i }); }
+      return true;
+    }
+  }
+  return false;
+}
+tunReset();
+// v0.31 aircraft: the officer's bomber run, recon flight and the new strafing run are flown by biplanes that cross the map
+// from their own side. Bullets hit them; each side's two AA guns (T.AA) fire at enemy planes within AA_R m. A plane shot
+// down drops nothing more (a recon plane stops spotting) and crashes. AA guns are wrecked by shells and repaired like nests.
+const PL = { v: 40, hp: 120, y: { bomb: 45, recon: 70, strafe: 26 } }, AA_R = 110, AA_DPS = 5, planes = [], AAS = T.AA.map(a => ({ ...a, dead: false, hp: 100, fix: 0, fixAt: 0 }));
+let planeId = 1;
+function planeLaunch(team, k, x, z, by) {
+  const dz = team === 0 ? -1 : 1, lead = { bomb: 4, recon: 3, strafe: 3 }[k] || 3;
+  const pl = { id: planeId++, team, k, tx: x, tz: z, x, z: z - dz * PL.v * lead, y: PL.y[k] || 50, dz, dx: 0, hp: PL.hp, by, t: 0, drop: 0, ph: 'in', a: 0 };
+  planes.push(pl); return pl;
+}
+function planeHurt(pl, dmg, by) {
+  if (pl.hp <= 0) return; pl.hp -= dmg; if (pl.hp > 0) return;
+  pl.ph = 'down'; if (pl.rc) pl.rc.until = 0;
+  bcast({ t: 'pd', id: pl.id, x: +pl.x.toFixed(1), z: +pl.z.toFixed(1) });
+  if (by && by.team !== pl.team) { addXp(by, 40); if (!by.bot) tell(by, 'Enemy aircraft shot down (+40 XP)'); }
+  killFeedRaw(by && by.team !== pl.team ? by : null, pl.team, 'aircraft', by && by.team !== pl.team ? 'rifle' : 'flak');
+  teamTell(pl.team, 'Our ' + ({ bomb: 'bomber', recon: 'recon plane', strafe: 'fighter' }[pl.k] || 'plane') + ' was shot down');
+  const cx = pl.x + pl.dx * PL.v * 1.5, cz = pl.z + pl.dz * PL.v * 1.5; later(1500, () => { if (Math.abs(cx) < T.W && Math.abs(cz) < T.W) explode(cx, cz, by && by.team !== pl.team ? by : null, .8); });
+}
+function aaFor(team) { return AAS.filter(a => a.team === team && !a.dead); }
+function planesTick() {
+  for (let i = planes.length - 1; i >= 0; i--) { const pl = planes[i]; pl.t += DT;
+    if (pl.ph === 'down') { planes.splice(i, 1); continue; }
+    if (pl.ph === 'circle') { pl.a += PL.v / 35 * DT; pl.x = pl.tx + 35 * Math.cos(pl.a); pl.z = pl.tz + 35 * Math.sin(pl.a); pl.dx = -Math.sin(pl.a); pl.dz = Math.cos(pl.a); if (pl.t > pl.until) { pl.ph = 'out'; pl.dx = 0; pl.dz = pl.team === 0 ? 1 : -1; } }
+    else { pl.x += pl.dx * PL.v * DT; pl.z += pl.dz * PL.v * DT; }
+    const along = (pl.z - pl.tz) * pl.dz;   // < 0 still on the way in
+    if (pl.k === 'recon' && pl.ph === 'in' && Math.hypot(pl.x - pl.tx, pl.z - pl.tz) <= 35) { pl.ph = 'circle'; pl.a = Math.atan2(pl.z - pl.tz, pl.x - pl.tx); pl.until = pl.t + 25;
+      pl.rc = { team: pl.team, x: pl.tx, z: pl.tz, r: SUP.recon.r, until: tickNo + 25 * TICK }; recons.push(pl.rc);
+      for (const q of humans) if (q.deployed && q.team === pl.team) send(q, { t: 'rc', x: +pl.tx.toFixed(1), z: +pl.tz.toFixed(1), r: SUP.recon.r, s: 25 }); }
+    if (pl.k === 'bomb') while (pl.drop < 8 && along >= (pl.drop - 3.5) * 8) { const bx = pl.x, bz = pl.tz + (pl.drop - 3.5) * 8 * pl.dz; pl.drop++; later(500, () => explode(bx, bz, pl.by)); }
+    if (pl.k === 'strafe' && Math.abs(along) < 30) {   // two machine guns raking the ground 10 m ahead
+      const gx = pl.x, gz = pl.z + pl.dz * 10;
+      pl.hit = pl.hit || new Set(); for (const e of ents.values()) if (e.team !== pl.team && e.alive && !e.cmd && !pl.hit.has(e.id) && Math.abs(e.x - gx) < 2.2 && Math.abs(e.z - gz) < 2.5) { pl.hit.add(e.id); if (rnd() < (e.cr ? .45 : .7)) damage(e, 45, pl.by, false, 'plane'); }   // each soldier under the guns is raked once a pass
+      for (const e of ents.values()) if (e.team !== pl.team && e.alive && !e.cmd && Math.hypot(e.x - gx, e.z - gz) < 7) suppress(e, 'mg', pl.by);
+    }
+    for (const a of aaFor(1 - pl.team)) if (Math.hypot(a.x - pl.x, a.z - pl.z) < AA_R) planeHurt(pl, AA_DPS * DT * (.6 + rnd() * .8), null);
+    if (pl.ph !== 'circle' && along > 30 && pl.k !== 'recon' && pl.ph === 'in') pl.ph = 'out';
+    if (Math.abs(pl.z) > T.W + 160 || Math.abs(pl.x) > T.W + 160) planes.splice(i, 1);
+  }
+  if (tickNo % 2 === 0 && (planes.length || planesSent)) { planesSent = planes.length > 0; bcast({ t: 'pl', l: planes.map(q => [q.id, q.team, q.k, +q.x.toFixed(1), +q.y.toFixed(1), +q.z.toFixed(1), +q.dx.toFixed(3), +q.dz.toFixed(3), q.k === 'strafe' && Math.abs((q.z - q.tz) * q.dz) < 30 ? 1 : 0, q.ph === 'circle' ? 1 : 0]), aa: AAS.map(a => a.dead ? 1 : 0) }); }
+}
+let planesSent = false;
+function aaWreck(i, by) { const a = AAS[i]; if (!a || a.dead) return; a.dead = true; a.hp = 0; a.fix = 0; a.fixAt = tickNo + NEST_AUTOFIX * TICK; bcast({ t: 'aad', i, d: 1 });
+  if (by && by.team !== a.team) { addXp(by, 30); if (!by.bot) tell(by, 'Enemy AA gun knocked out (+30 XP)'); } teamTell(a.team, 'An AA gun is down: hold E beside it to repair'); }
+function aaFixed(i, by) { const a = AAS[i]; a.dead = false; a.hp = 100; a.fix = 0; bcast({ t: 'aad', i, d: 0 }); if (by) { addXp(by, 15); if (!by.bot) tell(by, 'AA gun repaired (+15 XP)'); } }
+function phoneAutofix() { for (const [k, t0] of phoneCut) if (tickNo - t0 >= PHONE_AUTOFIX * TICK) { const [l, s] = k.split(':').map(Number); phoneSet(l, s, false, null); } }
 function nestWreck(i, by) {
   const n = NESTS[i]; if (!n || n.dead) return;
   n.dead = true; n.hp = 0; n.fix = 0; n.fixAt = tickNo + NEST_AUTOFIX * TICK;
@@ -563,11 +671,12 @@ function nestFixed(i, by) {
   bcast({ t: 'nd', i, d: 0 });
   if (by) { addXp(by, 15); if (!by.bot) tell(by, 'Machine gun repaired (+15 XP)'); }
 }
-function nestAutofix() { for (let i = 0; i < BASE_NESTS; i++) { const n = NESTS[i]; if (n.dead && n.fixAt && tickNo >= n.fixAt) nestFixed(i, null); } }
+function nestAutofix() { for (let i = 0; i < BASE_NESTS; i++) { const n = NESTS[i]; if (n.dead && n.fixAt && tickNo >= n.fixAt) nestFixed(i, null); } AAS.forEach((a, i) => { if (a.dead && a.fixAt && tickNo >= a.fixAt) aaFixed(i, null); }); }
 function fixAct(p, dt) {   // hands on a wreck of your own side within reach: progress, true if this was a repair
   const rate = dt / (p.cls === 'sapper' ? FIX_S.sapper : FIX_S.other);
   for (let i = 0; i < BASE_NESTS; i++) { const n = NESTS[i];
     if (n.dead && n.team === p.team && Math.hypot(p.x - n.x, p.z - n.z) < 3) { n.fix = Math.min(1, (n.fix || 0) + rate); send(p, { t: 'wk', p: n.fix, n: 'Repairing machine gun' }); if (n.fix >= 1) nestFixed(i, p); return true; } }
+  for (let i = 0; i < AAS.length; i++) { const a = AAS[i]; if (a.dead && a.team === p.team && Math.hypot(p.x - a.x, p.z - a.z) < 3) { a.fix = Math.min(1, a.fix + rate); send(p, { t: 'wk', p: a.fix, n: 'Repairing AA gun' }); if (a.fix >= 1) aaFixed(i, p); return true; } }
   const v = VEHM && VEHM.V.find(q => q.k !== 'tank' && q.dead && !q.lost && q.team === p.team && Math.hypot(p.x - q.x, p.z - q.z) < 3.2);
   if (v) { v.fix = Math.min(1, (v.fix || 0) + rate); send(p, { t: 'wk', p: v.fix, n: 'Repairing ' + T.VEH[v.k].n.toLowerCase() }); if (v.fix >= 1) { VEHM.fixNow(v); v.fix = 0; addXp(p, 15); if (!p.bot) tell(p, T.VEH[v.k].n + ' repaired (+15 XP)'); } return true; }
   return false;
@@ -576,6 +685,8 @@ function workAct(p) {
   if (!p.alive || p.mg != null || p.cmd || p.cl) return;
   const gap = tickNo - (p.wkLast || -99); p.wkLast = tickNo; const dt = Math.min(gap, 6) * DT;
   if (fixAct(p, dt)) return;
+  if (phoneAct(p, dt)) return;
+  if (tunnelAct(p, dt)) return;
   const own = nearestFort(p, f => f.team === p.team && f.done < 1);
   if (own) {
     const D = T.FORT[own.k]; own.done = Math.min(1, own.done + dt / D.work * (p.cls === 'sapper' ? 1 : .5)); own.helpers = own.helpers || new Set(); own.helpers.add(p);
@@ -1253,11 +1364,13 @@ function switchMap() {
   terr = T.makeTerrain();
   OB.forEach((o, i) => { o.x = T.OBJ[i].x; o.z = T.OBJ[i].z; });
   DP.forEach((d, i) => Object.assign(d, { n: T.DEPOTS[i].n, x: T.DEPOTS[i].x, z: T.DEPOTS[i].z }));
-  for (let i = 0; i < BASE_NESTS; i++) Object.assign(NESTS[i], T.NEST[i], { dead: false, bot: null, occ: null, hp: 100, fix: 0, fixAt: 0 });
   console.log('[map] round map ' + mapSeed + ' (' + (Date.now() - t0) + ' ms)'); return true;
 }
 function resetRound() {
-  const changed = switchMap(); T.resetBays(); craters = []; grenades.length = 0; posts = [];
+  const changed = switchMap(); T.resetBays();
+  for (let i = 0; i < BASE_NESTS; i++) Object.assign(NESTS[i], T.NEST[i], { dead: false, bot: null, occ: null, hp: 100, fix: 0, fixAt: 0 });
+  phoneCut.clear(); tunReset(); planes.length = 0; AAS.length = 0; T.AA.forEach(a => AAS.push({ ...a, dead: false, hp: 100, fix: 0, fixAt: 0 }));   // (every round, same map or not)
+   craters = []; grenades.length = 0; posts = [];
   for (const p of humans) if (p.mg != null && NESTS[p.mg].fort) dismount(p, true);
   T.clearForts(); NESTS.length = BASE_NESTS; bcast({ t: 'fo', f: [] }); NAV.rebuild(); if (changed) NAV.clear();   // (routes cached on the old map would mislead bots for seconds)
   OB.forEach((o, i) => { o.owner = i < 3 ? 0 : 1; o.p = i < 3 ? 1 : -1; o.lock = 0; });
@@ -1499,17 +1612,20 @@ function callSupport(p, m) {
   x = clamp(x, -T.W + 5, T.W - 5); z = clamp(z, -T.W + 5, T.W - 5);
   const cd = supCd[p.team];
   if (cd[k] > tickNo) { tell(p, k + ' not ready (' + Math.ceil((cd[k] - tickNo) / TICK) + ' s)'); return; }
+  const up = PHONE_K.includes(k) ? phoneUp(p.team) : -1;
+  if (up === 0) { tell(p, 'No telephone line to the batteries: get a line spliced (hold E at a break)'); return; }
   if (tierOf(p.team) < s.tier) { tell(p, 'Locked: needs requisition tier ' + s.tier + ' (hold ' + (s.tier === 2 ? '2 depots or an enemy line' : 'all 4 depots or two enemy lines') + ')'); return; }
   const mk = marks.find(q => q.team === p.team && Math.hypot(q.x - x, q.z - z) < 15), cost = mk && k !== 'drop' && k !== 'rally' ? Math.ceil(s.cost * .7) : s.cost;   // spotter marks: 30% cheaper and tighter
   if (cmdPts[p.team] < cost) { tell(p, 'Not enough command points (' + cost + ' needed). Hold the flank depots for more.'); return; }
-  cmdPts[p.team] -= cost; cd[k] = tickNo + s.cd * TICK; st(p).ci++;
+  cmdPts[p.team] -= cost; cd[k] = tickNo + Math.round(s.cd * TICK * (up > 0 ? 1 + .35 * (phoneTotal(p.team) - up) : 1)); st(p).ci++;
   if (mk) { if (mk.x !== x || mk.z !== z) { x = mk.x; z = mk.z; } if (mk.by && !mk.by.bot && mk.by.deployed) { addXp(mk.by, 10); tell(mk.by, 'The officer called a strike on your mark (+10 XP)'); } }
   const spread = mk ? .5 : 1;
   { const A = { barrage: [30, 11, null], bomb: [36, 12, null], heavy: [50, 10, null], creep: [26, 24, 1 - p.team] }[k]; if (A) raiseAlarm(x, z, A[0], A[1], A[2]); }   // bots under it make for the dugouts
   { const W = { barrage: [3, 7.5, 13], bomb: [4, 7, 30], gas: [3, 25, 11], heavy: [3, 6, 30], creep: [3, 20, 15] }[k]; if (W) strikeWarn(p.team, k, x, z, W[2] * (k === 'barrage' ? spread : 1), W[0], W[1], k === 'creep' ? { dz: p.team === 0 ? -1 : 1, len: 30 } : k === 'bomb' ? { yw: 0 } : {}); }
   for (const t of [1 - p.team]) if (['barrage', 'bomb', 'gas', 'heavy', 'creep'].includes(k) && [...ents.values()].some(e => e.team === t && e.alive && !e.cmd && Math.hypot(e.x - x, e.z - z) < 30)) alert(t, 'enemysup' + k, 'enemy', 'Enemy ' + ({ barrage: 'artillery', bomb: 'bombers', gas: 'GAS', heavy: 'heavy guns', creep: 'creeping barrage' })[k] + ' falling near (' + Math.round(x) + ', ' + Math.round(z) + ')', x, z, 8);
   const warn = what => { for (const q of humans) if (q.deployed && q.team === p.team && !q.cmd && leaders.get(q.team * 100 + q.sq) === q) tell(q, 'FRIENDLY ' + what + ' near (' + Math.round(x) + ', ' + Math.round(z) + ') - clear the area'); };
-  if (k === 'bomb') { tell(p, 'Bomber run inbound'); warn('bomber run'); for (let i = 0; i < 8; i++) later(4000 + i * 350, () => explode(x + (i - 3.5) * 8, z, p)); }
+  if (k === 'bomb') { tell(p, 'Bomber inbound: it must get past their AA guns'); warn('bomber run'); planeLaunch(p.team, 'bomb', x, z, p); }
+  else if (k === 'strafe') { tell(p, 'Fighter inbound for a strafing run'); warn('strafing run'); planeLaunch(p.team, 'strafe', x, z, p); }
   else if (k === 'barrage') { tell(p, 'Barrage inbound' + (mk ? ' on the spotter\'s mark' : '')); warn('barrage'); for (let i = 0; i < 7; i++) later(3000 + i * 700, () => explode(x + (rnd() - .5) * 26 * spread, z + (rnd() - .5) * 26 * spread, p)); }
   else if (k === 'heavy') { tell(p, 'Heavy bombardment inbound'); warn('HEAVY bombardment'); for (let i = 0; i < 14; i++) later(3000 + i * 220, () => explode(x + (rnd() - .5) * 50 * spread, z + (rnd() - .5) * 50 * spread, p)); }
   else if (k === 'creep') {   // creeping barrage: a 30 m wide wall of shells walks 30 m toward the enemy over 20 s; the selected squads advance behind it
@@ -1527,8 +1643,7 @@ function callSupport(p, m) {
     tell(p, 'Gas shells inbound - keep your own men clear'); warn('GAS attack'); const from = tickNo + 3 * TICK;
     gases.push({ x, z, r: SUP.gas.r, from, until: from + 25 * TICK, by: p }); bcast({ t: 'gas', x: +x.toFixed(1), z: +z.toFixed(1), r: SUP.gas.r, d: 3, s: 25 });
   } else if (k === 'recon') {   // recon flight: every enemy within 50 m shows on your team's maps for 25 s
-    tell(p, 'Recon flight over (' + Math.round(x) + ', ' + Math.round(z) + ')'); recons.push({ team: p.team, x, z, r: SUP.recon.r, until: tickNo + 25 * TICK });
-    for (const q of humans) if (q.deployed && q.team === p.team) send(q, { t: 'rc', x: +x.toFixed(1), z: +z.toFixed(1), r: SUP.recon.r, s: 25 });
+    tell(p, 'Recon plane on its way to (' + Math.round(x) + ', ' + Math.round(z) + ')'); planeLaunch(p.team, 'recon', x, z, p);
   } else if (k === 'rally') {   // forward rally point: a temporary respawn post for 90 s
     const y = hAt(terr.H, x, z); posts.push({ id: postId++, team: p.team, x, z, y, hp: POST_HP * .6, by: p, rally: tickNo + 90 * TICK });
     tellTeam(p.team, 'Rally point set at (' + Math.round(x) + ', ' + Math.round(z) + ') for 90 s - respawn there'); moraleBoost(p.team, 20, x, z, 35);
@@ -1679,7 +1794,7 @@ function guard(name, fn, a) { try { fn(a); } catch (e) { const n = guardAt.get(n
 function tickBody() {
   const t0 = process.hrtime.bigint(); tickNo++;
   if (round.state === 'ended') { round.t -= DT; if (round.t <= 0) resetRound(); }
-  if (tickNo % TICK === 0) guard('nestfix', nestAutofix);
+  if (tickNo % TICK === 0) { guard('nestfix', nestAutofix); guard('phonefix', phoneAutofix); }
   buildGrid(); computeLeaders(); guard('nav', () => NAV.tick()); if (tickNo % 20 === 0) guard('squads', squadTick);
   { const due = sched.filter(s => s.at <= tickNo); if (due.length) { sched = sched.filter(s => s.at > tickNo); for (const s of due) { try { s.fn(); } catch (e) { console.error(e); } } } }
   for (const p of humans) guard('human', humanTick, p);
@@ -1688,7 +1803,7 @@ function tickBody() {
     if (e.alive && e.tgt && e.tgt.alive && !e.charging && !e.mg && !e.climb) e.yaw = Math.atan2(-(e.tgt.x - e.x), -(e.tgt.z - e.z));   // in a fight he keeps his eyes (and rifle) on his man, even while moving
     else if (e.alive && !e.charging && !e.mg && y0 != null) { const d = Math.atan2(Math.sin(e.yaw - y0), Math.cos(e.yaw - y0)); if (Math.abs(d) > .5) e.yaw = y0 + Math.sign(d) * .5; } }
   guard('vehicles', () => VEHM.tick()); guard('fires', firesTick);
-  guard('bullets', bulletsTick); histTick();
+  guard('bullets', bulletsTick); guard('planes', planesTick); histTick();
   for (let i = grenades.length - 1; i >= 0; i--) { const g = grenades[i]; g.t -= DT; if (g.t <= 0) { grenades.splice(i, 1); guard('explode', () => explode(g.tx, g.tz, g.by)); } }
   for (const n of NESTS) if (n.heat > 0) { n.heat = Math.max(0, n.heat - DT * (n.over ? .3 : .2)); if (n.over && n.heat <= .35) n.over = false; }
   if (round.state === 'play') guard('objectives', objectivesTick);
@@ -1743,7 +1858,7 @@ function onText(c, txt) {
     if (l.cls === 'officer') sq = -1;
     if (!p.deployed) {
       p.cls = l.cls; p.w = l.w; p.u = l.u; p.sq = sq; p.deployed = true; p.alive = false; p.down = 0; p.rt = .3; p.sent = new Map();   // the client drops its entity copies on 'w'; resend everything
-      send(p, { t: 'w', id: p.id, team: p.team, sq, cls: l.cls, w: l.w, u: l.u, wx: T.WX.k, craters, tick: TICK, state: round.state, crates: crates.filter(c => c.team === p.team).map(crateMsg), forts: [...T.FORTS.values()].map(fortMsg), nd: NESTS.slice(0, BASE_NESTS).map((n, i) => n.dead ? i : -1).filter(i => i >= 0) });
+      send(p, { t: 'w', id: p.id, team: p.team, sq, cls: l.cls, w: l.w, u: l.u, wx: T.WX.k, craters, tick: TICK, state: round.state, crates: crates.filter(c => c.team === p.team).map(crateMsg), forts: [...T.FORTS.values()].map(fortMsg), nd: NESTS.slice(0, BASE_NESTS).map((n, i) => n.dead ? i : -1).filter(i => i >= 0), ph: [...phoneCut.keys()], tn: TUN.map((u, i) => p.team === T.TUNNELS[i].team || u.heard ? +u.p.toFixed(2) : 0), aa: AAS.map(a => a.dead ? 1 : 0) });
       if (sq >= 0) sendOrderTo(p); else sendOrders(p.team);
       send(p, VEHM.fullMsg()); send(p, eliteMsg()); for (const f of fires) if (f.until > tickNo) send(p, { t: 'fi', x: +f.x.toFixed(1), z: +f.z.toFixed(1), r: f.r, s: Math.ceil((f.until - tickNo) / TICK) });
       for (const f of flares) if (f.until > tickNo) send(p, { t: 'flr', x: +f.x.toFixed(1), z: +f.z.toFixed(1), s: Math.ceil((f.until - tickNo) / TICK), tm: f.team });
@@ -1935,4 +2050,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

@@ -441,6 +441,39 @@ function rollLayout(seed) {
   L.DEP = [[names[0], -ri(134, 145), west], [names[1], -ri(134, 145), -west], [names[2], ri(134, 145), -west], [names[3], ri(134, 145), west]];
   return L;
 }
+// v0.31 field telephone lines: one per HQ, on poles every 7 m from the HQ up to just behind its own front trench (poles
+// skip trench cuts; the wire spans them). PHONES[l] = { team, pts: [[x, z], ...] }; segment s runs pts[s] -> pts[s + 1].
+// v0.31 tunnel mines: two mine shafts per side in the front trench; a finished gallery blows up under the enemy front
+// trench straight across (TUNNELS[i] = { team, x, z (shaft head), tx, tz (charge under the enemy trench) }).
+const TUNNELS = [];
+function buildTunnels() {
+  TUNNELS.length = 0;
+  for (const t of [0, 1]) for (const x0 of t ? [-44, 40] : [-62, 58]) {   // (staggered: a shaft never sits on the other side's charge)
+    let x = x0; for (const d of [0, 4, -4, 8, -8, 12, -12]) { const xx = x0 + d; if (!NEST.some(n => Math.hypot(n.x - xx, n.z - trenchC(t ? -30 : 30, xx)) < 8) && !roomAt(xx, trenchC(t ? -30 : 30, xx))) { x = xx; break; } }
+    TUNNELS.push({ team: t, x, z: +trenchC(t ? -30 : 30, x).toFixed(2), tx: x, tz: +trenchC(t ? 30 : -30, x).toFixed(2) });
+  }
+}
+// v0.31 anti-aircraft guns: two per side between the HQ dugouts, AA[i] = { team, x, z }
+const AA = [];
+function buildAA() {
+  AA.length = 0;
+  for (const t of [0, 1]) { const H = HQS.filter(q => q.team === t).sort((a, b) => a.x - b.x); for (let i = 0; i + 1 < H.length && i < 2; i++) {
+    const x = Math.round((H[i].x + H[i + 1].x) / 2); let z = (H[i].z + H[i + 1].z) / 2;
+    for (const d of [0, 3, -3, 6, -6, 9]) { const zz = z + d; if (!FL.some(l => Math.abs(zz - trenchC(l, x)) < 4.5) && !roomAt(x, zz)) { z = zz; break; } }
+    AA.push({ team: t, x, z: +z.toFixed(2) }); } }
+}
+const PHONES = [];
+function buildPhones() {
+  PHONES.length = 0;
+  for (const q of HQS) {
+    const t = q.team, x = q.x + 4, zf = trenchC(t ? -30 : 30, x) + (t ? -3 : 3), dir = Math.sign(zf - q.z), pts = [];
+    for (let z = q.z; dir * (zf - z) > -.01; z += dir * 7) { if (FL.some(l => Math.abs(z - trenchC(l, x)) < 3.2)) continue; pts.push([x, +z.toFixed(2)]); }
+    if (!pts.length || Math.abs(pts[pts.length - 1][1] - zf) > 1) pts.push([x, +zf.toFixed(2)]);
+    if (pts.length >= 2) PHONES.push({ team: t, pts });
+  }
+}
+/** Distance from (x, z) to segment s of line l. */
+function phoneDist(l, s, x, z) { const P = PHONES[l].pts, [ax, az] = P[s], [bx, bz] = P[s + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)); return Math.hypot(ax + dx * u - x, az + dz * u - z); }
 function applyLayout(L) {
   Object.assign(MP, { ph1: 0, ph2: 0, a1: 1, a2: 1, gx: 0, gz: 0, hs: 0 }, L.P || {});
   const fill = (a, v) => { a.length = 0; a.push(...v); };
@@ -451,7 +484,7 @@ function applyLayout(L) {
     .concat(L.MORT[0].map(x => ({ k: 'mortar', team: 0, x, z: trenchC(64, x) + 9.5, yaw: 0 }))).concat(L.MORT[1].map(x => ({ k: 'mortar', team: 1, x, z: trenchC(-64, x) - 9.5, yaw: Math.PI }))));
   fill(OBJ, FL.map((t, i) => ({ t, x: OBX[i], z: trenchC(t, OBX[i]) })));
   fill(DEPOTS, L.DEP.map(([n, x, sd]) => ({ n, x, z: dz(x, sd) })));
-  buildRooms(); buildSB(); buildHQBoxes(); BAYS.clear(); FLOOR = null; PRISTINE = null;   // the terrain is generated afresh by the next makeTerrain()
+  buildRooms(); buildSB(); buildHQBoxes(); buildPhones(); buildTunnels(); buildAA(); BAYS.clear(); FLOOR = null; PRISTINE = null;   // the terrain is generated afresh by the next makeTerrain()
 }
 /** Is this layout playable? Every line objective sits in an open trench, enough dugouts per line, depots on open ground. */
 function mapCheck() {
@@ -532,7 +565,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { PHONES, phoneDist, TUNNELS, AA, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
