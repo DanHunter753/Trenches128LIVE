@@ -28,7 +28,7 @@ launcher only has to update itself, and only when you change the launcher.
    - `servers`: addresses always listed, e.g. `["https://play.example.com"]`
    - `site`, `discord`: optional https links shown in Settings
 2. **Choose where updates live** (`build.publish` in `package.json`):
-   - **GitHub Releases (set up already):** replace `YOUR_GITHUB_USER` and the repository name. Players' launchers
+   - **GitHub Releases (set up already):** check the owner (`DanHunter753`) and set the repository name. Players' launchers
      download releases without logging in, so that repository must be **public**. Your code can stay private: make a
      small public repository just for releases, add a personal access token (scope `repo`) as the secret
      `GH_RELEASE_TOKEN` in the private one, and point `publish` at the public one.

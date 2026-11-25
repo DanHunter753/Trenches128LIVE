@@ -51,6 +51,6 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"
     },
-    "publish": [{ "provider": "github", "owner": "YOUR_GITHUB_USER", "repo": "trench128-launcher", "releaseType": "release" }]
+    "publish": [{ "provider": "github", "owner": "DanHunter753", "repo": "trench128-launcher", "releaseType": "release" }]
   }
 }
