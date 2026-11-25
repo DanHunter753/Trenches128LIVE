@@ -86,6 +86,18 @@ GitHub Pages only hosts static files, so it can serve the **game page** but not 
 2. In the repo, go to Settings → Pages and deploy from branch `main`, folder `/docs`.
 3. Players open `https://<user>.github.io/<repo>/?server=game.example.com`. The server needs HTTPS (`wss://`). Add the github.io origin to `T128_ORIGINS` if you restrict origins.
 
+## Hands-free updates and nightly backups
+Once, on the server (as root): `cd ~/Trenches128LIVE && git pull && bash tools/install-autodeploy.sh`
+
+- Every 5 minutes the server checks GitHub. When `main` has something new it waits until nobody is playing (at
+  most 6 hours, then updates anyway), pulls, and rebuilds. So merging a pull request is all an update takes,
+  even from the GitHub phone app.
+- If a build fails, the game keeps running the previous version and that version isn't retried; merge a fix
+  and it is tried again.
+- Accounts and XP are backed up every night at 04:30 to `/var/backups/trench128`; the last 14 days are kept.
+- What happened: `journalctl -u trench128-deploy -n 20` · backups: `ls /var/backups/trench128` ·
+  turn it off: `systemctl disable --now trench128-deploy.timer trench128-backup.timer`
+
 ## Windows launcher (what players download)
 See `launcher/README.md`. In short: set your server addresses in `launcher/defaults.json`, set where updates are
 published in `launcher/package.json`, then either push a `launcher-vX.Y.Z` tag (GitHub Actions builds and publishes) or
