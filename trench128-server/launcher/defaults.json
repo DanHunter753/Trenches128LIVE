@@ -1,9 +1,0 @@
-{
-  "_readme": "Built into the launcher. masterUrl: a Trench 128 server started with --registry (its /servers list fills the server browser). servers: always listed. newsUrl: optional https JSON list of {title, date, body}; without it ui/news.json is shown. site / discord: links in the launcher (https only).",
-  "masterUrl": "",
-  "servers": [],
-  "newsUrl": "",
-  "site": "",
-  "discord": "",
-  "prerelease": false
-}
