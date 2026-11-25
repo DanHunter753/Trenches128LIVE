@@ -1,0 +1,38 @@
+# Builds the Windows launcher and publishes it as a GitHub release, which is where installed launchers look for updates.
+# Start it by pushing a tag such as launcher-v1.0.1 (the tag must match "version" in launcher/package.json).
+name: Launcher release
+on:
+  push:
+    tags: ['launcher-v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: launcher
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          v=$(node -p "require('./package.json').version")
+          [ "${GITHUB_REF_NAME}" = "launcher-v$v" ] || { echo "tag ${GITHUB_REF_NAME} but package.json says $v"; exit 1; }
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - name: Build and publish
+        run: npx electron-builder --win --x64 --publish always
+        env:
+          # the workflow's own token can publish to this repository; to publish to another (public) repository, add a
+          # personal access token as the secret GH_RELEASE_TOKEN and it is used instead
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Trench128-Setup
+          path: launcher/dist/*.exe

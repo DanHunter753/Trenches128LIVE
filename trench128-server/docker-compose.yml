@@ -1,0 +1,35 @@
+# Trench 128 on a VPS with automatic HTTPS (Caddy). 1) point your domain's DNS at the server, 2) cp .env.example .env and edit,
+# 3) docker compose up -d --build. Players open https://YOUR_DOMAIN. Data (accounts, XP) lives in the trench-data volume.
+services:
+  game:
+    build: .
+    restart: unless-stopped
+    environment:
+      T128_NAME: ${T128_NAME:-Trench 128}
+      T128_PUBLIC: https://${DOMAIN}
+      T128_ACCOUNTS: ${T128_ACCOUNTS:-optional}
+      T128_REGISTRY: ${T128_REGISTRY:-1}
+      T128_MASTER: ${T128_MASTER:-}
+      T128_FILL: ${T128_FILL:-40}
+      T128_SLOTS: ${T128_SLOTS:-128}
+      T128_REGION: ${T128_REGION:-}
+      T128_MAPS: ${T128_MAPS:-random}
+      T128_ORIGINS: ${T128_ORIGINS:-}
+      T128_TRUST_PROXY: "1"   # players arrive through Caddy: read their real address from its headers
+    volumes:
+      - trench-data:/data
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [game]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+volumes:
+  trench-data:
+  caddy-data:

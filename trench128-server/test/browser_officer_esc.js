@@ -1,0 +1,10 @@
+const { chromium } = require('playwright');
+const STUB = `(function(){function mk(){const store={};const f=function(){return mk()};return new Proxy(f,{get(t,k){if(k===Symbol.toPrimitive)return()=>0;if(k in store)return store[k];if(k==='length')return 0;store[k]=mk();return store[k]},set(t,k,v){store[k]=v;return true},apply(){return mk()},construct(){return mk()}})}window.THREE=new Proxy({},{get(t,k){if(/Filter$/.test(String(k)))return 1;return function(){return mk()}}})})();`;
+(async()=>{const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});const p=await b.newPage({viewport:{width:1100,height:800}});const errs=[];p.on('pageerror',e=>errs.push(e.message));
+await p.route('**/three.min.js',r=>r.fulfill({contentType:'text/javascript',body:STUB}));
+await p.goto('http://localhost:8099');await p.waitForSelector('#nm');await p.fill('#nm','OffTester');await p.click('#cn');await p.waitForSelector('#go');await p.click('.card[data-k="cls"][data-v="officer"]');await p.click('#go');await p.waitForFunction(()=>me.alive===true&&me.officer,null,{timeout:8000});
+const hidden0=await p.evaluate(()=>document.getElementById('ov').style.display==='none');
+await p.keyboard.press('Escape');const shown=await p.isVisible('#st');
+await p.click('#st');const setOpen=await p.isVisible('#set');await p.keyboard.press('Escape');const setClosed=!(await p.isVisible('#set'));
+await p.keyboard.press('Escape');const hiddenAgain=await p.evaluate(()=>document.getElementById('ov').style.display==='none');
+console.log(JSON.stringify({hidden0,shown,setOpen,setClosed,hiddenAgain,errs}));await b.close()})().catch(e=>{console.error('FAIL',e.message);process.exit(1)});

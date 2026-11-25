@@ -1,0 +1,12 @@
+# never upload player data or secrets
+accounts.json
+xp.json
+*.tmp
+.env
+# installed / built files (recreated by npm install and builds)
+node_modules/
+launcher/node_modules/
+launcher/dist/
+build/__pycache__/
+public/launcher/*.exe
+public/launcher/*.blockmap

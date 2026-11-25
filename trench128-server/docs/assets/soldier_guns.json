@@ -1,0 +1,1 @@
+{"fw": 160, "bodyw": 96, "fh": 150, "weapons": ["bolt", "carbine", "shotgun", "smg", "lmg", "mark", "flame", "atr", "hmg"], "cols": "state*4+view", "states": ["hold", "aim"]}

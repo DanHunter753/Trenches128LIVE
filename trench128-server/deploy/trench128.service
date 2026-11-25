@@ -1,0 +1,29 @@
+# systemd unit for running Trench 128 without Docker. Copy to /etc/systemd/system/, edit the paths and settings, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now trench128
+[Unit]
+Description=Trench 128 game server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trench
+WorkingDirectory=/opt/trench128
+ExecStart=/usr/bin/node server.js --trust-proxy
+Environment=PORT=8080
+Environment=T128_DATA=/var/lib/trench128
+Environment=T128_NAME=My Trench 128 server
+Environment=T128_PUBLIC=https://game.example.com
+Environment=T128_ACCOUNTS=optional
+Environment=T128_REGISTRY=1
+Environment=T128_FILL=40
+Restart=always
+RestartSec=3
+# stop saves XP and accounts (SIGTERM), give it a moment
+TimeoutStopSec=10
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/trench128 /opt/trench128/public/vendor
+
+[Install]
+WantedBy=multi-user.target

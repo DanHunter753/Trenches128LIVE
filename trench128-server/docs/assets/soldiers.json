@@ -1,0 +1,1 @@
+{"fw": 160, "fh": 150, "views": 4, "poses": 4, "poseNames": ["idle", "strideA", "strideB", "aim", "crouch"], "classes": ["rifleman", "assault", "gunner", "medic", "sapper", "officer", "recon"], "rows": "team*7+class", "cols": "pose*4+view (poses idle, strideA, strideB, aim, crouch)", "armed": true, "source": "owner-supplied reference art (build/ref), v0.29"}
