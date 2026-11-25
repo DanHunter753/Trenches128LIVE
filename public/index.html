@@ -179,7 +179,7 @@ function applyCrater(c,fx){T.dig(terr,c[0],c[1],c[2],c[3]);dirtyRect(c[0],c[1],c
 const dm=new THREE.Object3D(),sbM=new THREE.MeshLambertMaterial({color:0xa89870,map:TXP('tx_burlap',true)}),woodM=new THREE.MeshLambertMaterial({color:0xb0a090,map:TXP('tx_timber',true)}),mgM=new THREE.MeshLambertMaterial({color:0x222222});
 function box(w,h,d,m,x,y,z,ry){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);b.rotation.y=ry||0;scene.add(b);return b}
 T.HQS.forEach(q=>{const g=q.gy;box(11,.4,8,woodM,q.x,g+2.7,q.z);box(11,.6,8,sbM,q.x,g+3.2,q.z);[-5,5].forEach(a=>[-3.5,3.5].forEach(c=>box(.35,2.7,.35,woodM,q.x+a,g+1.35,q.z+c)))});
-T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k++){const a=k*.4;[.25,.8].forEach(y=>box(1.5,.55,.7,sbM,n.x+Math.sin(a)*2.2,g+y,n.z+dir*Math.cos(a)*2.2,a*dir))}box(.25,.25,1.8,mgM,n.x,g+1.1,n.z+dir*.9);box(.8,.8,.8,woodM,n.x,g+.4,n.z)});
+T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k++){const a=k*.4;[.25,.8].forEach(y=>box(1.5,.55,.7,sbM,n.x+Math.sin(a)*2.2,g+y,n.z+dir*Math.cos(a)*2.2,a*dir))}n.gm=box(.25,.25,1.8,mgM,n.x,g+1.1,n.z+dir*.9);box(.8,.8,.8,woodM,n.x,g+.4,n.z)});
 {const wp=new THREE.InstancedMesh(new THREE.CylinderGeometry(.06,.06,1.5,4),woodM,200),wl=[];let wn=0;
  [-1,1].forEach(s=>{const wz=x=>T.trenchC(s*30,x)-s*11;for(let x=-W+4;x<=W-8;x+=4){if(T.GAPS.some(g=>Math.abs(x-g)<5))continue;const z=wz(x),y=hAt(x,z);dm.position.set(x,y+.75,z);dm.updateMatrix();wp.setMatrixAt(wn++,dm.matrix);
   if(!T.GAPS.some(g=>Math.abs(x+4-g)<5))[.4,.8,1.2].forEach(h=>wl.push(x,y+h,z,x+4,hAt(x+4,wz(x+4))+h,wz(x+4)))}});
@@ -276,7 +276,11 @@ T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k+
 }
 /* player-built fortifications: mirrored from the server (fo/fa/fx) into shared.js so prediction, sight and drawing match */
 const SPM={},spMat=n=>SPM[n]||(SPM[n]=(()=>{const t=new THREE.TextureLoader().load('assets/'+n+'.png');t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;return new THREE.SpriteMaterial({map:t,alphaTest:.5})})());
-const FTM=new Map();let fMat=null,fortNear=null,wkT=0,bmOpen=false;
+const FTM=new Map();let fMat=null,fortNear=null,wkT=0,bmOpen=false,repNear=null;
+/* v0.31 wrecked guns: a knocked-out MG nest loses its gun; hold E beside a wreck of your own side to repair it */
+function nestDeadVis(i,d){const n=T.NEST[i];if(!n)return;const was=!!n.dead;n.dead=!!d;if(n.gm)n.gm.visible=!d;if(d&&!was){try{boomFx(n.x,n.z)}catch(e){}}}
+function nearWreck(){let best=null,bd=3;for(const n of T.NEST)if(n.dead&&n.team===me.team){const d=Math.hypot(n.x-me.x,n.z-me.z);if(d<bd){bd=d;best={n:'machine gun'}}}
+ for(const v of VH.values())if(v.dead&&!(v.fl&64)&&v.k!==0&&v.team===me.team){const d=Math.hypot(v.b.x-me.x,v.b.z-me.z);if(d<3.2&&d<bd){bd=d;best={n:v.k===1?'field gun':'mortar'}}}return best}
 function fortMats(){if(!fMat)fMat={bag:sbM,wood:woodM,stone:new THREE.MeshLambertMaterial({color:0xa8a49a,map:TXP('tx_stone',true)}),gun:mgM};return fMat}
 function fortMesh(f){const old=FTM.get(f.id);if(old){if(old.k===f.k&&old.spawn===f.spawn&&old.team===f.team){old.g.scale.y=f.done>=1?1:.12+.88*f.done;return}scene.remove(old.g);old.g.traverse(o=>{if(o.geometry)o.geometry.dispose()})}
  const M=fortMats(),P=T.fortParts(f.k),g=new THREE.Group();
@@ -437,7 +441,7 @@ function onMsg(m){
  switch(m.t){
   case'err':{if(RJ&&/in use/.test(m.m)&&rjTries++<5){if(ws){ws.onclose=null;ws.close()}ws=null;setTimeout(()=>{if($('cn'))$('cn').click()},1200);break}const e=$('ovb').querySelector('.err');if(e)e.textContent=m.m;if(/expired/.test(m.m)){tokSet($('host')?$('host').value:'',null);acctShow()}if(ws)ws.close();ws=null;break}
   case'prof':if(m.map!=null&&m.map!==T.MP.seed){mapReload(m.map,null,RJ&&RJ.dep);break}prof=m;me.id=m.id;me.team=m.team;me.xp=m.xp;me.rank=m.rank;try{const l=JSON.parse(localStorage.getItem('t128mp')||'{}');Object.assign(L,l)}catch(e){}if(RJ&&m.back!=null&&m.back>=0)L.sq=m.back;fixL();loadoutScreen();if(RJ&&RJ.dep){RJ=null;setTimeout(()=>{if($('go'))$('go').click()},80)}RJ=null;break;
-  case'w':applyWx(m.wx||'overcast');for(const c of m.craters){T.applyEv(terr,c);if(c[0]==='b')bayVis(c[1]*1000+c[2],true)}sync();propsFollow(0,0,1e9);fortsReset(m.forts||[]);me.cls=m.cls;me.w=m.w;drawGun();me.u=m.u;me.sq=m.sq;me.maxhp=CLS[m.cls].hp;deployed=true;document.body.classList.remove('menu');
+  case'w':applyWx(m.wx||'overcast');for(const i of(m.nd||[]))nestDeadVis(i,1);for(const c of m.craters){T.applyEv(terr,c);if(c[0]==='b')bayVis(c[1]*1000+c[2],true)}sync();propsFollow(0,0,1e9);fortsReset(m.forts||[]);me.cls=m.cls;me.w=m.w;drawGun();me.u=m.u;me.sq=m.sq;me.maxhp=CLS[m.cls].hp;deployed=true;document.body.classList.remove('menu');
    $('ov').style.display='none';say(m.cls==='officer'?'Officer on station.':'Deployed. Click the screen to capture the mouse.');if(m.cls!=='officer'){try{lockMouse()}catch(e){}}for(const c of(m.crates||[]))addCrate(c);setOfficer(m.cls==='officer');break;
   case'sp':maskOn=false;me.elite=null;supV=0;recPend=0;meleeT=9;me.chg=T.CHG_MAX;me.charging=false;ddL.length=0;me.x=m.x;me.y=m.y;me.z=m.z;me.vy=0;me.alive=true;me.hp=m.hp;me.cls=m.cls;me.w=m.w;drawGun();me.u=m.u;me.sq=m.sq;me.maxhp=CLS[m.cls].hp;if(me.mg)mgView(false);me.mg=false;me.cl=null;me.clWait=0;pending=[];if(!m.rv){me.yaw=me.team?Math.PI:0;me.pitch=0}me.down=false;me.gaveUp=false;me.ammo=me.prevAmmo=WPN[m.w].mag;me.prevHp=m.hp;me.eye=1.65;$('gun').style.display='';setOfficer(m.cls==='officer');myOrder=null;syncBeams();say(m.rv?'Revived — stay low':m.cls==='officer'?'Officer on station. Pick a squad and an order, then click the map.':'Spawned');break;
   case'dead':endPlace();setTimeout(()=>{if(document.pointerLockElement)document.exitPointerLock();spawnDraw()},400);me.alive=false;me.down=false;me.gaveUp=false;say(m.by==='your own choice'?'Respawning…':m.by==='bleeding out'?'You bled out. Respawning…':'Killed by '+m.by+'. Respawning…');break;
@@ -446,6 +450,7 @@ function onMsg(m){
   case'fa':fortApply(m.f);break;
   case'fx':fortDel(m.id);break;
   case'wk':me.wk={p:m.p,n:m.n,x:!!m.x,at:performance.now()};break;
+  case'nd':nestDeadVis(m.i,m.d);break;
   case'rvp':me.rvp=m.p;me.rvAt=performance.now();me.rvBy=m.by||'';break;
   case'msg':say(m.m);break;   case'chat':chatAdd(m);break;
   case'hm':if(m.v===2){tone(2600,2300,.03,.05,'triangle');break}hmV=1;{const h=$('hm');h.className=(m.k?'k ':'')+(m.h?'h':'');}hitSnd(m);if(m.k&&m.h&&performance.now()-knAt<300)knShow(knTxt+'  ·  HEADSHOT','+10');else if(m.k&&m.m&&performance.now()-knAt<300)knShow(knTxt+'  ·  BAYONET','+10');break;
@@ -492,7 +497,7 @@ function onMsg(m){
   case'opn':opBanner(m);break;
   case'oob':oobUntil=m.s?performance.now()+m.s*1000:0;break;
   case'end':roundState='ended';overlay('<h1>'+(m.win===0?'BLUE':'GREEN')+' WINS THE TERRITORY</h1>'+(opS?(opS[0]===me.team?(m.win===me.team?'Your attack broke through every line.':'Your attack ran out of men.'):(m.win===me.team?'Your line held. The enemy is spent.':'The enemy broke through your last line.')):(m.win===me.team?'Your side broke the line.':'Your side was overrun.'))+'<br>Next round the sides swap: attackers defend.'+'<br>New round starting shortly…'+aarHtml(m),'');document.exitPointerLock();break;
-  case'reset':if(m.map!=null&&m.map!==T.MP.seed){mapReload(m.map,m.rj,true);break}T.resetBays();for(const k of BAYI.keys())bayVis(k,false);for(const s of shellL)scene.remove(s.m);shellL.length=0;fireL.length=0;for(const f of flareL){scene.remove(f.m);if(f.L)scene.remove(f.L)}flareL.length=0;myVeh=null;vvKey='-';swL.length=0;mkL.length=0;alertL.length=0;alertDraw();syncPosts([]);fortsReset([]);terr=T.makeTerrain();sync();propsFollow(0,0,1e9);firesPlace();depotsPlace();dpS=T.DEPOTS.map(()=>[-1,0]);gasL.length=0;reconL.length=0;for(const e of ents.values())scene.remove(e.sp);ents.clear();me.alive=false;$('ov').style.display='none';myOrder=null;offOrders=[];syncBeams();crateM.forEach(c=>scene.remove(c.m));crateM.clear();say('New round');break;
+  case'reset':if(m.map!=null&&m.map!==T.MP.seed){mapReload(m.map,m.rj,true);break}T.NEST.forEach((n,i)=>{if(n.dead)nestDeadVis(i,0)});T.resetBays();for(const k of BAYI.keys())bayVis(k,false);for(const s of shellL)scene.remove(s.m);shellL.length=0;fireL.length=0;for(const f of flareL){scene.remove(f.m);if(f.L)scene.remove(f.L)}flareL.length=0;myVeh=null;vvKey='-';swL.length=0;mkL.length=0;alertL.length=0;alertDraw();syncPosts([]);fortsReset([]);terr=T.makeTerrain();sync();propsFollow(0,0,1e9);firesPlace();depotsPlace();dpS=T.DEPOTS.map(()=>[-1,0]);gasL.length=0;reconL.length=0;for(const e of ents.values())scene.remove(e.sp);ents.clear();me.alive=false;$('ov').style.display='none';myOrder=null;offOrders=[];syncBeams();crateM.forEach(c=>scene.remove(c.m));crateM.clear();say('New round');break;
  }
 }
 const WKEY=['bolt','carbine','shotgun','smg','lmg','mark','sniper','mg'];
@@ -1203,7 +1208,8 @@ function frame(){
   if(deployed&&me.alive&&me.cls==='medic'&&!me.mg){let bd=2.7;for(const e of ents.values())if(e.down&&e.team===me.team){const d=Math.hypot(e.b.x-me.x,e.b.z-me.z);if(d<bd){bd=d;medNear=e}}
    if(medNear&&dn('use')&&lockedNow()){revT-=dt;if(revT<=0){revT=.2;sendJ({t:'act',a:'revive'})}reviving=performance.now()}else revT=0}
   fortNear=deployed&&me.alive&&!me.mg&&!me.officer&&!medNear?nearFort():null;
-  if(fortNear&&dn('use')&&lockedNow()){wkT-=dt;if(wkT<=0){wkT=.2;sendJ({t:'act',a:'work'})}}else wkT=0}
+  repNear=deployed&&me.alive&&!me.mg&&!me.officer&&!medNear&&!fortNear?nearWreck():null;
+  if((fortNear||repNear)&&dn('use')&&lockedNow()){wkT-=dt;if(wkT<=0){wkT=.2;sendJ({t:'act',a:'work'})}}else wkT=0}
  ghostTick();opFrame();
  if(deployed&&me.alive&&!me.officer&&!me.mg&&!myVeh&&S.bob){const run=me.charging?1.5:sprB,amp=.022+.05*run;cam.position.y+=Math.sin(bob*2)*amp;cam.rotation.z+=Math.sin(bob)*(.004+.022*run);cam.rotation.x+=Math.sin(bob*2)*.004*run}
  cam.rotation.x+=punch;punch*=Math.max(0,1-dt*18);cam.updateMatrixWorld();soldiersDraw();
@@ -1230,7 +1236,7 @@ function frame(){
   {const hb=$('hb'),show=me.alive&&!me.officer;hb.style.display=show?'':'none';$('tabh').style.display=show||me.officer?'':'none';
    if(show&&myVeh){const vh=vehHud();hb.querySelector('.am').innerHTML=vst.rl>0?vst.rl.toFixed(1)+'<small>s reload</small>':'READY';hb.querySelector('.ul i').style.width=vst.hp+'%';hb.querySelector('.sp').textContent='ARMOUR '+vst.hp+'%  ·  SUPPLY '+me.supply;hb.querySelector('.it').textContent=vh?vh.keys:''}
    else if(show){if(me._wi!==me.w){me._wi=me.w;wIcon()}hb.querySelector('.am').innerHTML=me.mg?me.ammo+'<small>rds</small>':me.ammo+'<small>/ '+w.mag+(me.rel?' · reloading':'')+'</small>';hb.querySelector('.ul i').style.width=Math.max(0,Math.min(100,me.hp/(me.maxhp||100)*100))+'%';hb.querySelector('.sp').textContent='SUPPLY '+me.supply+'  ·  HP '+Math.ceil(me.hp);hb.querySelector('.it').textContent='['+kn('grenade')+'] GRENADES '+(me.gr|0)+'   ['+kn('heal')+'] '+(me.u==='gasnade'?'GAS GRENADES':me.u==='smokenade'?'SMOKE GRENADES':me.u==='flare'?'FLARES':'BANDAGES')+' '+(me.bd|0)+(maskOn?'   ['+kn('mask')+'] MASK ON':'')}
-   {const hi=$('hint');const vHint=show?(ekHint()||vehNearHint()):null;const wkOn=performance.now()-((me.wk&&me.wk.at)||0)<600;if(fortNear&&show&&!medNear){hi.style.display='block';const F=T.FORT[fortNear.k];hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':fortNear.team===me.team?'Hold ['+kn('use')+'] to build the '+F.n.toLowerCase()+' ('+Math.round(fortNear.done*100)+'%)':'Hold ['+kn('use')+'] to tear down the enemy '+F.n.toLowerCase()}else if(medNear&&show){hi.style.display='block';hi.textContent=performance.now()-(me.rvAt||0)<700?'Reviving '+Math.round(me.rvp*100)+'%':'Hold ['+kn('use')+'] to revive'}else if(vHint){hi.style.display='block';hi.textContent=vHint}else if(clAvail&&show&&!me.cl){hi.style.display='block';hi.textContent='Hold ['+kn('jump')+'] to climb'}else hi.style.display='none'}
+   {const hi=$('hint');const vHint=show?(ekHint()||vehNearHint()):null;const wkOn=performance.now()-((me.wk&&me.wk.at)||0)<600;if(repNear&&show&&!medNear){hi.style.display='block';hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':'Hold ['+kn('use')+'] to repair the '+repNear.n+(me.cls==='sapper'?'':' (sappers repair faster)')}else if(fortNear&&show&&!medNear){hi.style.display='block';const F=T.FORT[fortNear.k];hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':fortNear.team===me.team?'Hold ['+kn('use')+'] to build the '+F.n.toLowerCase()+' ('+Math.round(fortNear.done*100)+'%)':'Hold ['+kn('use')+'] to tear down the enemy '+F.n.toLowerCase()}else if(medNear&&show){hi.style.display='block';hi.textContent=performance.now()-(me.rvAt||0)<700?'Reviving '+Math.round(me.rvp*100)+'%':'Hold ['+kn('use')+'] to revive'}else if(vHint){hi.style.display='block';hi.textContent=vHint}else if(clAvail&&show&&!me.cl){hi.style.display='block';hi.textContent='Hold ['+kn('jump')+'] to climb'}else hi.style.display='none'}
    if(!opHud())$('stat').textContent=(wave[0]===me.team?'YOUR PUSH ':'ENEMY PUSH ')+Math.max(0,45-wave[1])+'s'+(myOrder&&!me.officer?'\n'+myOrder.ty.toUpperCase()+' '+myOrder.n+' · '+Math.round(Math.hypot(myOrder.x-me.x,myOrder.z-me.z))+' m':'')}}
  msgT-=dt;if(msgT<=0)$('msg').textContent='';
 }
