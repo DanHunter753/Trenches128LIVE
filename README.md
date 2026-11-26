@@ -73,6 +73,39 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.31 - gameplay round 1
+- **Wrecked guns and repairs:** an enemy grenade in a trench MG nest or a shell beside it knocks the gun out (the gunner
+  is thrown off, +30 XP, kill feed). Anti-tank rifle rounds now damage field guns and mortars too. Any wreck of your
+  own side is repaired by holding E beside it: a sapper takes about 8 s, anyone else about 20 s (+15 XP). An
+  unrepaired MG nest comes back on its own after 90 s. Test: `wrecks`.
+- **Mud and flooding:** in rain, trench floors flood (wading, about 22% slower), shell holes fill with water (about
+  28% slower) and no-man's-land turns to mud (about 12% slower); dugouts stay dry. The rule lives in the shared
+  movement code, so prediction stays exact; the ground looks dark and wet where it applies. Test: `mud`.
+- **Field telephone lines:** three wires on poles run from each side's HQ dugouts to its front trench (on every map).
+  Artillery (barrage, smoke, gas, creeping, heavy) needs at least one working line, and every cut line makes those
+  cooldowns about 35% longer. Shells cut wire; an enemy holding E at the wire cuts it (sapper 1.5 s, others 3 s,
+  +15 XP); holding E at a break of your own splices it (sapper 2.5 s, others 5 s, +10 XP). Breaks mend themselves
+  after 120 s. Cuts show red on the minimap; the officer panel shows "telephone x/3". Test: `phones`.
+- **Beginner tutorial:** on a first deploy a coach card walks through moving, sprinting, firing, reloading, going over
+  the top, objectives and teamwork, each step ticked off by doing it (touch players get touch wording). It can be
+  skipped, and Settings > Controls brings it back. Officers never see it. Test: `browser_tutorial`.
+- **Tunnel mines:** two mine shafts (timber frames) per side in the front trench. Holding E at one digs a gallery under
+  the enemy front trench opposite (sapper about 75 s of work, others 3x slower, diggers add up). Half-way the enemy
+  hears it: holding E at the listening post (sign post) above the charge countermines it (sapper 5 s, others 10 s),
+  collapsing the gallery. A finished gallery blows three big craters under their trench (+50 XP to the diggers). A
+  shaft needs 60 s before it can be dug again. Test: `tunnels`.
+- **Aircraft and AA guns:** the officer's bomber run and recon flight are now flown by biplanes that cross from your
+  own side (the bomber drops 8 bombs along its path; the recon plane circles the target for 25 s), plus a new
+  strafing run (tier 2, hotkey J: a fighter rakes a 60 m line). Rifles and MGs can shoot planes down (+40 XP);
+  each side has two AA guns between its HQ dugouts that fire flak at enemy planes within 110 m. A plane shot down
+  stops its job and crashes. AA guns are wrecked by enemy shells and repaired by holding E, like MG nests; knocking
+  out their AA first makes air support safer. Test: `planes`.
+- **Spawn map:** when you die, a map of the battlefield replaces the text list. Click your base, a field post, rally
+  point or building respawn point, or any flag your side fully holds (you respawn in that trench). A flag that is
+  being taken or has an enemy within 25 m is greyed out; if it falls before you respawn you go elsewhere and are
+  told. Number keys still work. The pause menu no longer pops over the map when you die. Test: `spawnmap`.
+- Fix: wrecked MG nests now reset at the start of every round even when the map doesn't change.
+
 ## v0.30.1 - phones, the rifle, the minimap, the launcher goes live
 - **Touch controls** (Settings > Controls; on by default on touch-only devices): a floating stick on the left half (push
   to the edge to sprint), drag on the right half to look, and buttons for fire, aim, jump, crouch, reload, grenade, heal,

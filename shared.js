@@ -366,6 +366,16 @@ function climbAt(c, t) {
   if (u < a) { const k = ease3(u / a); return { x: c.x0 + (c.wx - c.x0) * k, z: c.z0 + (c.wz - c.z0) * k, y: c.y0 + (c.y1 + .15 - c.y0) * k }; }
   const k = ease3((u - a) / (1 - a)); return { x: c.wx + (c.x1 - c.wx) * k, z: c.wz + (c.z1 - c.wz) * k, y: c.y1 + .15 * (1 - k) };
 }
+// v0.31 mud and flooding: in rain, trench floors flood (wading), shell holes fill with water and no-man's-land churns to
+// mud. wetCell(k): 0 dry, 1 mud, 2 flooded trench floor, 3 water-filled shell hole. Dugouts stay dry. Same on server and client.
+const WET_SPD = [1, .88, .78, .72];
+function wetCell(k, H, x, z) {
+  if (WX.k !== 'rain' || !H) return 0;
+  if (FLOOR && FLOOR[k]) return roomAt(x, z) ? 0 : 2;
+  if (PRISTINE && H[k] < PRISTINE[k] - .6) return 3;
+  return Math.abs(z) < 26 ? 1 : 0;
+}
+function wetAt(H, x, z) { const i = Math.round((x + W) / ST), j = Math.round((z + W) / ST); if (i < 0 || j < 0 || i > N || j > N) return 0; return wetCell(j * (N + 1) + i, H, x, z); }
 function step(p, cmd, H, spdMul) {
   if (p.cl) { p.cl.t += cmd.dt; const c = p.cl, q = climbAt(c, c.t); p.x = q.x; p.y = q.y; p.z = q.z; p.vy = 0; if (c.t >= c.dur) { p.x = c.x1; p.y = c.y1; p.z = c.z1; p.cl = null; } return; }
   if ((cmd.bits & 16) && p.y <= groundAt(H, p.x, p.z, p.y) + .1 && !(p.vy > 0)) {
@@ -378,7 +388,7 @@ function step(p, cmd, H, spdMul) {
   const wb = WPN[p.w], chg = (bits & 64) && (bits & 1) && f > 0 && wb && wb.bay && p.chg > .05 && !(bits & 2);
   p.charging = !!chg; p.chg = chg ? Math.max(0, p.chg - dt) : Math.min(CHG_MAX, p.chg + dt * .4);
   const mud = (WXS[WX.k] || WXS.overcast).mud;
-  const sp = (chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul;
+  const sp = (chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul * WET_SPD[wetAt(H, p.x, p.z)];
   const l = Math.hypot(f, s) || 1, yaw = cmd.yaw;
   const mx = (-Math.sin(yaw) * f + Math.cos(yaw) * s) / l, mz = (-Math.cos(yaw) * f - Math.sin(yaw) * s) / l;
   const nx = p.x + mx * sp * dt, nz = p.z + mz * sp * dt, sl = (groundAt(H, nx, nz, p.y) - groundAt(H, p.x, p.z, p.y)) / Math.max(.01, sp * dt);
@@ -431,6 +441,39 @@ function rollLayout(seed) {
   L.DEP = [[names[0], -ri(134, 145), west], [names[1], -ri(134, 145), -west], [names[2], ri(134, 145), -west], [names[3], ri(134, 145), west]];
   return L;
 }
+// v0.31 field telephone lines: one per HQ, on poles every 7 m from the HQ up to just behind its own front trench (poles
+// skip trench cuts; the wire spans them). PHONES[l] = { team, pts: [[x, z], ...] }; segment s runs pts[s] -> pts[s + 1].
+// v0.31 tunnel mines: two mine shafts per side in the front trench; a finished gallery blows up under the enemy front
+// trench straight across (TUNNELS[i] = { team, x, z (shaft head), tx, tz (charge under the enemy trench) }).
+const TUNNELS = [];
+function buildTunnels() {
+  TUNNELS.length = 0;
+  for (const t of [0, 1]) for (const x0 of t ? [-44, 40] : [-62, 58]) {   // (staggered: a shaft never sits on the other side's charge)
+    let x = x0; for (const d of [0, 4, -4, 8, -8, 12, -12]) { const xx = x0 + d; if (!NEST.some(n => Math.hypot(n.x - xx, n.z - trenchC(t ? -30 : 30, xx)) < 8) && !roomAt(xx, trenchC(t ? -30 : 30, xx))) { x = xx; break; } }
+    TUNNELS.push({ team: t, x, z: +trenchC(t ? -30 : 30, x).toFixed(2), tx: x, tz: +trenchC(t ? 30 : -30, x).toFixed(2) });
+  }
+}
+// v0.31 anti-aircraft guns: two per side between the HQ dugouts, AA[i] = { team, x, z }
+const AA = [];
+function buildAA() {
+  AA.length = 0;
+  for (const t of [0, 1]) { const H = HQS.filter(q => q.team === t).sort((a, b) => a.x - b.x); for (let i = 0; i + 1 < H.length && i < 2; i++) {
+    const x = Math.round((H[i].x + H[i + 1].x) / 2); let z = (H[i].z + H[i + 1].z) / 2;
+    for (const d of [0, 3, -3, 6, -6, 9]) { const zz = z + d; if (!FL.some(l => Math.abs(zz - trenchC(l, x)) < 4.5) && !roomAt(x, zz)) { z = zz; break; } }
+    AA.push({ team: t, x, z: +z.toFixed(2) }); } }
+}
+const PHONES = [];
+function buildPhones() {
+  PHONES.length = 0;
+  for (const q of HQS) {
+    const t = q.team, x = q.x + 4, zf = trenchC(t ? -30 : 30, x) + (t ? -3 : 3), dir = Math.sign(zf - q.z), pts = [];
+    for (let z = q.z; dir * (zf - z) > -.01; z += dir * 7) { if (FL.some(l => Math.abs(z - trenchC(l, x)) < 3.2)) continue; pts.push([x, +z.toFixed(2)]); }
+    if (!pts.length || Math.abs(pts[pts.length - 1][1] - zf) > 1) pts.push([x, +zf.toFixed(2)]);
+    if (pts.length >= 2) PHONES.push({ team: t, pts });
+  }
+}
+/** Distance from (x, z) to segment s of line l. */
+function phoneDist(l, s, x, z) { const P = PHONES[l].pts, [ax, az] = P[s], [bx, bz] = P[s + 1], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1, u = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)); return Math.hypot(ax + dx * u - x, az + dz * u - z); }
 function applyLayout(L) {
   Object.assign(MP, { ph1: 0, ph2: 0, a1: 1, a2: 1, gx: 0, gz: 0, hs: 0 }, L.P || {});
   const fill = (a, v) => { a.length = 0; a.push(...v); };
@@ -441,7 +484,7 @@ function applyLayout(L) {
     .concat(L.MORT[0].map(x => ({ k: 'mortar', team: 0, x, z: trenchC(64, x) + 9.5, yaw: 0 }))).concat(L.MORT[1].map(x => ({ k: 'mortar', team: 1, x, z: trenchC(-64, x) - 9.5, yaw: Math.PI }))));
   fill(OBJ, FL.map((t, i) => ({ t, x: OBX[i], z: trenchC(t, OBX[i]) })));
   fill(DEPOTS, L.DEP.map(([n, x, sd]) => ({ n, x, z: dz(x, sd) })));
-  buildRooms(); buildSB(); buildHQBoxes(); BAYS.clear(); FLOOR = null; PRISTINE = null;   // the terrain is generated afresh by the next makeTerrain()
+  buildRooms(); buildSB(); buildHQBoxes(); buildPhones(); buildTunnels(); buildAA(); BAYS.clear(); FLOOR = null; PRISTINE = null;   // the terrain is generated afresh by the next makeTerrain()
 }
 /** Is this layout playable? Every line objective sits in an open trench, enough dugouts per line, depots on open ground. */
 function mapCheck() {
@@ -522,7 +565,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { PHONES, phoneDist, TUNNELS, AA, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);

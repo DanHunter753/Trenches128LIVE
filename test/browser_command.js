@@ -12,7 +12,7 @@ const STUB = fs.readFileSync(__dirname + '/browser.js', 'utf8').match(/const STU
   await page.waitForSelector('#go', { timeout: 5000 });
   await page.click('.card[data-k="cls"][data-v="officer"]');
   await page.click('#go'); await page.waitForFunction(() => me.alive === true && me.officer === true, null, { timeout: 8000 }); await page.waitForTimeout(2500); const out = {};
-  out.panel = await page.evaluate(() => /COMMAND POINTS \d+ \/ 250/.test($('off').textContent) && document.querySelectorAll('#off .ab button').length === 13 && /Mill Farm/.test($('off').textContent));
+  out.panel = await page.evaluate(() => /COMMAND POINTS \d+ \/ 250/.test($('off').textContent) && document.querySelectorAll('#off .ab button').length === 14 && /Mill Farm/.test($('off').textContent));
   out.hotkeySelects = await page.evaluate(() => { cpS[0] = 100; supCd = supCd.map(() => 0); renderOff(); return true; }) && await (async () => { await page.keyboard.press('Digit3'); return page.evaluate(() => omode === 'smoke'); })();
   out.ring = await page.evaluate(() => { ofMouse = [640, 380]; ringTick(); return !!ringM && ringM.visible === true && ringM.userData.r === 12; });   // (the stub's scale vectors don't keep values)
   const sent = []; page.on('websocket', () => {}); await page.evaluate(() => { window.__sent = []; const ws = window.sendJ; window.sendJ = o => { window.__sent.push(o); return ws(o); }; });

@@ -38,7 +38,7 @@ const place = (e, x, z) => { e.x = x; e.z = z; e.y = T.hAt(S._test.terrH(), x, z
   for (let i = 0; i < 40 && DP[0].owner !== 0; i++) { place(a, DP[0].x, DP[0].z); await sleep(200); }
   ck('depotCaptured', DP[0].owner === 0); ck('captureBonusCP', X.cmdPts()[0] >= cp0 + 10); ck('captureAnnounced', A.got('msg', m => /Captured Mill Farm/.test(m.m)).length > 0);
   { const c1 = X.cmdPts()[0]; await sleep(4300); ck('passiveIncome', X.cmdPts()[0] >= c1 + 4); }
-  ck('sqsReportsCP', (() => { const m = O.last('sqs'); return m && m.cp >= 0 && m.k.length === 13 && m.inc >= 60 && m.r.length === 13 && m.tr.length === 13; })());
+  ck('sqsReportsCP', (() => { const m = O.last('sqs'); return m && m.cp >= 0 && m.k.length === 14 && m.inc >= 60 && m.r.length === 14 && m.tr.length === 14; })());
   // the enemy neutralises it
   place(a, 0, 100); DP[0].p = .04; for (let i = 0; i < 10 && DP[0].owner === 0; i++) { place(d, DP[0].x, DP[0].z); await sleep(150); }
   ck('depotNeutralised', DP[0].owner === -1); place(d, 0, -100);
@@ -54,7 +54,7 @@ const place = (e, x, z) => { e.x = x; e.z = z; e.y = T.hAt(S._test.terrH(), x, z
   ck('gasAnnounced', A.got('gas').length === 1 && D.got('gas').length === 1);
   await sleep(4200); place(d, 20, -100); ck('gasHurts', d.hp < 100 || !d.alive);
   place(d, 40, -110); d.hp = 100; d.sp[0] = 0;
-  O.send({ t: 'cmd', k: 'sup', s: 'recon', x: 40, z: -110 }); await sleep(1300);
+  O.send({ t: 'cmd', k: 'sup', s: 'recon', x: 40, z: -110 }); await sleep(3800);   // (v0.31: the recon plane has to fly there first)
   ck('reconSpots', d.sp[0] > 0 && A.got('rc').length === 1 && !D.got('rc').length);
   O.send({ t: 'cmd', k: 'sup', s: 'rally', x: 10, z: 60 }); await sleep(300);
   { const rp = X.posts().find(q => q.rally && q.team === 0); ck('rallyPost', !!rp); if (rp) { rp.rally = 1; await sleep(200); ck('rallyExpires', !X.posts().includes(rp)); } }

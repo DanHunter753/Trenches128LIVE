@@ -139,6 +139,7 @@ module.exports = function (C) {
     }
   }
   function bulletHit(b, x, y, z) {   // bullets stop on armour; only anti-tank rifle rounds hurt it
+    { const w = T.WPN[b.wk]; if (w && w.at) for (const v of V) if (v.k !== 'tank' && !v.dead && b.by && b.by.team !== v.team && distTo(v, x, z) < 1.3 && y > v.y && y < v.y + 1.8) { hurt(v, w.at * .6, b.by, 'atr'); return true; } }   // v0.31: anti-tank rounds wreck guns and mortars too
     for (const v of V) {
       if (v.k !== 'tank' || b.by === v.crew || b.by.veh === v) continue;
       if (!inTank(v, x, y, z, 0)) continue;
@@ -404,5 +405,6 @@ module.exports = function (C) {
   }
   const nearEnemyTank = (e, r) => V.find(v => v.k === 'tank' && !v.dead && v.team !== e.team && Math.hypot(v.x - e.x, v.z - e.z) < r) || null;
   const tanks = () => V.filter(v => v.k === 'tank');
-  return { V, shells, tick, input, enter, leave, vehNear, spawnTank, fireShell, fireMain, fireGun, tankMg, hurt, blast, bulletHit, inTank, crewTick, fullMsg, reset, groundLost, nearEnemyTank, tanks, lobPitch, tankGoal, artyTarget, TANK_NAME };
+  function fixNow(v) { if (!v.dead || v.lost) return; v.dead = false; v.hp = v.hpMax; v.repair = 0; C.teamTell(v.team, 'The ' + VEH[v.k].n.toLowerCase() + ' is back in action'); }   // v0.31: repaired by hand
+  return { fixNow, V, shells, tick, input, enter, leave, vehNear, spawnTank, fireShell, fireMain, fireGun, tankMg, hurt, blast, bulletHit, inTank, crewTick, fullMsg, reset, groundLost, nearEnemyTank, tanks, lobPitch, tankGoal, artyTarget, TANK_NAME };
 };
