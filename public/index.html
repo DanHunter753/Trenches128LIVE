@@ -79,6 +79,7 @@ body.touch{touch-action:none;overscroll-behavior:none}body.touch #c{touch-action
 body.touch #mm{right:auto;left:10px;top:34px;width:96px!important;height:96px!important}body.touch #kf{top:138px}body.touch #tabh{display:none}
 /* v0.33 phones: landscape only, a tidier HUD, and the gun pulled in from behind the buttons */
 body.flying #hb{display:none}
+#tcd{position:fixed;left:0;right:0;bottom:max(8vh,24px);display:none;justify-content:center;gap:9vw;z-index:16;pointer-events:none}#tcd button{pointer-events:auto;width:118px;height:118px;border-radius:50%;background:rgba(20,18,14,.5);border:2px solid rgba(222,204,150,.7);color:#efe3c0;font:bold 14px monospace;touch-action:none}#tcd button:active,#tcd button.on{background:rgba(196,156,72,.6);color:#111}
 #phud{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:5;display:none}
 #rot{position:fixed;inset:0;z-index:60;background:#14120ef2;color:#efe3c0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;font:16px 'Courier New',monospace;padding:24px}
 #rot b{font-size:64px;display:block;margin-bottom:12px;animation:rotk 1.6s ease-in-out infinite}#rot button{margin-top:18px;font:bold 15px monospace;padding:10px 18px;background:#3a3526;color:#efe3c0;border:1px solid #8a7a4a;border-radius:6px}
@@ -112,7 +113,7 @@ body.menu #off{display:none!important}
 body.menu #scope,body.menu #dn,body.menu #ch,body.menu #hud,body.menu #hb,body.menu #tabh,body.menu #stat,body.menu #hint,body.menu #banner,body.menu #oob,body.menu #opbar,body.menu #bm,body.menu #gun,body.menu #cross,body.menu #msg,body.menu #hurt,body.menu #mm{display:none}
 </style></head><body class="menu">
 <canvas id="c"></canvas><canvas id="gun" width="360" height="240"></canvas><canvas id="item" width="360" height="240"></canvas><canvas id="mm" width="170" height="170"></canvas><div id="tc"><div id="tcs"><i></i></div></div>
-<canvas id="phud"></canvas><div id="rot"><b>📱</b>Turn your phone sideways to play.<br><small>Trench 128 plays in landscape.</small><button id="rotb">Rotate to landscape</button></div><div id="tut"><button id="tutx">Skip tutorial</button><div id="tutt"></div><i><b id="tutp"></b></i></div><div id="bm"></div><div id="banner"></div><div id="oob"></div><div id="opbar"><i></i></div><div id="spk"></div><div id="hurt"></div><div id="supv"></div><div id="chgv"></div><canvas id="mud" width="180" height="120"></canvas><canvas id="fx" width="360" height="240"></canvas><canvas id="vv" width="360" height="240"></canvas><div id="cross"></div><div id="hm"><i></i><i></i><i></i><i></i></div><div id="chg"><b></b></div><div id="kn"></div><div id="chat"><div id="chatl"></div><input id="chati" maxlength="120" autocomplete="off" spellcheck="false"></div><div id="kf"></div><div id="sb"></div><div id="wheel"></div><div id="maskv"></div><div id="dpb"><span></span><i><b></b></i></div><div id="gasv"></div><div id="swt"></div><div id="brt"><span></span><i><b></b></i></div><div id="alf"></div><div id="selbox"></div><div id="hud"></div><div id="hb"><canvas id="wi" width="75" height="31"></canvas><div class="am"></div><div class="ul"><i></i></div><div class="sp"></div><div class="it"></div></div><div id="tabh">Hold TAB for controls</div><div id="stat"></div><div id="hint"></div><div id="scope"></div><div id="dn"></div><canvas id="ch" width="160" height="64"></canvas><div id="msg"></div>
+<div id="tcd"><button id="tcdm">CALL<br>MEDIC</button><button id="tcdr">HOLD TO<br>RESPAWN</button></div><canvas id="phud"></canvas><div id="rot"><b>📱</b>Turn your phone sideways to play.<br><small>Trench 128 plays in landscape.</small><button id="rotb">Rotate to landscape</button></div><div id="tut"><button id="tutx">Skip tutorial</button><div id="tutt"></div><i><b id="tutp"></b></i></div><div id="bm"></div><div id="banner"></div><div id="oob"></div><div id="opbar"><i></i></div><div id="spk"></div><div id="hurt"></div><div id="supv"></div><div id="chgv"></div><canvas id="mud" width="180" height="120"></canvas><canvas id="fx" width="360" height="240"></canvas><canvas id="vv" width="360" height="240"></canvas><div id="cross"></div><div id="hm"><i></i><i></i><i></i><i></i></div><div id="chg"><b></b></div><div id="kn"></div><div id="chat"><div id="chatl"></div><input id="chati" maxlength="120" autocomplete="off" spellcheck="false"></div><div id="kf"></div><div id="sb"></div><div id="wheel"></div><div id="maskv"></div><div id="dpb"><span></span><i><b></b></i></div><div id="gasv"></div><div id="swt"></div><div id="brt"><span></span><i><b></b></i></div><div id="alf"></div><div id="selbox"></div><div id="hud"></div><div id="hb"><canvas id="wi" width="75" height="31"></canvas><div class="am"></div><div class="ul"><i></i></div><div class="sp"></div><div class="it"></div></div><div id="tabh">Hold TAB for controls</div><div id="stat"></div><div id="hint"></div><div id="scope"></div><div id="dn"></div><canvas id="ch" width="160" height="64"></canvas><div id="msg"></div>
 <div id="off"></div>
 <div id="ov"><div class="box" id="ovb"></div></div>
 <button id="gear" title="Settings">⚙</button><div id="fps"></div><div id="set"><div id="setb"></div></div>
@@ -746,6 +747,12 @@ function landscape(){if(!S.touch)return;try{const d=document.documentElement,loc
 function orientTick(){const p=innerHeight>innerWidth*1.05;document.body.classList.toggle('portrait',p);document.body.classList.toggle('ingame',!!deployed)}
 addEventListener('resize',orientTick);addEventListener('orientationchange',()=>setTimeout(orientTick,200));
 $('rotb').addEventListener('click',()=>landscape());$('rotb').addEventListener('touchend',e=>{e.preventDefault();landscape()});
+/* v0.33.2 knocked down on a phone: two big buttons, CALL MEDIC (the Y shout) and HOLD TO RESPAWN (the held E) */
+{const tb=(id,start,end)=>{const el=$(id);el.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();el.classList.add('on');start()},{passive:false});
+  const up=e=>{if(e)e.preventDefault();el.classList.remove('on');end()};el.addEventListener('touchend',up,{passive:false});el.addEventListener('touchcancel',()=>up());};
+ tb('tcdm',()=>{if(me.down&&!me.alive){sendJ({t:'act',a:'ping',k:'medic'});say('You shout for a medic!')}},()=>{});
+ tb('tcdr',()=>{const c=S.binds.use;if(c)K[c]=1},()=>{const c=S.binds.use;if(c)K[c]=0})}
+function tcDownTick(){const on=!!S.touch&&deployed&&me.down&&!me.alive,el=$('tcd');if((el.style.display==='flex')!==on){el.style.display=on?'flex':'none';if(!on){const c=S.binds.use;if(c)K[c]=0;$('tcdr').classList.remove('on')}}}
 function tcActive(){return !!S.touch&&deployed&&me.alive&&!me.officer&&$('ov').style.display==='none'}
 addEventListener('touchstart',e=>{if(!tcActive())return;if(e.target&&e.target.closest&&e.target.closest('#tc button,#set,#gear,#ov,#chat,#chati'))return;
  if(!TCH.fs&&document.documentElement.requestFullscreen&&!document.fullscreenElement){TCH.fs=true;try{document.documentElement.requestFullscreen().catch(()=>{})}catch(x){}}
@@ -793,7 +800,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wounded.</b> When you're knocked down, press Y to shout for a medic; bot medics come running. Medics can revive anyone, bots included.<br>
  <b>Weather.</b> Each round is overcast, foggy, rainy or at night. In the dark, flares (a utility, or the officer's star shells) light up the field.<br>
  <b>Fighting.</b> Bullets drop and take time to arrive. Sprinting lowers the gun; V stabs, sprint + hold V to charge with the bayonet. Being shot at near-misses suppresses you. TAB shows the full controls in game.
- </div></details><div class="ver">v0.33.1</div>`,'');
+ </div></details><div class="ver">v0.33.2</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -1401,7 +1408,7 @@ function frame(){
  if(S.fps){fpsT+=dt;fpsN++;fpsMs=Math.max(fpsMs,dt*1000);if(fpsT>.5){const ri=renderer.info&&renderer.info.render;$('fps').textContent=Math.round(fpsN/fpsT)+' FPS · worst '+Math.round(fpsMs)+' ms · '+(ri?ri.calls:'?')+' draws · '+lodN+' soldiers · '+ssN+' props';fpsT=fpsN=0;fpsMs=0}}
  {const dnE=$('dn'),nowp=performance.now();medNear=null;
   if(deployed&&me.down&&!me.alive){me.bleedT=Math.max(0,(me.bleedT||0)-dt);me.giveT=dn('use')?(me.giveT||0)+dt:0;if(me.giveT>=1.2&&!me.gaveUp){me.gaveUp=true;sendJ({t:'act',a:'giveup'})}
-   const rv=nowp-(me.rvAt||0)<700;dnE.style.display='block';dnE.innerHTML="YOU'RE DOWN\n<small>"+(rv?'Being revived by '+me.rvBy+' · '+Math.round(me.rvp*100)+'%':'Waiting for a medic · bleeding out in '+Math.ceil(me.bleedT)+'s')+'\n['+kn('ping')+'] shout for a medic · hold ['+kn('use')+'] to respawn now</small><i><b style="width:'+Math.min(100,me.giveT/1.2*100)+'%"></b></i>'}
+   const rv=nowp-(me.rvAt||0)<700;dnE.style.display='block';dnE.innerHTML="YOU'RE DOWN\n<small>"+(rv?'Being revived by '+me.rvBy+' · '+Math.round(me.rvp*100)+'%':'Waiting for a medic · bleeding out in '+Math.ceil(me.bleedT)+'s')+'\n'+(S.touch?'tap CALL MEDIC · hold RESPAWN to give up and respawn':'['+kn('ping')+'] shout for a medic · hold ['+kn('use')+'] to respawn now')+'</small><i><b style="width:'+Math.min(100,me.giveT/1.2*100)+'%"></b></i>'}
   else dnE.style.display='none';
   if(deployed&&me.alive&&me.cls==='medic'&&!me.mg){let bd=2.7;for(const e of ents.values())if(e.down&&e.team===me.team){const d=Math.hypot(e.b.x-me.x,e.b.z-me.z);if(d<bd){bd=d;medNear=e}}
    if(medNear&&dn('use')&&lockedNow()){revT-=dt;if(revT<=0){revT=.2;sendJ({t:'act',a:'revive'})}reviving=performance.now()}else revT=0}
@@ -1415,7 +1422,7 @@ function frame(){
  cam.rotation.x+=punch;punch*=Math.max(0,1-dt*18);cam.updateMatrixWorld();soldiersDraw();
  if(shake>0){shake=Math.max(0,shake-dt*1.6);cam.position.x+=(Math.random()-.5)*shake*.25;cam.position.y+=(Math.random()-.5)*shake*.25}
  draw();
- tcTick();orientTick();phudDraw(dt);const showMM=deployed&&S.mm>0;   /* v0.30.1: every soldier has the minimap (was squad leaders and officers only) */mm.style.display=showMM?'block':'none';if(showMM){mmT-=dt;if(mmT<=0){mmT=.08;drawMM()}}
+ tcTick();tcDownTick();orientTick();phudDraw(dt);const showMM=deployed&&S.mm>0;   /* v0.30.1: every soldier has the minimap (was squad leaders and officers only) */mm.style.display=showMM?'block':'none';if(showMM){mmT-=dt;if(mmT<=0){mmT=.08;drawMM()}}
  hudT-=dt;if(hudT<=0&&deployed){hudT=.1;
   const bar=o=>{const n=Math.round((o.p+1)*5);return '█'.repeat(n)+'░'.repeat(10-n)},w=WPN[me.w];
   let h=RK[me.rank][0]+' · '+me.xp+' XP · '+(me.team?'GREEN':'BLUE')+' · '+(me.officer?'OFFICER':me.sq>=0?T.SQUADS[me.sq]+(me.lead?' (SQUAD LEADER)':''):'no squad')+'\n';

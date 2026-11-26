@@ -18,7 +18,7 @@ const BROWSER = [['browser'], ['browser_ads'], ['browser_audio'], ['browser_clim
   ['browser_settings'], ['browser_v16'], ['browser_v26', { env: { T128_WX: 'night' } }],
   ['browser_v27', { args: ['--registry', '--public', 'http://localhost:8099', '--name', 'BTest'] }],
   ['browser_v29'],
-  ['browser_tutorial'], ['browser_plane'], ['browser_tclayout'], ['browser_maps', { targs: ['--own-server'] }],
+  ['browser_tutorial'], ['browser_plane'], ['browser_tclayout'], ['browser_touchdown'], ['browser_maps', { targs: ['--own-server'] }],
   ['browser_touch'],
   ['browser_soak', { env: { T128_WX: 'night' }, args: ['--fill', '40'], targs: ['http://localhost:8099', '90'] }]];
 

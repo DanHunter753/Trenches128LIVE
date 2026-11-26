@@ -73,6 +73,11 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.33.2 - knocked down on a phone
+- Phones had no way to shout for a medic or give up while knocked down (the touch buttons hide when you're down). Two
+  big buttons now appear: CALL MEDIC (the Y shout) and HOLD TO RESPAWN (the held E, with the same 1.2 s bar), and the
+  downed screen says to use them. Test: `browser_touchdown`.
+
 ## v0.33.1 - your own button layout on phones
 - The pencil button (top right, phones only) turns on layout editing: the buttons wiggle, drag any of them wherever you
   like, then Done. The layout is saved on the phone with the other settings (as fractions of the screen, so it still
