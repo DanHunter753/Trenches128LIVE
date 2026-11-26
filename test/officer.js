@@ -50,7 +50,7 @@ function client(name, join) {
   const shield = setInterval(() => { for (const c of [L, G]) { const e = c.ent(); if (e && e.alive) e.hp = 1e6; } }, 50);
   G.send({ t: 'cmd', k: 'order', sq: 1, ty: 'attack', x: 0, z: -22 }); await sleep(300);
   ck('nonOfficerCannotOrder', !S._test.orders[0].has(1));
-  A.send({ t: 'cmd', k: 'order', sq: 1, ty: 'attack', x: 3, z: -20 }); await sleep(400);
+  A.send({ t: 'cmd', k: 'order', sq: 1, ty: 'attack', x: require('../shared.js').OBJ[3].x - 3, z: require('../shared.js').OBJ[3].z + 4 }); await sleep(400);
   const o1 = L.last('ord'), o2 = G.last('ord'), ol = A.last('ords');
   ck('humanSquadReceivesOrder', o1 && o1.o && o1.o.ty === 'attack' && /Green Front/.test(o1.o.n) && o2 && o2.o && o2.o.ty === 'attack');
   ck('officerGetsOrderList', ol && ol.l.some(r => r[0] === 1 && r[1] === 'attack'));
@@ -59,9 +59,9 @@ function client(name, join) {
   const xp0 = S._test.humans.size && L.ent().xp, oxp0 = A.ent().xp; const le = L.ent(); le.x = S._test.OB[3].x; le.z = S._test.OB[3].z; await sleep(1100);   // at the (staggered) Green Front objective
   ck('orderCompletes', L.last('ord').o.done === 1 && got(L.ent().xp - xp0, 20) && got(A.ent().xp - oxp0, 15));
   // squad-wide reward: a new defend order, the grunt waits near the point, the leader arrives
-  { const g = G.ent(), le2 = L.ent(); g.x = 40; g.z = 80; le2.x = 0; le2.z = 100; await sleep(300);
-    A.send({ t: 'cmd', k: 'order', sq: 1, ty: 'defend', x: 40, z: 82 }); await sleep(400);
-    const gx0 = g.xp, lx0 = le2.xp, ax0 = A.ent().xp; le2.x = 41; le2.z = 83; await sleep(1100);
+  { const g = G.ent(), le2 = L.ent(); g.x = 40; g.z = 88; le2.x = 0; le2.z = 110; await sleep(300);
+    A.send({ t: 'cmd', k: 'order', sq: 1, ty: 'defend', x: 40, z: 90 }); await sleep(400);
+    const gx0 = g.xp, lx0 = le2.xp, ax0 = A.ent().xp; le2.x = 41; le2.z = 91; await sleep(1100);
     ck('troopsRewardedOnCompletion', got(g.xp - gx0, 10) && got(le2.xp - lx0, 20) && got(A.ent().xp - ax0, 17) && G.msgs.some(m => m.t === 'msg' && /squad completed its order/.test(m.m)));
     const o = S._test.orders[0].get(1); o.held -= 31 * 20; const gx1 = g.xp, lx1 = le2.xp; await sleep(1100);
     ck('defendHoldPays', got(g.xp - gx1, 5) && got(le2.xp - lx1, 8)); clearInterval(shield); g.hp = le2.hp = 100; }

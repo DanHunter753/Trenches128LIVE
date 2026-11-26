@@ -73,6 +73,20 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.32 - a bigger, ruined battlefield
+- **Map 400 x 400 m** (was 320 x 320; about 1.6x the area). The front is 25% wider: wire gaps, communication trenches,
+  dugouts, nests, HQs, guns, mines and the flank depots (now at x ±170-180) spread out to match. The six lines keep
+  their depths (z ±30 / ±64 / ±100, homes at ±140), so Operations, spawns and weapon ranges play the same; the extra
+  depth behind each home camp holds ruined villages. Terrain is 800 x 800 cells (still 0.5 m).
+- **Structures (about 35 a map, from the map seed):** shelled-out farmhouses (brick), chapels with a broken tower
+  (stone), burnt barns (charred timber), walled yards and broken wall stubs; wrecked tanks, lorries, a downed biplane,
+  a field gun and wagons. Ruins sit at the flank depots (the farms, chapels and works they are named after), behind the
+  reserve lines and around the home camps; tank hulks, the plane wreck and wall stubs give cover in no-man's land.
+  Every piece is solid: it stops walking, bullets and sight on the server and client alike, bots route around it,
+  tanks can't drive through the taller pieces, and anyone spawning on one is moved clear. They show on the minimap
+  and the spawn map, and the client merges them into one mesh per material. Test: `structs`.
+- Fix: on the spawn map, the first flag could look picked before you chose anything.
+
 ## v0.31 - gameplay round 1
 - **Wrecked guns and repairs:** an enemy grenade in a trench MG nest or a shell beside it knocks the gun out (the gunner
   is thrown off, +30 XP, kill feed). Anti-tank rifle rounds now damage field guns and mortars too. Any wreck of your

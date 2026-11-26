@@ -181,6 +181,23 @@ function applyCrater(c,fx){T.dig(terr,c[0],c[1],c[2],c[3]);dirtyRect(c[0],c[1],c
 /* ------------------------------------------------------------------ static props (visual only) */
 const dm=new THREE.Object3D(),sbM=new THREE.MeshLambertMaterial({color:0xa89870,map:TXP('tx_burlap',true)}),woodM=new THREE.MeshLambertMaterial({color:0xb0a090,map:TXP('tx_timber',true)}),mgM=new THREE.MeshLambertMaterial({color:0x222222});
 function box(w,h,d,m,x,y,z,ry){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);b.rotation.y=ry||0;scene.add(b);return b}
+/* v0.32 ruins and wrecks (T.STRUCT): each solid box drawn with its material; wrecks get a few extra non-solid details */
+{const brM=new THREE.MeshLambertMaterial({color:0xa89c90,map:TXP('tx_brick',true)}),stM=new THREE.MeshLambertMaterial({color:0x9c988e,map:TXP('tx_stone',true)}),
+  rustM=new THREE.MeshLambertMaterial({color:0x4a3a2c}),darkM=new THREE.MeshLambertMaterial({color:0x2a2622}),charM=new THREE.MeshLambertMaterial({color:0x3a3028,map:TXP('tx_timber',true)}),
+  M={brick:brM,stone:stM,wood:charM,metal:rustM};
+ const MG=new Map(),addG=(g,m,x,y,z,rx,ry,rz)=>{const o=new THREE.Object3D();o.position.set(x,y,z);o.rotation.set(rx||0,ry||0,rz||0);o.updateMatrix();let q=g.index?g.toNonIndexed():g;q.applyMatrix4(o.matrix);if(!MG.has(m))MG.set(m,[]);MG.get(m).push(q)},
+  boxT=(w,h,d,m,x,y,z,ry)=>{const g=new THREE.BoxGeometry(w,h,d),uv=g.attributes.uv;if(uv)for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*Math.max(w,d)/2,uv.getY(i)*h/2);addG(g,m,x,y,z,0,ry)},
+  cyl=(r,h,m,x,y,z,rx,ry,rz)=>addG(new THREE.CylinderGeometry(r,r,h,10),m,x,y,z,rx,ry,rz);   /* every piece is merged into one mesh per material: a few draw calls for the lot */
+ for(const S of T.STRUCT){for(const b of S.parts)boxT(b.hx*2,b.y1-b.y0,b.hz*2,M[b.mat]||stM,b.cx,(b.y0+b.y1)/2,b.cz,b.yaw);
+  const c=Math.cos(S.yaw),s=Math.sin(S.yaw),L=(lx,lz)=>[S.x+lx*c+lz*s,S.z-lx*s+lz*c],g0=S.parts[0]?S.parts[0].y0:hAt(S.x,S.z);
+  if(S.k==='tank'){for(const sx of[-1,1]){const[x,z]=L(sx*1.85,0);boxT(.55,1.5,8.2,darkM,x,g0+.85,z,S.yaw)}const[bx,bz]=L(0,-3.2);boxT(.16,.16,1.8,darkM,bx,g0+2.3,bz,S.yaw+.4)}
+  else if(S.k==='lorry'){for(const sx of[-1,1])for(const lz of[-1.9,.2,1.9]){const[x,z]=L(sx*1.1,lz);cyl(.45,.25,darkM,x,g0+.7,z,0,S.yaw,Math.PI/2)}}
+  else if(S.k==='plane'){const[x,z]=L(0,3.2);boxT(2.6,.08,.8,charM,x,g0+.7,z,S.yaw);boxT(.08,1,.7,charM,x,g0+1.1,z,S.yaw);const[ex,ez]=L(.5,-3.2);boxT(.9,.9,.9,darkM,ex,g0+.6,ez,S.yaw)}
+  else if(S.k==='gun'){for(const sx of[-1,1]){const[x,z]=L(sx*1.1,.2);cyl(.7,.12,charM,x,g0+.4,z,.5,S.yaw,Math.PI/2.4)}const[x,z]=L(0,-1.4);boxT(.18,.18,2.4,darkM,x,g0+.9,z,S.yaw)}
+  else if(S.k==='wagon'){const[x,z]=L(.9,1);cyl(.6,.1,charM,x,g0+.35,z,1.2,S.yaw,0)}}
+ for(const [m,L] of MG){let n=0;for(const g of L)n+=g.attributes.position.count;const P=new Float32Array(n*3),Nn=new Float32Array(n*3),U=new Float32Array(n*2);let o=0;
+  for(const g of L){const c=g.attributes.position.count;P.set(g.attributes.position.array,o*3);if(g.attributes.normal)Nn.set(g.attributes.normal.array,o*3);if(g.attributes.uv)U.set(g.attributes.uv.array,o*2);o+=c;g.dispose&&g.dispose()}
+  const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(P,3));G.setAttribute('normal',new THREE.BufferAttribute(Nn,3));G.setAttribute('uv',new THREE.BufferAttribute(U,2));G.computeBoundingSphere&&G.computeBoundingSphere();scene.add(new THREE.Mesh(G,m))}}
 T.HQS.forEach(q=>{const g=q.gy;box(11,.4,8,woodM,q.x,g+2.7,q.z);box(11,.6,8,sbM,q.x,g+3.2,q.z);[-5,5].forEach(a=>[-3.5,3.5].forEach(c=>box(.35,2.7,.35,woodM,q.x+a,g+1.35,q.z+c)))});
 const PHM=new Map(),PCUT=new Set(),wireM=new THREE.MeshLambertMaterial({color:0x1a1712});T.PHONES.forEach((L,l)=>{L.pts.forEach(([x,z],i)=>{const g=hAt(x,z);box(.14,2.8,.14,woodM,x,g+1.4,z);box(.6,.08,.08,woodM,x,g+2.6,z);if(i<L.pts.length-1){const z2=L.pts[i+1][1],g2=hAt(x,z2);const w=box(.04,.04,Math.abs(z2-z),wireM,x+.25,(g+g2)/2+2.6,(z+z2)/2);PHM.set(l+':'+i,w)}})});
 const TNP=T.TUNNELS.map(()=>0);T.TUNNELS.forEach(q=>{const g=hAt(q.x,q.z);box(1.6,.18,.18,woodM,q.x,g+1.9,q.z);box(.18,1.9,.18,woodM,q.x-.75,g+.95,q.z);box(.18,1.9,.18,woodM,q.x+.75,g+.95,q.z);box(1.3,.05,1.3,wireM,q.x,g+.03,q.z);const h=hAt(q.tx,q.tz);box(.1,1.3,.1,woodM,q.tx,h+.65,q.tz);box(.5,.3,.05,woodM,q.tx,h+1.2,q.tz)});
@@ -259,6 +276,7 @@ T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k+
    /* ladders against the rear wall and the odd ammo box or sand pile on the trench floor */
    for(const t of T.FL){const sg=T.sgn(t);for(let x=-W+8;x<W-8;x+=3){const hv=T.hash(x,t+70);if(T.collapsed(t,Math.floor((x+W)/9)))continue;if(hv>.12)continue;if(T.GAPS.some(g=>Math.abs(x-g)<4)||T.ROOMS.some(r=>r.t===t&&Math.abs(x-r.xc)<3))continue;const c=T.trenchC(t,x);
     if(hv<.05)mk('ladder',x,c-1.35*sg,1.55,hAt(x,c-.6*sg));else if(hv<.085)mk('ammobox',x,c+.6*sg,.45,hAt(x,c+.6*sg));else mk('sandpile',x,c+.55*sg,.8,hAt(x,c+.55*sg))}}
+   T.STRUCT.forEach((S,i)=>{const n=/farm|chapel|barn|yard|stub/.test(S.k)?6:2;for(let k=0;k<n;k++){const a=T.hash(i,k+300)*6.283,r=(T.STRUCT_R[S.k]||4)*(.7+T.hash(k,i+301)*.6),x=S.x+Math.cos(a)*r,z=S.z+Math.sin(a)*r;if(openG(x,z)&&!T.fortHit(x,hAt(x,z),z,.6,true))mk(k%3?'rubble':'sandpile',x,z,1.2)}});
    scatter('knife',34,110,-20,20,1);scatter('stump0',30,112,-22,22,1.1);
    /* backdrop outside the playable square (players are clamped to +-118 m) */
    const far=(n,a)=>{const s=n&1?1:-1,side=n%4<2;const along=(T.hash(n,a)-.5)*(2*W+120),out=W+4+T.hash(n,a+1)*70;return side?[along,s*out]:[s*out,along]};
@@ -337,7 +355,7 @@ function ghostCheck(k,x,z,yaw){const D=T.FORT[k];if(me.supply<D.cost||!me.alive|
 function ghostTick(){if(!ghostK||!ghost)return;if(!me.alive||!deployed){endPlace();return}const D=T.FORT[ghostK],x=me.x-Math.sin(me.yaw)*D.ahead,z=me.z-Math.cos(me.yaw)*D.ahead,[ok,y]=ghostCheck(ghostK,x,z,me.yaw);ghostOk=ok;
  ghost.position.set(x,y,z);ghost.rotation.y=me.yaw;ghost.userData.mt.color.setHex(ok?0x60ff60:0xff5040)}
 /* respawn picker: home base or any friendly field post / building respawn point */
-let spawnSel=-1;
+let spawnSel=null;   // (null: no choice; flags use ids -1..-6)
 const nearLine=(x,z)=>{let b=0,d=1e9;T.OBJ.forEach((q,i)=>{const k=Math.hypot(q.x-x,q.z-z);if(k<d){d=k;b=i}});return T.LINES[b]};
 /* where the server stages each side in Operations (mirrors server homeZ): attackers behind their own front line or the last trench they took, defenders behind the next line they still hold */
 function stageZ(){if(!opS)return{n:'Home base',z:me.team?-T.HOME_Z:T.HOME_Z};const att=opS[0],sec=opS[1],sd=att===0?1:-1,L=att===0?[3,4,5]:[2,1,0],z=(i,off)=>T.trenchC(T.FL[i],0)+off;
@@ -731,7 +749,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wounded.</b> When you're knocked down, press Y to shout for a medic; bot medics come running. Medics can revive anyone, bots included.<br>
  <b>Weather.</b> Each round is overcast, foggy, rainy or at night. In the dark, flares (a utility, or the officer's star shells) light up the field.<br>
  <b>Fighting.</b> Bullets drop and take time to arrive. Sprinting lowers the gun; V stabs, sprint + hold V to charge with the bayonet. Being shot at near-misses suppresses you. TAB shows the full controls in game.
- </div></details><div class="ver">v0.31</div>`,'');
+ </div></details><div class="ver">v0.32</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -968,7 +986,7 @@ const ICON={};['bolt','carbine','shotgun','smg','lmg','mark','flame','atr','hmg'
 function wIcon(){const im=ICON[me.w],c=$('wi');if(!im||!im.naturalWidth)return;const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);g.imageSmoothingEnabled=false;const sc=Math.min(c.width/im.naturalWidth,c.height/im.naturalHeight),w=im.naturalWidth*sc,h=im.naturalHeight*sc;g.drawImage(im,0,c.height-h,w,h);g.globalCompositeOperation='source-in';g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.globalCompositeOperation='source-over'}
 const mm=$('mm');mm.addEventListener('click',e=>{if(!me.officer||!deployed)return;const b=mm.getBoundingClientRect();let u=(e.clientX-b.left)/b.width,v=(e.clientY-b.top)/b.height;if(me.team===1){u=1-u;v=1-v}ofx=u*2*W-W;ofz=v*2*W-W});
 const mc=mm.getContext('2d'),mt=document.createElement('canvas');mt.width=mt.height=161;
-function mmTerrain(){const g=mt.getContext('2d'),im=g.createImageData(161,161),q=N/160;for(let j=0;j<161;j++)for(let i=0;i<161;i++){const k=Math.round(j*q)*(N+1)+Math.round(i*q),o=(j*161+i)*4;im.data[o]=col[k*3]*340;im.data[o+1]=col[k*3+1]*340;im.data[o+2]=col[k*3+2]*340;im.data[o+3]=255}g.putImageData(im,0,0);mmDirty=false}
+function mmTerrain(){const g=mt.getContext('2d'),im=g.createImageData(161,161),q=N/160;for(let j=0;j<161;j++)for(let i=0;i<161;i++){const k=Math.round(j*q)*(N+1)+Math.round(i*q),o=(j*161+i)*4;im.data[o]=col[k*3]*340;im.data[o+1]=col[k*3+1]*340;im.data[o+2]=col[k*3+2]*340;im.data[o+3]=255}g.putImageData(im,0,0);{const k=161/T.S;g.fillStyle='#2b2620';for(const b of T.SBOX)if(b.st&&b.y1-b.y0>.6){g.save();g.translate((b.cx+W)*k,(b.cz+W)*k);g.rotate(-b.yaw);g.fillRect(-b.hx*k,-b.hz*k,Math.max(1,b.hx*2*k),Math.max(1,b.hz*2*k));g.restore()}}mmDirty=false}
 function drawMM(){if(mmDirty)mmTerrain();const s=mm.width/T.S,X=x=>(x+W)*s,Y=z=>(z+W)*s,flip=me.team===1;
  mc.save();if(flip){mc.translate(mm.width,mm.height);mc.rotate(Math.PI)}mc.imageSmoothingEnabled=false;mc.drawImage(mt,0,0,mm.width,mm.height);if(me.officer&&fogC)mc.drawImage(fogC,0,0,mm.width,mm.height);
  T.PHONES.forEach((L,l)=>{if(L.team!==me.team)return;for(let s=0;s<L.pts.length-1;s++){mc.strokeStyle=PCUT.has(l+':'+s)?'#e33':'rgba(230,220,170,.55)';mc.lineWidth=1;mc.beginPath();mc.moveTo(X(L.pts[s][0]),Y(L.pts[s][1]));mc.lineTo(X(L.pts[s+1][0]),Y(L.pts[s+1][1]));mc.stroke()}});

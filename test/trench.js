@@ -7,7 +7,8 @@ const mk = (x, z, y) => ({ x, z, y: y === undefined ? T.hAt(H, x, z) : y, vy: 0 
 const t = 30, sg = T.sgn(t);                           // blue front line: enemy is toward -z, so u>0 means smaller z
 // an intact stretch of the line (not a blown-in bay, wire gap, communication trench, dugout or MG nest)
 const okX = x => !T.collapsed(t, Math.floor((x + T.W) / 9)) && !T.collapsed(t, Math.floor((x + T.W) / 9) + 1) && !T.collapsed(t, Math.floor((x + T.W) / 9) - 1) && T.GAPS.every(g => Math.abs(x - g) > 8) && T.CT.every(q => Math.abs(x - q) > 8) && T.ROOMS.every(r => Math.abs(x - r.xc) > 8) && T.NEST.every(n => Math.abs(x - n.x) > 8) && Math.abs(T.trenchSlope(t, x)) < .25;
-let X0 = -10; for (let d = 0; d < 60 && !okX(X0); d++) X0 = -10 + (d % 2 ? d : -d);
+const flatPar = x => { const P = q => T.hAt(H, q, T.trenchC(t, q) + 3 * sg); return Math.abs(P(x) - P(x - 2)) < .15 && Math.abs(P(x) - P(x + 2)) < .15 && Math.abs(P(x) - T.base(x, T.trenchC(t, x) + 3 * sg)) < .9; };   // (no shell hole in the parapet here)
+let X0 = -10; for (let d = 0; d < 120 && !(okX(X0) && flatPar(X0)); d++) X0 = -10 + (d % 2 ? d : -d);
 const G = T.GAPS.reduce((a, g) => Math.abs(g) < Math.abs(a) ? g : a);
 const uOf = (p, x) => (p.z - T.trenchC(t, x)) * sg;
 // 1. scaling ramp at a wire gap: from the rear straight across the line and out the other side
@@ -33,7 +34,7 @@ ck('sandbagsBlockClamberWhereIntact', (p.z - T.trenchC(t, full.x)) * sg < 3.4);
 // 5. cannot walk out of the trench from the floor elsewhere (back wall, no ramp)
 p = mk(X0, c); run(p, BACK, 3); ck('backWallBlocks', uOf(p, X0) > -2.0);
 // 6. dugouts
-const room = T.ROOMS.find(r => r.t === 30 && Math.abs(T.trenchSlope(30, r.xc)) < .3) || T.ROOMS.find(r => r.t === 30), rsg = room.sg;
+const room = T.ROOMS.filter(r => r.t === 30 && Math.abs(r.xc) < T.W - 40).sort((a, b) => Math.abs(T.trenchSlope(30, a.xc)) - Math.abs(T.trenchSlope(30, b.xc)))[0] || T.ROOMS.find(r => r.t === 30), rsg = room.sg;   // (the flattest dugout away from the flank depots)
 p = mk(room.xc, room.c); run(p, rsg > 0 ? FWD : BACK, 0.001);   // stand in the trench at the door
 p = mk(room.xc, room.c, T.hAt(H, room.xc, room.c));
 run(p, rsg > 0 ? BACK : FWD, 0);                                // (rsg is the enemy direction; the room lies on the opposite side)

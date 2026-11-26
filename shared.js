@@ -3,7 +3,7 @@
 // so terrain, movement and stat tables can never drift apart.
 (function (root) {
 // v0.21: 320 m square (was 240). Lines meander and the line objectives are staggered along them.
-const S = 320, N = 640, ST = S / N, W = S / 2, NV = (N + 1) * (N + 1);
+const S = 400, N = 800, ST = S / N, W = S / 2, NV = (N + 1) * (N + 1);
 const FL = [100, 64, 30, -30, -64, -100], CT = [], GAPS = [];
 const CZ0 = 28, CZ1 = 104, HOME_Z = 140, NML = 44;     // communication trenches run |z| CZ0..CZ1; home bases at ±HOME_Z; no-man's land |z| < NML
 const OBX = [];                                         // objective x along each line (zig-zag instead of a straight column)
@@ -308,6 +308,72 @@ function buildHQBoxes() { SGRID.clear(); SBOX.length = 0; for (const q of HQS) {
   for (const a of [-5, 5]) for (const c of [-3.5, 3.5]) B(q.x + a, q.z + c, .2, .2, g - .2, g + 2.7);   // posts
   B(q.x, q.z, 5.5, 4, g + 2.5, g + 3.5, true);   // timber roof + sandbag layer: stops bullets and sight, but never blocks walking in under its edge
 } }
+// ---- v0.32 battlefield structures: shelled-out buildings (farmhouses, chapels, barns, a walled yard) and wrecked vehicles
+// (tank hulks, lorries, a downed biplane, field gun and wagon wrecks). Every piece is a solid box in SBOX/SGRID, so it stops
+// walking, bullets and sight on server and client alike, and the bots' nav grid routes around it. STRUCT lists the pieces
+// for drawing: { k, x, z, yaw, parts: [box, ...] }. Built from the map seed, after the HQ boxes (which clear SGRID).
+const STRUCT = [];
+function addSBox(cx, cz, yaw, hx, hz, y0, y1, mat, nb) {
+  const b = { cx, cz, c: Math.cos(yaw), s: Math.sin(yaw), hx, hz, y0, y1, mat, f: null, cells: [], nb: !!nb, st: 1, yaw }, R = Math.hypot(hx, hz) + .5; SBOX.push(b);
+  for (let x = Math.floor((cx - R) / FC); x <= Math.floor((cx + R) / FC); x++) for (let z = Math.floor((cz - R) / FC); z <= Math.floor((cz + R) / FC); z++) { const k = x * 4096 + z; b.cells.push(k); if (!SGRID.has(k)) SGRID.set(k, []); SGRID.get(k).push(b); }
+  return b;
+}
+const STRUCT_R = { farm: 8, chapel: 10, barn: 8.5, yard: 9, tank: 5, lorry: 4, plane: 6, gun: 2.5, wagon: 2.5, stub: 4 };
+function structOK(x, z, R) {
+  if (Math.abs(x) > W - R - 6 || Math.abs(z) > W - R - 6) return false;
+  for (const t of FL) if (Math.abs(z - trenchC(t, x)) < R + 13) return false;   // (dugouts reach back from the line, and men walk up to them)
+  const az = Math.abs(z);
+  if (az > CZ0 - 8 && az < CZ1 + 8 && CT.some(c => Math.abs(x - c) < R + 8)) return false;
+  if (az < NML && GAPS.some(g => Math.abs(x - g) < R + 7)) return false;
+  if (Math.abs(az - HOME_Z) < R + 12 && Math.abs(x) < 80) return false;   // the home camp
+  if (MINES.some(m => Math.hypot(x - m[0], z - m[1]) < m[2] + R + 3)) return false;
+  if (HQS.some(q => Math.hypot(x - q.x, z - q.z) < R + 11) || NEST.some(n => Math.hypot(x - n.x, z - n.z) < R + 7)) return false;
+  if (EMPL.some(q => Math.hypot(x - q.x, z - q.z) < R + 9) || AA.some(a => Math.hypot(x - a.x, z - a.z) < R + 7)) return false;
+  if (DEPOTS.some(d => Math.hypot(x - d.x, z - d.z) < R + DEP_R + 2) || OBJ.some(o => Math.hypot(x - o.x, z - o.z) < R + 12)) return false;
+  if (PHONES.some(L => Math.abs(x - L.pts[0][0]) < R + 2 && z > Math.min(...L.pts.map(p => p[1])) - R && z < Math.max(...L.pts.map(p => p[1])) + R)) return false;
+  if (STRUCT.some(q => Math.hypot(x - q.x, z - q.z) < R + STRUCT_R[q.k] + 6)) return false;
+  return true;
+}
+function buildStruct() {
+  STRUCT.length = 0; const R = rng(MP.hs * 7919 + 13), u = (a, b) => a + (b - a) * R();
+  const gmin = (x, z, yaw, hx, hz) => { const c = Math.cos(yaw), s = Math.sin(yaw); let m = 1e9; for (const [a, b] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz], [0, 0]]) m = Math.min(m, gen(x + a * c + b * s, z - a * s + b * c)); return m; };
+  const put = (k, x, z, yaw) => {
+    const S = { k, x, z, yaw, parts: [] }, c = Math.cos(yaw), s = Math.sin(yaw), P = (lx, lz, hx, hz, h0, h1, mat, ry, nb) => {   // a part in the structure's local frame
+      const wx = x + lx * c + lz * s, wz = z - lx * s + lz * c, g = gmin(wx, wz, yaw + (ry || 0), hx, hz) - .25; S.parts.push(addSBox(wx, wz, yaw + (ry || 0), hx, hz, g + h0, g + h1, mat, nb)); };
+    const walls = (w, d, hmax, mat, door) => {   // a ruined rectangle of 2 m wall stretches, some gone, the rest broken off at random heights
+      const sides = [[0, -d / 2, w, 0], [0, d / 2, w, 0], [-w / 2, 0, d, Math.PI / 2], [w / 2, 0, d, Math.PI / 2]];
+      sides.forEach(([cx, cz, len, ry], si) => { const n = Math.max(2, Math.round(len / 2)), sl = len / n;
+        for (let i = 0; i < n; i++) { const along = -len / 2 + sl * (i + .5); if ((si === door && i === Math.floor(n / 2)) || R() < .2) continue;
+          const h = hmax * (.25 + .75 * R() * R()) + .5, lx = cx + (ry ? 0 : along), lz = cz + (ry ? along : 0); P(lx, lz, ry ? .3 : sl / 2, ry ? sl / 2 : .3, 0, h, mat); } });
+    };
+    if (k === 'farm') { walls(u(9, 12), u(6.5, 8), 3.2, 'brick', 0); P(u(-2, 2), u(-1, 1), 1, .9, 0, .9, 'stone'); }
+    else if (k === 'chapel') { const d = u(12, 15); walls(u(7.5, 9), d, 3.6, 'stone', 1); P(0, d / 2 + .1, 1.6, .45, 0, u(5.5, 7.5), 'stone'); P(0, -d / 2 + 1.6, 1.1, 1.1, 0, u(3, 4.5), 'stone'); }
+    else if (k === 'barn') { const w = u(11, 13), d = u(7, 8.5); for (const sx of [-1, 1]) for (const sz of [-1, 0, 1]) if (R() < .8) P(sx * w / 2, sz * d / 2.2, .2, .2, 0, u(1.5, 3.8), 'wood'); for (const sz of [-1, 1]) if (R() < .7) P(u(-2, 2), sz * d / 2, u(2, 4), .12, 0, u(1, 2.2), 'wood'); }
+    else if (k === 'yard') { const w = u(14, 18); for (const [lx, lz, L, ry] of [[0, -w / 2, w, 0], [-w / 2, 0, w, 1], [w / 2, 0, w, 1]]) for (let a = -L / 2 + 1; a < L / 2; a += 2) if (R() > .25) P(ry ? lx : lx + a, ry ? lz + a : lz, ry ? .25 : 1, ry ? 1 : .25, 0, u(.8, 1.6), 'stone'); }
+    else if (k === 'stub') { for (let i = 0; i < 3; i++) if (R() < .85) P(-3 + i * 2.2 + u(-.3, .3), u(-.4, .4), 1, .3, 0, u(.7, 1.9), 'brick', u(-.3, .3)); }
+    else if (k === 'tank') { P(0, 0, 1.75, 3.9, 0, 2.1, 'metal'); P(u(-.4, .4), u(-.8, .4), 1.1, 1.3, 2.1, 2.7, 'metal', u(-.5, .5)); }
+    else if (k === 'lorry') { P(0, -1.9, 1.05, .85, 0, 2.3, 'metal'); P(0, 1, 1.05, 1.9, 0, 1.3, 'wood'); }
+    else if (k === 'plane') { P(0, 0, .55, 3, 0, 1.1, 'wood'); P(0, -1, 4, .7, 0, .35, 'wood', u(-.25, .25), true); }
+    else if (k === 'gun') { P(0, 0, 1, .7, 0, 1.3, 'metal'); }
+    else if (k === 'wagon') { P(0, 0, .8, 1.6, 0, 1.2, 'wood'); }
+    STRUCT.push(S); return S;
+  };
+  const place = (k, x0, x1, z0, z1, tries) => { const Rr = STRUCT_R[k]; for (let i = 0; i < (tries || 40); i++) { const x = u(x0, x1), z = u(z0, z1); if (structOK(x, z, Rr)) return put(k, x, z, u(0, 6.283)); } return null; };
+  // ruins at the flank depots (the farms, chapels and works they are named after), just outside the capture circle
+  for (const d of DEPOTS) { const k = /Chapel|Abbey/.test(d.n) ? 'chapel' : /Mill|Farm|Pump|Tannery/.test(d.n) ? 'farm' : 'barn';
+    for (let i = 0; i < 30; i++) { const a = u(0, 6.283), r = DEP_R + STRUCT_R[k] + u(3, 7), x = d.x + Math.cos(a) * r, z = d.z + Math.sin(a) * r; if (structOK(x, z, STRUCT_R[k]) || (i > 25 && Math.abs(x) < W - 14)) { if (structOK(x, z, STRUCT_R[k])) put(k, x, z, u(0, 6.283)); break; } } }
+  for (const sg of [-1, 1]) {
+    const Z = (a, b) => [Math.min(sg * a, sg * b), Math.max(sg * a, sg * b)];
+    // behind the reserve line and around the home camp: shattered villages
+    for (const [k, a, b] of [['farm', 108, 132], ['chapel', 150, 188], ['farm', 150, 188], ['barn', 150, 188], ['yard', 108, 132], ['barn', 108, 132], ['farm', 150, 188]]) place(k, -W + 12, W - 12, ...Z(a, b));
+    // between the support and reserve lines: a few ruins and abandoned transport
+    for (const k of ['farm', 'lorry', 'wagon', 'barn']) place(k, -W + 12, W - 12, ...Z(72, 92));
+    // behind the support line: a wrecked lorry or field gun
+    for (const k of ['gun', 'lorry', 'wagon']) place(k, -W + 12, W - 12, ...Z(108, 190));
+  }
+  // no-man's land: knocked-out tanks, a downed biplane and broken wall stubs: cover for the brave
+  for (const k of ['tank', 'tank', 'tank', 'plane', 'stub', 'stub', 'stub', 'tank']) place(k, -W + 14, W - 14, -14, 14, 60);
+}
 // body=true: does a standing body at feet height y overlap the box? body=false: is the point (bullet, sight line) inside it?
 function fortHit(x, y, z, r, body) {
   r = r || 0; const k = fcell(x, z);
@@ -415,9 +481,9 @@ const DEPOTS = [], DEP_R = 9, VIS_R = 42;   // VIS_R: officer fog of war, how fa
 // (six lines at the same depths, so Operations, spawns and ranges are unchanged). Server and clients run the same code on the
 // same seed, so they build identical maps. A layout that fails mapCheck() is re-rolled with the next seed.
 const DEPOT_NAMES = ['Mill Farm', 'Chalk Quarry', 'Chapel Ruins', 'Brickworks', 'Sugar Refinery', 'Wood Yard', 'Signal Box', 'Old Abbey', 'Lime Kiln', 'Pump House', 'Tannery', 'Rail Halt'];
-const CLASSIC = { CT: [-122, -55, 10, 70, 126], GAPS: [-100, -32, 38, 104], OBX: [-52, 34, -18, 22, -44, 58], ROOM_X: [-138, -90, -30, 40, 100, 143],
-  NEST: [[-84, -8, 62], [-66, 18, 88]], HQX: [[-82, 14, 96], [-82, 14, 96]], FGUN: [[-62, 68], [-62, 68]], MORT: [[-40, 55], [-40, 55]],
-  MINES: [[-74, -3, 10, 4.2], [92, 6, 8, 3.4]], DEP: [['Mill Farm', -142, 1], ['Chalk Quarry', -140, -1], ['Chapel Ruins', 144, 1], ['Brickworks', 141, -1]] };
+const CLASSIC = { CT: [-152, -69, 12, 88, 158], GAPS: [-125, -40, 48, 130], OBX: [-65, 42, -22, 28, -55, 72], ROOM_X: [-172, -112, -38, 50, 125, 179],
+  NEST: [[-105, -10, 78], [-82, 22, 110]], HQX: [[-102, 18, 120], [-102, 18, 120]], FGUN: [[-78, 85], [-78, 85]], MORT: [[-50, 69], [-50, 69]],
+  MINES: [[-92, -3, 10, 4.2], [115, 6, 8, 3.4]], DEP: [['Mill Farm', -178, 1], ['Chalk Quarry', -175, -1], ['Chapel Ruins', 180, 1], ['Brickworks', 176, -1]] };
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const far = (x, list, d) => list.every(v => Math.abs(x - v) >= d);
 function rollLayout(seed) {
@@ -426,19 +492,19 @@ function rollLayout(seed) {
   // a value in [lo, hi] that keeps its distance from the given lists (24 tries, then the band's middle)
   const pick = (lo, hi, rules) => { for (let k = 0; k < 24; k++) { const x = ri(lo, hi); if (rules.every(([l, d]) => far(x, l, d))) return x; } return Math.round((lo + hi) / 2); };
   const jit = (base, j, sep, lim, rules) => base.map(b0 => b0).map((b0, i, a) => { let x = b0; for (let k = 0; k < 24; k++) { const c = Math.max(-lim, Math.min(lim, b0 + ri(-j, j))); if (far(c, a.slice(0, i), sep) && rules.every(([l, d]) => far(c, l, d))) { x = c; break; } } return a[i] = x; });
-  L.GAPS = jit(CLASSIC.GAPS, 16, 45, 125, []);
-  L.CT = jit(CLASSIC.CT, 10, 40, 132, [[L.GAPS, 12]]);
-  L.ROOM_X = jit(CLASSIC.ROOM_X, 10, 32, 144, [[L.GAPS, 12], [L.CT, 10]]);
-  L.OBX = []; for (let i = 0; i < 6; i++) L.OBX.push(pick(-70, 70, [[L.GAPS, 9], i ? [[L.OBX[i - 1]], 28] : [[], 0]]));
-  const bands = [[-110, -50], [-30, 30], [50, 110]];
+  L.GAPS = jit(CLASSIC.GAPS, 20, 56, 156, []);
+  L.CT = jit(CLASSIC.CT, 12, 50, 165, [[L.GAPS, 12]]);
+  L.ROOM_X = jit(CLASSIC.ROOM_X, 12, 40, 180, [[L.GAPS, 12], [L.CT, 10]]);
+  L.OBX = []; for (let i = 0; i < 6; i++) L.OBX.push(pick(-88, 88, [[L.GAPS, 9], i ? [[L.OBX[i - 1]], 28] : [[], 0]]));
+  const bands = [[-138, -62], [-38, 38], [62, 138]];
   L.NEST = [0, 1].map(tm => bands.map(([lo, hi]) => pick(lo, hi, [[L.GAPS, 10], [L.CT, 8], [[L.OBX[tm ? 3 : 2]], 12]])));
-  L.HQX = [0, 1].map(tm => [[-110, -55], [-25, 25], [55, 110]].map(([lo, hi]) => pick(lo, hi, [[L.CT, 12], [L.GAPS, 10], [[L.OBX[tm ? 4 : 1]], 12]])));
-  L.FGUN = [0, 1].map(() => [pick(-95, -35, [[L.CT, 10]]), pick(35, 95, [[L.CT, 10]])]);
-  L.MORT = [0, 1].map(tm => [pick(-75, -15, [[L.HQX[tm], 16], [L.CT, 8], [L.GAPS, 8]]), pick(15, 80, [[L.HQX[tm], 16], [L.CT, 8], [L.GAPS, 8]])]);
-  L.MINES = [[-120, -30], [30, 120]].map(([lo, hi]) => { const r = u(7, 9); return [pick(lo, hi, [[L.GAPS, r + 9]]), u(-6, 6), r, u(3, 4.4)]; });
+  L.HQX = [0, 1].map(tm => [[-138, -69], [-31, 31], [69, 138]].map(([lo, hi]) => pick(lo, hi, [[L.CT, 12], [L.GAPS, 10], [[L.OBX[tm ? 4 : 1]], 12]])));
+  L.FGUN = [0, 1].map(() => [pick(-119, -44, [[L.CT, 10]]), pick(44, 119, [[L.CT, 10]])]);
+  L.MORT = [0, 1].map(tm => [pick(-94, -19, [[L.HQX[tm], 16], [L.CT, 8], [L.GAPS, 8]]), pick(19, 100, [[L.HQX[tm], 16], [L.CT, 8], [L.GAPS, 8]])]);
+  L.MINES = [[-150, -38], [38, 150]].map(([lo, hi]) => { const r = u(7, 9); return [pick(lo, hi, [[L.GAPS, r + 9]]), u(-6, 6), r, u(3, 4.4)]; });
   const names = DEPOT_NAMES.slice(); for (let i = names.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [names[i], names[j]] = [names[j], names[i]]; }
   const west = R() < .5 ? 1 : -1;   // which side's depot sits further forward on each flank
-  L.DEP = [[names[0], -ri(134, 145), west], [names[1], -ri(134, 145), -west], [names[2], ri(134, 145), -west], [names[3], ri(134, 145), west]];
+  L.DEP = [[names[0], -ri(168, 181), west], [names[1], -ri(168, 181), -west], [names[2], ri(168, 181), -west], [names[3], ri(168, 181), west]];
   return L;
 }
 // v0.31 field telephone lines: one per HQ, on poles every 7 m from the HQ up to just behind its own front trench (poles
@@ -448,7 +514,7 @@ function rollLayout(seed) {
 const TUNNELS = [];
 function buildTunnels() {
   TUNNELS.length = 0;
-  for (const t of [0, 1]) for (const x0 of t ? [-44, 40] : [-62, 58]) {   // (staggered: a shaft never sits on the other side's charge)
+  for (const t of [0, 1]) for (const x0 of t ? [-55, 50] : [-78, 72]) {   // (staggered: a shaft never sits on the other side's charge)
     let x = x0; for (const d of [0, 4, -4, 8, -8, 12, -12]) { const xx = x0 + d; if (!NEST.some(n => Math.hypot(n.x - xx, n.z - trenchC(t ? -30 : 30, xx)) < 8) && !roomAt(xx, trenchC(t ? -30 : 30, xx))) { x = xx; break; } }
     TUNNELS.push({ team: t, x, z: +trenchC(t ? -30 : 30, x).toFixed(2), tx: x, tz: +trenchC(t ? 30 : -30, x).toFixed(2) });
   }
@@ -484,7 +550,7 @@ function applyLayout(L) {
     .concat(L.MORT[0].map(x => ({ k: 'mortar', team: 0, x, z: trenchC(64, x) + 9.5, yaw: 0 }))).concat(L.MORT[1].map(x => ({ k: 'mortar', team: 1, x, z: trenchC(-64, x) - 9.5, yaw: Math.PI }))));
   fill(OBJ, FL.map((t, i) => ({ t, x: OBX[i], z: trenchC(t, OBX[i]) })));
   fill(DEPOTS, L.DEP.map(([n, x, sd]) => ({ n, x, z: dz(x, sd) })));
-  buildRooms(); buildSB(); buildHQBoxes(); buildPhones(); buildTunnels(); buildAA(); BAYS.clear(); FLOOR = null; PRISTINE = null;   // the terrain is generated afresh by the next makeTerrain()
+  buildRooms(); buildSB(); buildHQBoxes(); buildPhones(); buildTunnels(); buildAA(); buildStruct(); BAYS.clear(); FLOOR = null; PRISTINE = null;   // the terrain is generated afresh by the next makeTerrain()
 }
 /** Is this layout playable? Every line objective sits in an open trench, enough dugouts per line, depots on open ground. */
 function mapCheck() {
@@ -565,7 +631,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { PHONES, phoneDist, TUNNELS, AA, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { PHONES, phoneDist, TUNNELS, AA, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);

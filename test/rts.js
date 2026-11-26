@@ -60,6 +60,7 @@ const place = (e, x, z) => { e.x = x; e.z = z; e.y = T.hAt(S._test.terrH(), x, z
   { X.setCmd(0, 200); const xp0 = a.xp || 0; O.send({ t: 'cmd', k: 'sup', s: 'barrage', x: mk.x + 6, z: mk.z, }); await sleep(300); const diff = 200 - X.cmdPts()[0];
     ck('markDiscount', diff === 11 || diff === 4); ck('spotterXp', (a.xp || 0) >= xp0 + 10);
     const w = A.got('sw', m => m.k === 'barrage').pop(); ck('markTightens', w && Math.abs(w.r - 6.5) < .01 && Math.abs(w.x - mk.x) < .1); }
+  await sleep(1100);   // (the roster goes out once a second)
   ck('sqsCards', (() => { const m = O.last('sqs'); const r = m && m.l.find(q => q[0] === 100); return r && r.length >= 13 && typeof r[5] === 'number' && m.tier === 3 && Array.isArray(m.mk); })());
   const bad = Object.entries(R).filter(([, v]) => !v).map(([k]) => k);
   console.log(JSON.stringify(R)); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);

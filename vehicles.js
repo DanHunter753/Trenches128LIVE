@@ -332,7 +332,7 @@ module.exports = function (C) {
       const nx = v.x + fx * v.v * DT, nz = v.z + fz * v.v * DT, nose = Math.sign(v.v) * D.len * .52;
       let blocked = Math.abs(nx + fx * nose) > T.W - 3 || Math.abs(nz + fz * nose) > T.W - 3;
       const ex = nx + fx * nose, ez = nz + fz * nose;
-      const bigBlock = [...T.FORTS.values()].some(f => !T.FORT[f.k].small && Math.hypot(f.x - ex, f.z - ez) < 4) || T.HQS.some(q => Math.abs(q.x - ex) < 6.2 && Math.abs(q.z - ez) < 4.6);   // blockhouses, pillboxes, HQ shelters
+      const bigBlock = [...T.FORTS.values()].some(f => !T.FORT[f.k].small && Math.hypot(f.x - ex, f.z - ez) < 4) || T.HQS.some(q => Math.abs(q.x - ex) < 6.2 && Math.abs(q.z - ez) < 4.6) || T.SBOX.some(b => b.st && b.y1 - b.y0 > 1.1 && Math.abs(b.cx - ex) < 12 && Math.abs(b.cz - ez) < 12 && T.inBox(b, ex, ez, 1.4));   // + v0.32 ruins and wrecks   // blockhouses, pillboxes, HQ shelters
       for (const o of V) if (o !== v && !(o.k !== 'tank' && o.dead) && Math.hypot(o.x - nx, o.z - nz) < (o.k === 'tank' ? 7.5 : 3.2) && Math.hypot(o.x - nx, o.z - nz) < Math.hypot(o.x - v.x, o.z - v.z)) {
         if (o.k !== 'tank' && o.team !== v.team && Math.abs(v.v) > .5) hurt(o, 9999, drv || v.crew, 'tank');   // rolls over an enemy gun pit
         else blocked = true;
