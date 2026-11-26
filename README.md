@@ -73,6 +73,21 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.37 - the rifleman: rifle grenades, and the bolt rifle is his alone
+- **Only riflemen carry the bolt-action rifle.** Sappers now choose a shotgun or a carbine (a saved sapper loadout with the
+  bolt rifle switches to the shotgun).
+- **Rifle grenades ([N]).** Fit a grenade to the rifle's muzzle (1 s, uses one of your grenades and the usual grenade supply).
+  A dotted arc and a ring show where it will land, and the hint gives the range: 30–110 m depending on how high you raise the
+  muzzle. Fire to launch it; [N] or [R] takes it off again. Its burst is a little smaller than a hand grenade's but it wrecks
+  a machine-gun nest it lands in. Every machine shares the flight path, so the arc you see is the one the server flies.
+  Rifleman bots lob them (with a lob's scatter, at most one per target every 15 s across the side) onto manned enemy guns
+  and knots of three or more men 35–110 m away.
+- **Quicker hands.** Riflemen work the bolt 20% faster and come up to the sights faster.
+- **Steady nerves.** Incoming fire suppresses a rifleman half as much (less spread and screen shake).
+- **Longer bayonet charge.** 4.5 s of charge stamina instead of 3, refilling half again as fast.
+- Tests: `classes` covers all of it (aim solution, reach, fitting, unloading, launch, a bot hitting a manned gun 70 m off);
+  `browser_classes` fits and launches one through the real client.
+
 ## v0.36 - class abilities: ammo boxes and morphine
 - **Class ability key: [N]** (rebindable; a KIT button on phones, shown for the classes that have one).
 - **Machine gunner: ammo boxes.** [N] puts a box down at your feet (3 supply, every 35 s, two of yours at a time; a box lasts

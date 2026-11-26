@@ -27,6 +27,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(150); await a.keyboard.up('KeyC'); await sleep(120); ck('standCancels', await a.evaluate(() => !(me.sld > 0)));
   await a.keyboard.up('KeyW'); await a.keyboard.up('ShiftLeft'); await sleep(800);
   ck('serverAgrees', await a.evaluate(() => pending.length < 30 && Math.abs(me.vy) < 3));
+  // rifleman: fit a rifle grenade, see the range readout, launch it
+  const r = await join('Rifleman Ray', 'rifleman'); await r.evaluate(() => { me.pitch = .3; sendJ({ t: 'act', a: 'ability' }); });
+  await r.waitForFunction(() => me.rg === 1, null, { timeout: 3000 }).catch(() => {});
+  ck('rgHint', await r.evaluate(() => new Promise(res => { hudT = 0; setTimeout(() => res(/RIFLE GRENADE · \d+ m/.test($('hint').textContent)), 300); })));
+  await sleep(1100); await r.evaluate(() => { me.pitch = .3; fireLatch = true; });
+  await r.waitForFunction(() => me.rg === 0 && rgL.length >= 1, null, { timeout: 3000 }).catch(() => {}); ck('rgLaunched', await r.evaluate(() => me.rg === 0 && rgL.length >= 1 && me.gr === 1));
+  ck('sapperNoBolt', await r.evaluate(() => !CLS.sapper.w.includes('bolt') && CLS.rifleman.w.includes('bolt')));
   ck('noErrors', !errors.length); R.errors = errors.slice(0, 3);
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED');
   await browser.close(); process.exit(bad.length ? 1 : 0);
