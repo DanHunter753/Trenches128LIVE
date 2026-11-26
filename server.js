@@ -490,6 +490,7 @@ function onAct(p, a, m) {
   if (p.deployed && a === 'revive') { reviveAct(p); return; }
   if (p.deployed && a === 'ping' && p.down > 0) { callMedic(p); return; }
   if (p.deployed && a === 'work') { workAct(p); return; }
+  if (p.deployed && a === 'spawnAt') { const id = Math.floor(+(m && m.id)); p.spawnPick = Number.isFinite(id) ? id : null; return; }   // v0.34.1: picked while dead (it used to fall through the 'alive' check below and was dropped)
   if (!p.deployed || !p.alive) return;
   if (p.veh && !['mg', 'ping', 'mark', 'mask'].includes(a)) return;   // seated in a vehicle or at a gun
   if (a === 'reload') { p.mg != null ? startBelt(p) : startReload(p); }
@@ -501,7 +502,6 @@ function onAct(p, a, m) {
   else if (a === 'fob') buildPost(p);
   else if (a === 'build') buildAct(p, String(m && m.k));
   else if (a === 'fspawn') fortSpawn(p);
-  else if (a === 'spawnAt') { const id = Math.floor(+(m && m.id)); p.spawnPick = Number.isFinite(id) ? id : null; }
   else if (a === 'mg') {   // F: leave / man a machine gun, a tank, a field gun or a mortar, or take an elite kit
     if ((p.mgCd || 0) > tickNo) return; p.mgCd = tickNo + Math.round(1.2 * TICK);
     if (p.veh) VEHM.leave(p); else if (p.mg != null) dismount(p); else if (takeElite(p)) { } else if (!VEHM.enter(p)) mount(p);
