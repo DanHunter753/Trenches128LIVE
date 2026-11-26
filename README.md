@@ -73,6 +73,12 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.33.1 - your own button layout on phones
+- The pencil button (top right, phones only) turns on layout editing: the buttons wiggle, drag any of them wherever you
+  like, then Done. The layout is saved on the phone with the other settings (as fractions of the screen, so it still
+  fits after a rotation or on another screen size). Reset puts the default layout back. While editing, buttons don't
+  fire their actions and the tutorial card steps aside. Test: `browser_tclayout`.
+
 ## v0.33 - fly the biplanes; phones in landscape
 - **Flyable biplanes:** each side has one parked at a new airfield behind its home camp (a mown strip with a hangar and a
   windsock; also a choice on the spawn map). [F] climbs in. W/S throttle, the mouse steers (the plane turns and climbs
