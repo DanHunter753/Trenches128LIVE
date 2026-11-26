@@ -18,7 +18,7 @@ T.setMap(0); const terr = T.makeTerrain();
 const w = T.SBOX.find(b => b.st && b.mat === 'brick' && b.y1 - b.y0 > 2), mid = (w.y0 + w.y1) / 2;
 ck('wallStopsBody', !!T.fortHit(w.cx, w.y0 + .3, w.cz, .3, true));
 const t = T.fortSeg(w.cx - w.s * 2, mid, w.cz - w.c * 2, w.cx + w.s * 2, mid, w.cz + w.c * 2); ck('wallStopsBullet', t >= 0 && t <= 1);
-const NAV = require('../botai.js')(T, () => terr.H); NAV.rebuild(); NAV.tick(); const f = NAV.field(0, T.HOME_Z - 8, Date.now());
+const NAV = require('../botai.js')(T, () => terr.H); NAV.rebuild(); NAV.tick(); const f = NAV.field(0, T.HOME_Z - 8, Date.now(), true);
 const hull = T.STRUCT.find(q => q.k === 'tank').parts[0], ci = Math.floor(hull.cx + T.W), cj = Math.floor(hull.cz + T.W);   // (a hull: thick enough to cover whole 1 m nav cells) R.navCell = f[cj * T.S + ci]; ck('navAvoidsWall', !(f[cj * T.S + ci] < 1e8));
 // server: spawning on a wall moves you clear
 process.argv = ['node', 'x', '--port', '8079', '--fill', '2', '--no-fetch', '--data', require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 't128st-'))]; process.env.T128_TEST = '1';

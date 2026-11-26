@@ -749,7 +749,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wounded.</b> When you're knocked down, press Y to shout for a medic; bot medics come running. Medics can revive anyone, bots included.<br>
  <b>Weather.</b> Each round is overcast, foggy, rainy or at night. In the dark, flares (a utility, or the officer's star shells) light up the field.<br>
  <b>Fighting.</b> Bullets drop and take time to arrive. Sprinting lowers the gun; V stabs, sprint + hold V to charge with the bayonet. Being shot at near-misses suppresses you. TAB shows the full controls in game.
- </div></details><div class="ver">v0.32</div>`,'');
+ </div></details><div class="ver">v0.32.1</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
