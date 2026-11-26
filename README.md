@@ -73,6 +73,22 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.35 - lamps and fires at night
+- **Night maps are lit by the war itself**, so flares are no longer the only light. Each lamp or fire sits where it would really be:
+  - shaded lamps *inside* the front-line dugouts (nothing burns in the open on the front line);
+  - storm lanterns at the doors of the support and reserve dugouts, at the HQ shelters, supply dumps, field-gun pits and hangars;
+  - coke braziers in the reserve and support trenches;
+  - paraffin flare pots along both airstrips, so pilots can find them;
+  - burning tank and plane wrecks, a few ruined farms and barns still on fire, candles in the chapel ruins, and the patches
+    of burning ground in no-man's land.
+- Each one throws a flickering pool of warm light on the ground, a halo you can see from far off, and lights up the walls
+  and soldiers near it; everything else stays dark.
+- **It matters for play.** The server and clients build the same list of lights. At night a man standing in the light is seen
+  and engaged as if it were day; one in the dark still only at night range. Crossing past a burning wreck or a brazier gives
+  you away, so plan the route through the dark (or put up a flare to light the rest).
+- Cheap to draw: the flames and halos are two GPU point batches animated in the shader, and the light pools are one mesh.
+- New test `lights` (placement rules, same on every machine, lit vs. dark sight at night).
+
 ## v0.34.2 - an immersion pass on the ruins and wrecks
 - **Ruins you can actually see.** Under real WebGL the farmhouses, chapels and barns rendered nearly black (dim lighting on
   very dark textures). They are now drawn unlit like the rest of the world with the light baked into each face, on new

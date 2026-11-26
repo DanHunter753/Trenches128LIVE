@@ -1567,6 +1567,7 @@ function setWx(k) { T.WX.k = k; bcast({ t: 'wx', k }); }
 function sightAt(team, x, z) {
   const s = (T.WXS[T.WX.k] || T.WXS.overcast).sight; if (s >= 1) return 1;
   for (const f of flares) if (f.until > tickNo && Math.abs(f.x - x) < FLARE_R && Math.hypot(f.x - x, f.z - z) < FLARE_R) return 1;
+  if (T.WX.k === 'night') return Math.max(s, T.litAt(x, z));   // v0.35: lamps and fires light the men standing near them
   return s;
 }
 function flareAt(x, z, team) {

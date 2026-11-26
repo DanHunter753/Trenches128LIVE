@@ -204,6 +204,7 @@ function applyCrater(c,fx){T.dig(terr,c[0],c[1],c[2],c[3]);dirtyRect(c[0],c[1],c
 const dm=new THREE.Object3D(),sbM=new THREE.MeshLambertMaterial({color:0xa89870,map:TXP('tx_burlap',true)}),woodM=new THREE.MeshLambertMaterial({color:0xb0a090,map:TXP('tx_timber',true)}),mgM=new THREE.MeshLambertMaterial({color:0x222222});
 function box(w,h,d,m,x,y,z,ry){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);b.rotation.y=ry||0;scene.add(b);return b}
 /* v0.32 ruins and wrecks (T.STRUCT): each solid box drawn with its material; wrecks get a few extra non-solid details */
+const STRN=[];function structNight(n){for(const q of STRN){if(q.G){q.G.attributes.color.array.set(n?q.Cn:q.Cc);q.G.attributes.color.needsUpdate=true}q.m.color.copy(q.c0).multiplyScalar(n?.3:1)}}
 {const BM=(c,m)=>new THREE.MeshBasicMaterial({color:c,map:m||null,vertexColors:true}),   /* v0.34.2: unlit like the rest of the world, with the light baked into each face */
   hz=(a,b)=>{const v=Math.sin(a*12.9898+b*78.233)*43758.5453;return v-Math.floor(v)},
   tx=(w,h,f)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');for(let j=0;j<h;j++)for(let i=0;i<w;i++){const [r,gg,b]=f(i,j);g.fillStyle=`rgb(${r|0},${gg|0},${b|0})`;g.fillRect(i,j,1,1)}return pxTex(c,true)},
@@ -230,10 +231,11 @@ function box(w,h,d,m,x,y,z,ry){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,
   else if(S.k==='wagon'){const[x,z]=L(.9,1);cyl(.6,.1,charM,x,g0+.35,z,1.2,S.yaw,0)}}
  for(const [m,L] of MG){let n=0;for(const g of L)n+=g.attributes.position.count;const P=new Float32Array(n*3),Nn=new Float32Array(n*3),U=new Float32Array(n*2);let o=0;
   for(const g of L){const c=g.attributes.position.count;P.set(g.attributes.position.array,o*3);if(g.attributes.normal)Nn.set(g.attributes.normal.array,o*3);if(g.attributes.uv)U.set(g.attributes.uv.array,o*2);o+=c;g.dispose&&g.dispose()}
-  const Cc=new Float32Array(n*3);for(let i=0;i<n;i++){const nx=Nn[i*3],ny=Nn[i*3+1],nz=Nn[i*3+2],py=P[i*3+1],gy=hAt(P[i*3],P[i*3+2]),k=Math.max(.42,Math.min(1,.62+.3*ny+.16*nx-.08*nz))*Math.min(1,.72+.28*Math.min(1,Math.max(0,(py-gy)/2.2)));Cc[i*3]=k;Cc[i*3+1]=k*.98;Cc[i*3+2]=k*.94}   /* faces toward the sky and the light are brighter; the bottoms of walls are dirtier */
-  const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(P,3));G.setAttribute('normal',new THREE.BufferAttribute(Nn,3));G.setAttribute('uv',new THREE.BufferAttribute(U,2));G.setAttribute('color',new THREE.BufferAttribute(Cc,3));G.computeBoundingSphere&&G.computeBoundingSphere();scene.add(new THREE.Mesh(G,m))}}
+  const Cc=new Float32Array(n*3);for(let i=0;i<n;i++){const nx=Nn[i*3],ny=Nn[i*3+1],nz=Nn[i*3+2],py=P[i*3+1],gy=hAt(P[i*3],P[i*3+2]),k=Math.max(.42,Math.min(1,.62+.3*ny+.16*nx-.08*nz))*Math.min(1,.72+.28*Math.min(1,Math.max(0,(py-gy)/2.2)));Cc[i*3]=k;Cc[i*3+1]=k*.98;Cc[i*3+2]=k*.94}
+  const Cn=new Float32Array(n*3);for(let i=0;i<n;i++){const l=T.litAt(P[i*3],P[i*3+2]);Cn[i*3]=Cc[i*3]*(1+3.4*l);Cn[i*3+1]=Cc[i*3+1]*(1+2.4*l);Cn[i*3+2]=Cc[i*3+2]*(1+1.2*l)}   /* v0.35: at night only what stands near a lamp or a fire is lit */   /* faces toward the sky and the light are brighter; the bottoms of walls are dirtier */
+  const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(P,3));G.setAttribute('normal',new THREE.BufferAttribute(Nn,3));G.setAttribute('uv',new THREE.BufferAttribute(U,2));G.setAttribute('color',new THREE.BufferAttribute(Cc,3));G.computeBoundingSphere&&G.computeBoundingSphere();scene.add(new THREE.Mesh(G,m));STRN.push({G,m,Cc,Cn,c0:m.color.clone()})}}
 /* v0.33 airfields: a mown strip with marker boards, a windsock and a canvas hangar */
-T.AIRF.forEach((a,t)=>{const dir=-Math.sign(a.x),stripM=new THREE.MeshBasicMaterial({color:0x58603a,transparent:true,opacity:.32,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+T.AIRF.forEach((a,t)=>{const dir=-Math.sign(a.x),stripM=new THREE.MeshBasicMaterial({color:0x58603a,transparent:true,opacity:.32,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});STRN.push({m:stripM,c0:stripM.color.clone()});
  {const NX=56,NZ=6,P=[],I=[];for(let i=0;i<=NX;i++)for(let j=0;j<=NZ;j++){const x=a.x+dir*(i*2-2),z=a.z-7+j*14/NZ;P.push(x,hAt(x,z)+.05,z)}for(let i=0;i<NX;i++)for(let j=0;j<NZ;j++){const q=i*(NZ+1)+j;I.push(q,q+1,q+NZ+1,q+1,q+NZ+2,q+NZ+1)}
   const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.Float32BufferAttribute(P,3));G.setIndex(I);const m=new THREE.Mesh(G,stripM);m.material.side=THREE.DoubleSide;scene.add(m)}   /* the mown strip: one sheet draped over the ground */
  for(let k=0;k<=110;k+=22)for(const sz of[-1,1])box(1.2,.25,.4,woodM,a.x+dir*k,hAt(a.x+dir*k,a.z+sz*7.5)+.12,a.z+sz*7.5);
@@ -840,7 +842,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Armour and guns.</b> Press F at a tank, field gun or trench mortar to man it. The attackers get a tank each round; anti-tank rifles, bundle charges and field guns knock it out. In a tank, C switches to an outside view.<br>
  <b>Elite kits.</b> Crates at your staging area: Flamethrower, Tank Hunter or Sentry. F at a crate to become one until you die.<br>
  <b>Wounded.</b> When you're knocked down, press Y to shout for a medic; bot medics come running. Medics can revive anyone, bots included.<br>
- <b>Weather.</b> Each round is overcast, foggy, rainy or at night. In the dark, flares (a utility, or the officer's star shells) light up the field.<br>
+ <b>Weather.</b> Each round is overcast, foggy, rainy or at night. At night, lanterns at the dugouts and dumps, braziers in the rear trenches and burning wrecks throw pools of light: anyone standing in one can be seen, so pick your way through the dark. Flares (a utility, or the officer's star shells) light up the rest.<br>
  <b>Fighting.</b> Bullets drop and take time to arrive. Sprinting lowers the gun; V stabs, sprint + hold V to charge with the bayonet. Being shot at near-misses suppresses you. TAB shows the full controls in game.<br>
  <b>Respawning.</b> When you die, click where to come back on the battlefield map: your base, the airfield, a field post, a rally point or any flag your side fully holds.<br>
  <b>Orders.</b> When your officer sends your squad somewhere, a beacon of light in your squad's colour marks the spot, with its distance on screen. Teammates have a blue marker, your squad a green one.<br>
@@ -850,7 +852,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wrecked guns.</b> Shells knock out MG nests, field guns and AA guns; hold E beside one to repair it (sappers are fastest).<br>
  <b>Phones.</b> Touch controls turn on by themselves; play in landscape. The ✎ button lets you move the buttons where you like.<br>
  <b>Your career.</b> Every game earns XP toward 100 levels and the ranks up to General. Your service record is on this screen.
- </div></details><div class="ver">v0.34.2</div>`,'');
+ </div></details><div class="ver">v0.35</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -974,13 +976,52 @@ function splat(k,blood){mudA=Math.min(1.2,mudA+.5+k);mdc.clearRect(0,0,180,120);
   for(let j=0;j<5;j++)mdc.fillRect(Math.round(x+(Math.random()-.5)*sz),Math.round(y+(Math.random()-.5)*sz),Math.ceil(sz*.6),Math.ceil(sz*.5));if(Math.random()<.3)mdc.fillRect(Math.round(x),Math.round(y),1,Math.round(3+Math.random()*8))}}
 let knT=0,knAt=0,knTxt='';function knShow(t,sc){knTxt=t;knAt=performance.now();knT=2.6;$('kn').innerHTML=t.replace(/[<>&]/g,'')+'\n<b>'+sc+' XP</b>';$('kn').style.opacity=1}
 /* the reference's battlefield: patches of burning ground in no-man's land, some sending up black smoke columns */
-const FLT=[0,1,2,3].map(f=>{const c=document.createElement('canvas');c.width=16;c.height=24;const g=c.getContext('2d');for(let y=0;y<24;y++)for(let x=0;x<16;x++){const cx=Math.abs(x-7.5)/8,h=1-y/24,r=Math.sin(x*1.7+f*2.1+y*.6)*.18+Math.sin(x*.7-f*1.3)*.12,v=(1-h)*(1-cx*1.3)+r;if(v>.25){g.fillStyle=v>.75?'#fff2b0':v>.55?'#ffb030':v>.4?'#e8601a':'#8a2a10';g.fillRect(x,y,1,1)}}return pxTex(c,false)});
+const FLC=[],FLT=[0,1,2,3].map(f=>{const c=document.createElement('canvas');FLC.push(c);c.width=16;c.height=24;const g=c.getContext('2d');for(let y=0;y<24;y++)for(let x=0;x<16;x++){const cx=Math.abs(x-7.5)/8,h=1-y/24,r=Math.sin(x*1.7+f*2.1+y*.6)*.18+Math.sin(x*.7-f*1.3)*.12,v=(1-h)*(1-cx*1.3)+r;if(v>.25){g.fillStyle=v>.75?'#fff2b0':v>.55?'#ffb030':v>.4?'#e8601a':'#8a2a10';g.fillRect(x,y,1,1)}}return pxTex(c,false)});
 let fires=null;
 function firesInit(){fires=[];let sd=7;const r=()=>(sd=(sd*16807)%2147483647)/2147483647;
- for(let i=0;i<22;i++){const x=(r()-.5)*(2*W-40),z=(r()-.5)*(2*T.NML-16),m=new THREE.Sprite(new THREE.SpriteMaterial({map:FLT[0],transparent:true,depthWrite:false,fog:false}));m.center.set(.5,0);const k=.8+r()*1.2;m.scale.set(k,k*1.5,1);scene.add(m);
-  const f={x,z,m,k,ph:r()*9,sm:[]};if(i%3===0)for(let j=0;j<6;j++){const s=smokeS(j&1);s.material.transparent=true;s.material.alphaTest=0;s.material.color.setRGB(.13,.12,.11);s.center.set(.5,.2);scene.add(s);f.sm.push({s,t:j/6})}fires.push(f)}firesPlace()}
+ T.BURN.forEach((B,i)=>{const {x,z,k}=B,m=new THREE.Sprite(new THREE.SpriteMaterial({map:FLT[0],transparent:true,depthWrite:false,fog:false}));m.center.set(.5,0);m.scale.set(k,k*1.5,1);scene.add(m);   /* positions shared with the server (T.BURN): they light the ground at night */
+  const f={x,z,m,k,ph:B.ph,sm:[]};if(i%3===0)for(let j=0;j<6;j++){const s=smokeS(j&1);s.material.transparent=true;s.material.alphaTest=0;s.material.color.setRGB(.13,.12,.11);s.center.set(.5,.2);scene.add(s);f.sm.push({s,t:j/6})}fires.push(f)});firesPlace();lightsInit()}
+/* v0.35 night lights (T.LIGHTS, shared with the server): lantern / brazier / pot meshes, flames and halos drawn as GPU point sprites
+   (two draw calls, animated in the shader), and pools of light draped on the ground (one additive mesh). At night a soldier
+   standing in the light is drawn lit. */
+let LV=null;
+function lightsInit(){const LI=T.LIGHTS,yOf=l=>l.y!=null?l.y:hAt(l.x,l.z)+(l.h||0),parts=new Map(),put=(g,col,x,y,z)=>{g=g.index?g.toNonIndexed():g;g.translate(x,y,z);if(!parts.has(col))parts.set(col,[]);parts.get(col).push(g)};
+ const glassC=0xffc468,FL=[],HL=[],HF=[];
+ for(const l of LI){const y=yOf(l),k=l.k;
+  if(k==='lantern'||k==='lamp'){const s=k==='lamp'?.7:1;put(new THREE.BoxGeometry(.2*s,.05,.2*s),0x2a2620,l.x,y+.17*s,l.z);put(new THREE.BoxGeometry(.05,.1,.05),0x2a2620,l.x,y+.24*s,l.z);put(new THREE.BoxGeometry(.15*s,.22*s,.15*s),'glass',l.x,y,l.z);put(new THREE.BoxGeometry(.2*s,.04,.2*s),0x2a2620,l.x,y-.13*s,l.z);
+   if(l.h!=null&&!l.hang&&l.h>.95){const g0=hAt(l.x,l.z);put(new THREE.BoxGeometry(.09,y-g0+.3,.09),0x4a3a2a,l.x+.14,(y+g0+.3)/2,l.z)}
+   HL.push(l.x,y,l.z,k==='lamp'?.8:1.7,.8)}
+  else if(k==='brazier'){put(new THREE.CylinderGeometry(.32,.24,.5,8),0x24201c,l.x,y+.35,l.z);for(const a of[0,2.1,4.2])put(new THREE.BoxGeometry(.05,.3,.05),0x24201c,l.x+Math.cos(a)*.22,y+.1,l.z+Math.sin(a)*.22);FL.push(l.x,y+.95,l.z,1,(l.x*7+l.z)%4);HL.push(l.x,y+.9,l.z,2.8,1)}
+  else if(k==='pot'){put(new THREE.CylinderGeometry(.16,.18,.26,7),0x24201c,l.x,y+.13,l.z);FL.push(l.x,y+.5,l.z,.55,(l.x+l.z*3)%4);HL.push(l.x,y+.45,l.z,1.5,.85)}
+  else if(k==='fire'){for(let j=0;j<4;j++){const a=j*1.9+l.x,r=j?1.3:0;FL.push(l.x+Math.cos(a)*r,hAt(l.x+Math.cos(a)*r,l.z+Math.sin(a)*r)+1.1-j*.12,l.z+Math.sin(a)*r,2.4-j*.3,j)}HF.push(l.x,y+1.4,l.z,7,1)}
+  else if(k==='wreck')HF.push(l.x,y,l.z,5,.8);else if(k==='burn')HF.push(l.x,y+.6,l.z,2.6+(l.r-6)*.35,.7)}
+ const mats={};for(const[c,L]of parts){let n=0;for(const g of L)n+=g.attributes.position.count;const P=new Float32Array(n*3);let o=0;for(const g of L){P.set(g.attributes.position.array,o);o+=g.attributes.position.count*3}
+  const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(P,3));const m=new THREE.MeshBasicMaterial({color:c==='glass'?glassC:c});mats[c]=m;scene.add(new THREE.Mesh(G,m))}
+ /* point sprites: size in metres, a phase per point; the shader flickers them, so the CPU never touches them */
+ const VS='attribute float sz;attribute float ph;uniform float sc,t,gain;varying float vF,vA;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);float f=1.+.09*sin(t*11.+ph*5.)+.05*sin(t*27.+ph*3.);vF=floor(mod(t*10.+ph*1.7,4.));vA=gain*clamp(1.-(-mv.z)/240.,0.,1.)*(.86+.14*f);gl_PointSize=sz*f*sc/max(.5,-mv.z);gl_Position=projectionMatrix*mv;}',
+  pts=(arr,frag,tex,blend)=>{const n=arr.length/5,P=new Float32Array(n*3),Z=new Float32Array(n),H=new Float32Array(n);for(let i=0;i<n;i++){P.set(arr.slice(i*5,i*5+3),i*3);Z[i]=arr[i*5+3];H[i]=arr[i*5+4]}
+   const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(P,3));G.setAttribute('sz',new THREE.BufferAttribute(Z,1));G.setAttribute('ph',new THREE.BufferAttribute(H,1));
+   const m=new THREE.ShaderMaterial({uniforms:{map:{value:tex},sc:{value:500},t:{value:0},gain:{value:1}},vertexShader:VS,fragmentShader:frag,transparent:true,depthWrite:false,blending:blend});const o=new THREE.Points(G,m);o.frustumCulled=false;scene.add(o);return o};
+ const gc=document.createElement('canvas');gc.width=gc.height=64;{const g=gc.getContext('2d'),r=g.createRadialGradient(32,32,0,32,32,32);r.addColorStop(0,'rgba(255,214,150,1)');r.addColorStop(.18,'rgba(255,170,80,.6)');r.addColorStop(.5,'rgba(220,110,40,.16)');r.addColorStop(1,'rgba(160,60,10,0)');g.fillStyle=r;g.fillRect(0,0,64,64)}
+ const glowT=new THREE.CanvasTexture(gc),HFR='uniform sampler2D map;varying float vF,vA;void main(){vec4 c=texture2D(map,gl_PointCoord);gl_FragColor=vec4(c.rgb*c.a*vA,1.);}';
+ const fa=document.createElement('canvas');fa.width=64;fa.height=24;{const g=fa.getContext('2d');FLC.forEach((c,i)=>g.drawImage(c,i*16,0))}const fT=pxTex(fa,false);
+ const FFR='uniform sampler2D map;varying float vF,vA;void main(){vec2 p=gl_PointCoord;float u=(p.x-.5)*1.5+.5;if(u<0.||u>1.)discard;vec4 c=texture2D(map,vec2((vF+u)/4.,1.-p.y));if(c.a<.5)discard;gl_FragColor=vec4(c.rgb,1.);}';
+ const lamps=pts(HL,HFR,glowT,THREE.AdditiveBlending),fireH=pts(HF,HFR,glowT,THREE.AdditiveBlending),flames=pts(FL,FFR,fT,THREE.NormalBlending);flames.material.transparent=false;
+ /* pools of light on the ground: fine cells near trenches (so the light follows the walls and floor), coarse ones in the open */
+ const PP=[],PC=[],PI=[],IK={lantern:.5,lamp:.42,brazier:.62,pot:.4,fire:.75,wreck:.6,burn:.55};
+ for(const l of LI){const fine=l.y!=null||l.k==='brazier'||Math.abs(Math.abs(l.z)-64)<14||Math.abs(Math.abs(l.z)-100)<14||Math.abs(Math.abs(l.z)-30)<10,cs=fine?.8:2,n=Math.ceil(2*l.r/cs),I=IK[l.k]||.5,b0=PP.length/3,fy=l.y!=null?l.y-1.95:null;
+  for(let i=0;i<=n;i++)for(let j=0;j<=n;j++){const x=l.x-l.r+i*2*l.r/n,z=l.z-l.r+j*2*l.r/n,d=Math.hypot(x-l.x,z-l.z)/l.r,f=d<1?(1-d)*(1-d)*I:0,y=fy!=null&&d<.5?Math.max(hAt(x,z),fy):hAt(x,z);PP.push(x,y+.07,z);PC.push(f,f*.66,f*.34)}
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){const q=b0+i*(n+1)+j;if(PC[q*3]+PC[(q+1)*3]+PC[(q+n+1)*3]+PC[(q+n+2)*3]<=0)continue;PI.push(q,q+1,q+n+1,q+1,q+n+2,q+n+1)}}
+ const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.Float32BufferAttribute(PP,3));G.setAttribute('color',new THREE.Float32BufferAttribute(PC,3));G.setIndex(PI);
+ const pool=new THREE.Mesh(G,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4,side:THREE.DoubleSide,fog:false}));pool.frustumCulled=false;scene.add(pool);
+ LV={lamps,fireH,flames,pool,glass:mats.glass,n:LI.length}}
+const _ls=new THREE.Vector2();
+function lightsTick(){if(!LV)return;const night=wxK==='night',t=performance.now()/1000;renderer.getDrawingBufferSize(_ls);const sc=_ls.y/(2*Math.tan(cam.fov*Math.PI/360));
+ for(const o of[LV.lamps,LV.fireH,LV.flames]){o.material.uniforms.t.value=t;o.material.uniforms.sc.value=sc}
+ LV.lamps.visible=night||wxK==='fog';LV.lamps.material.uniforms.gain.value=night?1:.35;LV.fireH.material.uniforms.gain.value=night?1:.3;LV.pool.visible=night;LV.pool.material.opacity=.92+.08*Math.sin(t*9);
+ LV.glass.color.setHex(night?0xffd27a:0x9a8458)}
 function firesPlace(){if(fires)for(const f of fires)f.y=hAt(f.x,f.z)}
-function firesTick(dt,now){if(!terr)return;if(!fires)firesInit();for(const f of fires){const fr=Math.floor(now/90+f.ph)&3;f.m.material.map=FLT[fr];f.m.position.set(f.x,f.y-.05,f.z);const w=1+.08*Math.sin(now/70+f.ph);f.m.scale.set(f.k*w,f.k*1.5*(2-w),1);
+function firesTick(dt,now){if(!terr)return;if(!fires)firesInit();lightsTick();for(const f of fires){const fr=Math.floor(now/90+f.ph)&3;f.m.material.map=FLT[fr];f.m.position.set(f.x,f.y-.05,f.z);const w=1+.08*Math.sin(now/70+f.ph);f.m.scale.set(f.k*w,f.k*1.5*(2-w),1);
   for(const p of f.sm){p.t+=dt/9;if(p.t>1)p.t-=1;const u=p.t,sc=2+u*9;p.s.position.set(f.x+u*u*6,f.y+.5+u*22,f.z+u*2);p.s.scale.set(sc,sc*1.2,1);p.s.material.opacity=Math.min(1,u*6)*(1-u)*.75}}}
 function cloud(x,z,r,life,col,n,low){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,d=Math.sqrt(Math.random())*r*.7,cx=x+Math.cos(a)*d,cz=z+Math.sin(a)*d,sm=psGet('sc'+(i&1),()=>new THREE.Sprite(spMat('smoke'+(i&1)).clone()));sm.material.transparent=true;sm.material.alphaTest=0;sm.material.depthWrite=false;sm.material.color.setRGB(col[0],col[1],col[2]);sm.center.set(.5,.15);
   sm.position.set(cx,hAt(cx,cz)-.3,cz);scene.add(sm);debris.push({m:sm,smoke:1,sx:r*.55,sy:low?r*.32:r*.6,gr:.05,gm:6,op:low?.8:.92,vx:(Math.random()-.5)*.25,vy:low?.02:.06,vz:(Math.random()-.5)*.25,t:0,life:life+Math.random()*3})}}
@@ -1271,8 +1312,8 @@ function staticDraw(far){const cx=cam.position.x,cz=cam.position.z,o=me.officer&
 let ssN=0,sdFar=150;function soldiersDraw(){const m=cam.matrixWorld.elements;CR[0]=m[0];CR[1]=m[1];CR[2]=m[2];CU[0]=m[4];CU[1]=m[5];CU[2]=m[6];
  const far=Math.min(400,1.98/Math.max(.002,scene.fog.density||.011)),cx=cam.position.x,cz=cam.position.z;lodN=0;sdFar=far;
  for(const e of ents.values()){const P=e.sp.position;if(e.sp.visible===false||e.row==null)continue;const dx=P.x-cx,dz=P.z-cz,d=Math.hypot(dx,dz);if(d>far&&!me.officer)continue;lodN++;
-  const S=e.sp.scale;BODY.add(P.x,P.y,P.z,S.x,S.y,e.row,e.col,sprK*(e.spotted&&e.team!==me.team?1.08:1),CR,CU);
-  if(!ART.armed&&!e.down&&S.y>1.5&&d<120){const l=d||1,k=e.vw===2?-.06:.06;GUNB.add(P.x+dx/l*-k,P.y,P.z+dz/l*-k,1.3*160/96,1.95,e.gl||0,(e.aim?4:0)+(e.vw||0),sprK,CR,CU)}}
+  const S=e.sp.scale;let kL=sprK;if(wxK==='night'){const l=T.litAt(P.x,P.z);if(l>0)kL=Math.max(kL,sprK+(.95-sprK)*l)}BODY.add(P.x,P.y,P.z,S.x,S.y,e.row,e.col,kL*(e.spotted&&e.team!==me.team?1.08:1),CR,CU);
+  if(!ART.armed&&!e.down&&S.y>1.5&&d<120){const l=d||1,k=e.vw===2?-.06:.06;GUNB.add(P.x+dx/l*-k,P.y,P.z+dz/l*-k,1.3*160/96,1.95,e.gl||0,(e.aim?4:0)+(e.vw||0),kL,CR,CU)}}
  BODY.end();GUNB.end();ssN=staticDraw(far)}
 /* static decoration (grass, props): hidden beyond a distance, checked twice a second */
 let lodT=0;function lodTick(dt){lodT-=dt;if(lodT>0)return;lodT=.5;const cx=cam.position.x,cz=cam.position.z,o=me.officer;for(const q of LODS){const d=Math.abs(q.position.x-cx)+Math.abs(q.position.z-cz);q.visible=o?q.userData.r>40:d<q.userData.r}}
@@ -1382,7 +1423,7 @@ const WXT={overcast:1,fog:.95,rain:.8,night:.3};let sprK=1,sprT=0;
 function tintArt(k){const t=(m)=>{if(m&&m.color)m.color.setRGB(k,k,Math.min(1,k*1.12))};if(ART.mat)for(const r of ART.mat)for(const m of r)t(m);if(ART.gun)for(const r of ART.gun)for(const m of r)t(m);sprK=k}
 function tintScene(k){scene.traverse(o=>{if(o.isSprite&&o.material&&o.material.color&&!o.userData.glow&&!o.userData.ent)o.material.color.setRGB(k,k,Math.min(1,k*1.12))});tintArt(k)}
 function artTick(dt){sprT-=dt;if(sprT>0)return;sprT=.2;const base=WXT[wxK]||1;let k=base;if(base<1)for(const f of flareL){const d=Math.hypot(f.x-cam.position.x,f.z-cam.position.z);if(d<70)k=Math.max(k,base+(1-base)*(1-d/70)*(f.m.material.opacity||0))}if(Math.abs(k-sprK)>.02)tintArt(k)}
-function applyWx(k){wxK=WXV[k]?k:'overcast';T.WX.k=wxK;{const w=wxK==='rain';if(w!==wetOn){wetOn=w;dirty=true}}const w=WXV[wxK];tintScene(WXT[wxK]||1);scene.background.setHex(w.bg);scene.fog.color.setHex(w.bg);hemi.intensity=w.hemi;sun.intensity=w.sun;if(window.SKY&&SKY.material)SKY.material.color.setScalar(w.sky);
+function applyWx(k){wxK=WXV[k]?k:'overcast';structNight(wxK==='night');T.WX.k=wxK;{const w=wxK==='rain';if(w!==wetOn){wetOn=w;dirty=true}}const w=WXV[wxK];tintScene(WXT[wxK]||1);scene.background.setHex(w.bg);scene.fog.color.setHex(w.bg);hemi.intensity=w.hemi;sun.intensity=w.sun;if(window.SKY&&SKY.material)SKY.material.color.setScalar(w.sky);
  if(wxK==='rain'&&!rainL){const n=700;rainP=new Float32Array(n*6);for(let i=0;i<n;i++){const x=(Math.random()-.5)*50,y=Math.random()*26,z=(Math.random()-.5)*50;rainP.set([x,y,z,x+.05,y-.7,z],i*6)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(rainP,3));rainL=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0xa8b0b8,transparent:true,opacity:.45,fog:false}));rainL.frustumCulled=false;scene.add(rainL)}
  if(rainL)rainL.visible=wxK==='rain';
  if(wxK==='fog'&&!fogB.length)for(let i=0;i<16;i++){const sm=new THREE.Sprite(spMat('smoke'+(i&1)).clone());sm.material.transparent=true;sm.material.alphaTest=0;sm.material.opacity=.32;sm.material.color.setRGB(.82,.82,.8);sm.scale.set(34,7,1);sm.position.set((Math.random()-.5)*2*W,1+Math.random()*2.5,(Math.random()-.5)*1.6*W);sm.userData.v=.6+Math.random()*.8;scene.add(sm);fogB.push(sm)}
@@ -1503,7 +1544,7 @@ function frame(){
   obj.forEach((o,i)=>{h+='<span style="color:var(--'+(o.owner===0?'bl':'rd')+')">'+T.LINES[i]+'  '+(o.lock>0?'reinforcing '+o.lock+'s':bar(o))+'</span>\n'});
   h+='SIDE OBJECTIVES: '+T.DEPOTS.map((d,i)=>'<span style="color:'+(dpS[i][0]<0?'#aaa':dpS[i][0]===me.team?'var(--'+(me.team?'rd':'bl')+')':'#e05040')+'">'+d.n+(dpS[i][0]<0?'':dpS[i][0]===me.team?' (ours)':' (enemy)')+'</span>').join(' · ')+'\n';
   if(opS){const [att,sec,nsec,tk,tkMax,bat,nbat]=opS;h+='OPERATION: '+(att===me.team?'you attack':'you defend')+' · sector '+Math.min(sec+1,nsec)+'/'+nsec+' · '+(att===me.team?'tickets ':'enemy tickets ')+tk+'/'+tkMax+' · battalion '+Math.min(bat+1,nbat)+'/'+nbat+'\n'}
-  h+='WEATHER: '+T.WXS[wxK].n+(wxK==='night'?' · flares light the field':wxK==='fog'?' · short sight lines':wxK==='rain'?' · mud slows you':'')+'\n';
+  h+='WEATHER: '+T.WXS[wxK].n+(wxK==='night'?' · lamps, fires and flares light the field':wxK==='fog'?' · short sight lines':wxK==='rain'?' · mud slows you':'')+'\n';
   {const vh=vehHud();if(vh)h+=vh.line1+'\n'+(vh.extra?vh.extra+'\n':'')}
   h+='WAVE: '+(wave[0]===me.team?'YOUR PUSH':'ENEMY PUSH')+' '+Math.max(0,45-wave[1])+'s\n';
   if(myOrder&&!me.officer){const dx=myOrder.x-me.x,dz=myOrder.z-me.z;h+='ORDER: '+myOrder.ty.toUpperCase()+' '+myOrder.n+' · '+Math.round(Math.hypot(dx,dz))+' m '+(dz<0?'N':'S')+(dx>0?'E':'W')+(myOrder.done?' ✓ reached':'')+'\n'}
