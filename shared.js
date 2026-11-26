@@ -15,7 +15,7 @@ const mea = (t, x) => 6 * MP.a1 * Math.sin(x * .041 + t * .37 + MP.ph1) + 2.5 * 
 const trenchC = (t, x) => t + tri(x) + mea(t, x);         // centre line z of line t at x (bends + zig-zag bays)
 const trenchSlope = (t, x) => (trenchC(t, x + 1) - trenchC(t, x - 1)) / 2;
 const sgn = t => t > 0 ? -1 : 1;                          // enemy direction along z: u = (z - c) * sgn
-const NEST = [], HQS = [];
+const NEST = [], HQS = [], LIGHTS = [];
 // v0.26 crewed guns: two field guns behind each reserve line, two trench mortars in pits behind each support line
 const EMPL = [], OBJ = [];
 const LINES = ['1 · Blue Reserve', '2 · Blue Support', '3 · Blue Front', '4 · Green Front', '5 · Green Support', '6 · Green Reserve'];
@@ -308,6 +308,46 @@ function buildHQBoxes() { SGRID.clear(); SBOX.length = 0; for (const q of HQS) {
   for (const a of [-5, 5]) for (const c of [-3.5, 3.5]) B(q.x + a, q.z + c, .2, .2, g - .2, g + 2.7);   // posts
   B(q.x, q.z, 5.5, 4, g + 2.5, g + 3.5, true);   // timber roof + sandbag layer: stops bullets and sight, but never blocks walking in under its edge
 } }
+// ---- v0.35 night lighting. Where a lamp or a fire would really be: shaded lamps inside the front-line dugouts, storm lanterns at
+// the doors of the support and reserve dugouts, coke braziers in the reserve and support trenches, lanterns at the HQ shelters,
+// supply dumps, gun pits and hangars, paraffin flare pots along the airstrips, burning wrecks, a few ruins still on fire, and the
+// patches of burning ground in no-man's land. Server and clients build the same list: at night a man standing in the light is
+// seen as if by day (litAt), so the lamps and fires are both scenery and cover you choose to avoid.
+// Each light: { x, z, k: kind, r: reach in m, y: absolute height (dugout lamps) or h: height above the ground }
+const BURN = (() => { const o = []; let sd = 7; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;   // no-man's-land fires (fixed, as before)
+  for (let i = 0; i < 22; i++) { const x = (r() - .5) * (2 * W - 40), z = (r() - .5) * (2 * NML - 16), k = .8 + r() * 1.2, ph = r() * 9; o.push({ x, z, k, ph, smoke: i % 3 === 0 }); } return o; })();
+let LGRID = new Map();
+function buildLights() {
+  LIGHTS.length = 0; const L = (x, z, k, r, o) => LIGHTS.push(Object.assign({ x: +x.toFixed(2), z: +z.toFixed(2), k, r }, o || {}));
+  for (const q of ROOMS) {
+    if (Math.abs(q.t) === 30) { if (hsh(q.xc, q.t + .5) < .7) L(q.xc + .8, (q.fz0 + q.fz1) / 2, 'lamp', 4.5, { y: q.fy + 1.95 }); }   // a candle or shaded lamp, never in the open at the front
+    else L(q.xc + 2.1, q.c - q.sg * 2.55, 'lantern', 9, { y: q.fy + 2.05 });                                                         // hung by the dugout door
+  }
+  for (const t of [100, 64, -100, -64]) for (let i = 0; i < ROOM_X.length; i++) {
+    if (Math.abs(t) === 64 && i % 2) continue; const x = ROOM_X[i] + (hsh(i, t) < .5 ? -7 : 7);
+    if (GAPS.some(g => Math.abs(g - x) < 6) || CT.some(c => Math.abs(c - x) < 5)) continue;
+    L(x, trenchC(t, x), 'brazier', 11, { h: 0 });
+  }
+  for (const q of HQS) { L(q.x - 3.5, q.z, 'lantern', 10, { h: 2.4, hang: 1 }); L(q.x + 3.5, q.z + (q.team ? 1 : -1) * 2, 'lantern', 10, { h: 2.4, hang: 1 }); }
+  for (const d of DEPOTS) L(d.x + 3, d.z + (d.z > 0 ? -3 : 3), 'lantern', 11, { h: 2.1 });
+  for (const e of EMPL) if (e.k === 'fgun') L(e.x + 2.4, e.z + (e.team ? -1.5 : 1.5), 'lantern', 7, { h: 1.2 });
+  AIRF.forEach((a, t) => { const dir = -Math.sign(a.x), hx = a.x - dir * 10, hz = a.z + (t ? -14 : 14), fz = hz + (t ? 5.2 : -5.2);
+    L(hx - 4, fz, 'lantern', 9, { h: 2.4 }); L(hx + 4, fz, 'lantern', 9, { h: 2.4 });
+    for (let k = 11; k <= 99; k += 22) for (const sz of [-1, 1]) L(a.x + dir * k, a.z + sz * 7.5, 'pot', 6, { h: 0 }); });
+  STRUCT.forEach((S, i) => { const hv = hsh(i * 3.7, MP.hs + 1);
+    if (S.k === 'tank' || S.k === 'plane') L(S.x, S.z, 'wreck', 13, { h: 1 });
+    else if ((S.k === 'farm' || S.k === 'barn') && hv < .55) L(S.x + Math.cos(hv * 40) * 1.5, S.z + Math.sin(hv * 40) * 1.5, 'fire', 14, { h: 0 });
+    else if (S.k === 'chapel' && hv < .6) L(S.x, S.z, 'lamp', 6, { h: .9 }); });   // candles left burning in the chapel ruins
+  for (const b of BURN) L(b.x, b.z, 'burn', 6 + b.k * 4, { h: 0 });
+  LGRID = new Map(); LIGHTS.forEach((l, i) => { for (let gx = Math.floor((l.x - l.r) / 16); gx <= Math.floor((l.x + l.r) / 16); gx++) for (let gz = Math.floor((l.z - l.r) / 16); gz <= Math.floor((l.z + l.r) / 16); gz++) { const k = gx * 1000 + gz; if (!LGRID.has(k)) LGRID.set(k, []); LGRID.get(k).push(l); } });
+}
+/** How well lit the ground is at (x, z) by the lamps and fires: 0 (dark) .. 1 (in the pool of light). */
+function litAt(x, z) {
+  const c = LGRID.get(Math.floor(x / 16) * 1000 + Math.floor(z / 16)); if (!c) return 0; let b = 0;
+  for (const l of c) { const d = Math.hypot(l.x - x, l.z - z); if (d < l.r) { const v = 1 - d / l.r; b = Math.max(b, Math.min(1, v * 1.6)); } }
+  return b;
+}
+
 // ---- v0.32 battlefield structures: shelled-out buildings (farmhouses, chapels, barns, a walled yard) and wrecked vehicles
 // (tank hulks, lorries, a downed biplane, field gun and wagon wrecks). Every piece is a solid box in SBOX/SGRID, so it stops
 // walking, bullets and sight on server and client alike, and the bots' nav grid routes around it. STRUCT lists the pieces
@@ -599,7 +639,7 @@ function applyLayout(L) {
     .concat(L.MORT[0].map(x => ({ k: 'mortar', team: 0, x, z: trenchC(64, x) + 9.5, yaw: 0 }))).concat(L.MORT[1].map(x => ({ k: 'mortar', team: 1, x, z: trenchC(-64, x) - 9.5, yaw: Math.PI }))));
   fill(OBJ, FL.map((t, i) => ({ t, x: OBX[i], z: trenchC(t, OBX[i]) })));
   fill(DEPOTS, L.DEP.map(([n, x, sd]) => ({ n, x, z: dz(x, sd) })));
-  buildRooms(); buildSB(); buildHQBoxes(); buildPhones(); buildTunnels(); buildAA(); buildStruct(); BAYS.clear(); FLOOR = null; PRISTINE = null;   // the terrain is generated afresh by the next makeTerrain()
+  buildRooms(); buildSB(); buildHQBoxes(); buildPhones(); buildTunnels(); buildAA(); buildStruct(); buildLights(); BAYS.clear(); FLOOR = null; PRISTINE = null;   // the terrain is generated afresh by the next makeTerrain()
 }
 /** Is this layout playable? Every line objective sits in an open trench, enough dugouts per line, depots on open ground. */
 function mapCheck() {
@@ -686,7 +726,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);

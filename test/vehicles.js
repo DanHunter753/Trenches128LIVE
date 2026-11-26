@@ -115,7 +115,7 @@ const input = (c, f, s, bits, yaw, pitch, n) => { const cmds = []; for (let i = 
     if (bot) { place(bot, c.x, c.z); X.eliteErrands(); } ck('botTakesKit', bot && bot.elite === c.k); }
   // ---- weather
   X.setWx('night'); await sleep(150);
-  ck('nightBroadcast', A.got('wx', m => m.k === 'night').length >= 1 && T.WX.k === 'night' && X.sightAt(0, 0, 0) < .5);
+  ck('nightBroadcast', A.got('wx', m => m.k === 'night').length >= 1 && T.WX.k === 'night' && (() => { for (let x = -150; x < 150; x += 7) if (T.litAt(x, 18) === 0) return X.sightAt(0, x, 18) < .5; return false; })());   // v0.35: a dark spot (lamps and fires light their surroundings)
   { const e = [...X.ents.values()].find(q => q.team === 1 && q.alive && !q.mg && q.bot); place(e, 10, 5); e.sp[0] = 0; X.flareAt(10, 5, 0); await sleep(150);
     ck('flareLights', X.sightAt(0, 10, 5) === 1 && e.sp[0] > X.tickNo() && A.got('flr').length >= 1); }
   { X.setWx('rain'); const p = { x: 0, y: T.hAt(X.terrH(), 0, 130), z: 130, vy: 0, cls: 'rifleman', w: 'bolt' }; for (let i = 0; i < 10; i++) T.step(p, { dt: .05, f: 1, s: 0, bits: 1, yaw: 0 }, X.terrH(), 1); const wet = 130 - p.z;
