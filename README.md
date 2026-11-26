@@ -73,6 +73,24 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.36 - class abilities: ammo boxes and morphine
+- **Class ability key: [N]** (rebindable; a KIT button on phones, shown for the classes that have one).
+- **Machine gunner: ammo boxes.** [N] puts a box down at your feet (3 supply, every 35 s, two of yours at a time; a box lasts
+  2½ minutes or 10 restocks). Anyone on your side who walks over it gets a full magazine, their grenades and their utility
+  (bandages, smoke, gas or flares) back, once every 25 s. The gunner earns 4 XP each time a teammate restocks. Gunner bots put
+  boxes down where three or more friends are gathered.
+- **Machine gunner: bracing.** Crouch and the light machine gun fires with about half the spread and less climb.
+- **Assault: faster and quicker hands.** Speed 1.06 → 1.10, and reloads take 30% less time.
+- **Assault: slide.** Crouch while sprinting forward and you drop into a slide: a fast burst (12 m/s, falling to a crouch over
+  0.9 s) under fire and into cover, low and hard to hit. Cancel it any time by standing up (let go of crouch, or tap it again
+  with toggle-crouch), jumping (a hop out of it) or pulling back; a wall stops it too. 1.2 s before the next one. It runs in
+  the shared movement code, so your own screen predicts it exactly; a little dust, a scrape and a camera tilt go with it.
+- **Assault: morphine.** [N] injects a syrette: for 10 s you move 20% faster and take 40% less damage (gas excepted), and get
+  15 HP back. Two per life, and an ammo box gives you one back. The screen warms at the edges while it lasts, and the HUD
+  counts it down. Assault bots use it when hurt in a fight.
+- New tests `classes` (server rules and the slide's start, burst, cancels and cooldown) and `browser_classes` (box drawn with its
+  hint, morphine HUD and speed, a slide with the real keys and standing up to cancel it).
+
 ## v0.35 - lamps and fires at night
 - **Night maps are lit by the war itself**, so flares are no longer the only light. Each lamp or fire sits where it would really be:
   - shaded lamps *inside* the front-line dugouts (nothing burns in the open on the front line);

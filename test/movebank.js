@@ -18,7 +18,7 @@ function client(name) { return new Promise(res => { const ws = new WebSocket('ws
   const cmds = []; for (let i = 0; i < 12; i++) cmds.push([++seq, 16, 1, 0, 1, Math.PI / 2, 0]);
   const sim = { x: me.x, y: me.y, z: me.z, vy: 0, w: me.w, cls: me.cls }; for (const c of cmds) T.step(sim, { dt: .016, f: 1, s: 0, bits: 1, yaw: Math.PI / 2 }, X.terr().H, T.spOf(me));
   const x0 = me.x; A.ws.send(JSON.stringify({ t: 'in', c: cmds, rt: X.tickNo() })); await sleep(250);
-  R.server = +(me.x - x0).toFixed(2); R.predicted = +(sim.x - x0).toFixed(2); ck('burstFullyApplied', Math.abs(me.x - sim.x) < .05 && Math.abs(R.predicted) > 1);
+  R.server = +(me.x - x0).toFixed(2); R.predicted = +(sim.x - x0).toFixed(2); ck('burstFullyApplied', Math.abs(me.x - sim.x) < .05 && Math.abs(R.predicted) > .6);   // (a slow machine gunner covers ~0.9 m)
   // a speed hack: 3 s of 50 ms frames in one go
   place(); await sleep(400); const x1 = me.x; for (let m = 0; m < 3; m++) { const c = []; for (let i = 0; i < 20; i++) c.push([++seq, 50, 1, 0, 1, Math.PI / 2, 0]); A.ws.send(JSON.stringify({ t: 'in', c, rt: X.tickNo() })); }
   await sleep(120); R.hackMoved = +Math.abs(me.x - x1).toFixed(2); ck('speedHackCapped', Math.abs(me.x - x1) < 7 * 1 * (.6 + .2) + .5);   // sprint 7 m/s x (bank + a few ticks)
