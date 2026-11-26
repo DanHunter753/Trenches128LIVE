@@ -80,6 +80,7 @@ body.touch #mm{right:auto;left:10px;top:34px;width:96px!important;height:96px!im
 /* v0.33 phones: landscape only, a tidier HUD, and the gun pulled in from behind the buttons */
 body.flying #hb{display:none}
 #tcd{position:fixed;left:0;right:0;bottom:max(8vh,24px);display:none;justify-content:center;gap:9vw;z-index:16;pointer-events:none}#tcd button{pointer-events:auto;width:118px;height:118px;border-radius:50%;background:rgba(20,18,14,.5);border:2px solid rgba(222,204,150,.7);color:#efe3c0;font:bold 14px monospace;touch-action:none}#tcd button:active,#tcd button.on{background:rgba(196,156,72,.6);color:#111}
+#wp{position:fixed;left:0;top:0;z-index:6;pointer-events:none;font:bold 12px 'Courier New',monospace;color:#fff;text-shadow:0 0 3px #000,0 0 2px #000;white-space:nowrap}#wp i{position:absolute;left:-7px;top:-14px;width:0;height:0;border:7px solid transparent;border-bottom:12px solid #fc4;transform-origin:7px 13px}#wp:not(.edge) i{transform:rotate(180deg)!important}#wp b{position:absolute;left:0;top:4px;transform:translateX(-50%);background:#0007;padding:1px 5px;border-radius:3px}#wp.edge i{left:-7px;top:-13px}
 #phud{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:5;display:none}
 #rot{position:fixed;inset:0;z-index:60;background:#14120ef2;color:#efe3c0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;font:16px 'Courier New',monospace;padding:24px}
 #rot b{font-size:64px;display:block;margin-bottom:12px;animation:rotk 1.6s ease-in-out infinite}#rot button{margin-top:18px;font:bold 15px monospace;padding:10px 18px;background:#3a3526;color:#efe3c0;border:1px solid #8a7a4a;border-radius:6px}
@@ -113,7 +114,7 @@ body.menu #off{display:none!important}
 body.menu #scope,body.menu #dn,body.menu #ch,body.menu #hud,body.menu #hb,body.menu #tabh,body.menu #stat,body.menu #hint,body.menu #banner,body.menu #oob,body.menu #opbar,body.menu #bm,body.menu #gun,body.menu #cross,body.menu #msg,body.menu #hurt,body.menu #mm{display:none}
 </style></head><body class="menu">
 <canvas id="c"></canvas><canvas id="gun" width="360" height="240"></canvas><canvas id="item" width="360" height="240"></canvas><canvas id="mm" width="170" height="170"></canvas><div id="tc"><div id="tcs"><i></i></div></div>
-<div id="tcd"><button id="tcdm">CALL<br>MEDIC</button><button id="tcdr">HOLD TO<br>RESPAWN</button></div><canvas id="phud"></canvas><div id="rot"><b>📱</b>Turn your phone sideways to play.<br><small>Trench 128 plays in landscape.</small><button id="rotb">Rotate to landscape</button></div><div id="tut"><button id="tutx">Skip tutorial</button><div id="tutt"></div><i><b id="tutp"></b></i></div><div id="bm"></div><div id="banner"></div><div id="oob"></div><div id="opbar"><i></i></div><div id="spk"></div><div id="hurt"></div><div id="supv"></div><div id="chgv"></div><canvas id="mud" width="180" height="120"></canvas><canvas id="fx" width="360" height="240"></canvas><canvas id="vv" width="360" height="240"></canvas><div id="cross"></div><div id="hm"><i></i><i></i><i></i><i></i></div><div id="chg"><b></b></div><div id="kn"></div><div id="chat"><div id="chatl"></div><input id="chati" maxlength="120" autocomplete="off" spellcheck="false"></div><div id="kf"></div><div id="sb"></div><div id="wheel"></div><div id="maskv"></div><div id="dpb"><span></span><i><b></b></i></div><div id="gasv"></div><div id="swt"></div><div id="brt"><span></span><i><b></b></i></div><div id="alf"></div><div id="selbox"></div><div id="hud"></div><div id="hb"><canvas id="wi" width="75" height="31"></canvas><div class="am"></div><div class="ul"><i></i></div><div class="sp"></div><div class="it"></div></div><div id="tabh">Hold TAB for controls</div><div id="stat"></div><div id="hint"></div><div id="scope"></div><div id="dn"></div><canvas id="ch" width="160" height="64"></canvas><div id="msg"></div>
+<div id="tcd"><button id="tcdm">CALL<br>MEDIC</button><button id="tcdr">HOLD TO<br>RESPAWN</button></div><div id="wp" style="display:none"><i></i><b></b></div><canvas id="phud"></canvas><div id="rot"><b>📱</b>Turn your phone sideways to play.<br><small>Trench 128 plays in landscape.</small><button id="rotb">Rotate to landscape</button></div><div id="tut"><button id="tutx">Skip tutorial</button><div id="tutt"></div><i><b id="tutp"></b></i></div><div id="bm"></div><div id="banner"></div><div id="oob"></div><div id="opbar"><i></i></div><div id="spk"></div><div id="hurt"></div><div id="supv"></div><div id="chgv"></div><canvas id="mud" width="180" height="120"></canvas><canvas id="fx" width="360" height="240"></canvas><canvas id="vv" width="360" height="240"></canvas><div id="cross"></div><div id="hm"><i></i><i></i><i></i><i></i></div><div id="chg"><b></b></div><div id="kn"></div><div id="chat"><div id="chatl"></div><input id="chati" maxlength="120" autocomplete="off" spellcheck="false"></div><div id="kf"></div><div id="sb"></div><div id="wheel"></div><div id="maskv"></div><div id="dpb"><span></span><i><b></b></i></div><div id="gasv"></div><div id="swt"></div><div id="brt"><span></span><i><b></b></i></div><div id="alf"></div><div id="selbox"></div><div id="hud"></div><div id="hb"><canvas id="wi" width="75" height="31"></canvas><div class="am"></div><div class="ul"><i></i></div><div class="sp"></div><div class="it"></div></div><div id="tabh">Hold TAB for controls</div><div id="stat"></div><div id="hint"></div><div id="scope"></div><div id="dn"></div><canvas id="ch" width="160" height="64"></canvas><div id="msg"></div>
 <div id="off"></div>
 <div id="ov"><div class="box" id="ovb"></div></div>
 <button id="gear" title="Settings">⚙</button><div id="fps"></div><div id="set"><div id="setb"></div></div>
@@ -621,7 +622,7 @@ function onSnap(buf){
   const x=q[0]/100,y=q[1]/100,z=q[2]/100,f=q[4],lk=q[5],yw=q[3]/256*Math.PI*2;
   if(!e){const sp=new THREE.Object3D();sp.scale.set(SPW(),1.95,1);e={sp,q,a:{t:now,x,y,z},b:{t:now,x,y,z}};ents.set(id,e)}
   if(m&3){e.a=now-e.b.t>130?{t:now-50,x:e.b.x,y:e.b.y,z:e.b.z}:e.b;e.b={t:now,x,y,z}}   /* resumed after standing still: interpolate over one tick, not the whole pause */
-  if(e.gone&&now-e.goneT>1500){e.gone=false;e.sp.visible=true}e.team=f&1;e.cls=lk&7;e.wi=(lk>>3)&7;if(e.cls===7){e.elite=e.wi;e.cls=2;e.gl=6+e.elite}else{e.elite=-1;e.gl=Math.min(5,e.wi)}e.fire=!!(f&16);e.aim=!!(f&128);e.yaw=yw;e.bot=!!(f&2);e.mg=!!(f&4);e.down=!!(f&64);e.crouch=!!(f&8);e.spotted=!!(f&32);e.seen=now;
+  if(e.gone&&now-e.goneT>1500){e.gone=false;e.sp.visible=true}e.team=f&1;e.cls=lk&7;e.wi=(lk>>3)&7;e.mysq=!!(lk&64);if(e.cls===7){e.elite=e.wi;e.cls=2;e.gl=6+e.elite}else{e.elite=-1;e.gl=Math.min(5,e.wi)}e.fire=!!(f&16);e.aim=!!(f&128);e.yaw=yw;e.bot=!!(f&2);e.mg=!!(f&4);e.down=!!(f&64);e.crouch=!!(f&8);e.spotted=!!(f&32);e.seen=now;
  }
  {const nr=dv.getUint16(o,true);o+=2;for(let i=0;i<nr;i++,o+=2)drop(dv.getUint16(o,true))}
  for(const [id,e] of ents)if(e.gone&&now-e.seen<350){e.sp.visible=false;if(e.gs)e.gs.visible=false}
@@ -667,7 +668,22 @@ $('c').addEventListener('click',e=>{if(!me.officer||!deployed||!me.alive)return;
 addEventListener('wheel',e=>{if(me.officer&&deployed)ofh=Math.max(40,Math.min(170,ofh+e.deltaY*.1))},{passive:true});
 function syncBeams(){const want=new Map();if(me.officer)offOrders.forEach(o=>want.set(o[0],o));else if(myOrder&&!myOrder.done&&me.sq>=0)want.set(me.sq,[me.sq,myOrder.ty,myOrder.x,myOrder.z]);
  for(const[k,b]of beams)if(!want.has(k)){scene.remove(b);beams.delete(k)}
- for(const[k,o]of want){let b=beams.get(k);if(!b){b=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,40,8),new THREE.MeshBasicMaterial({color:sqCol(k),transparent:true,opacity:.55}));scene.add(b);beams.set(k,b)}b.position.set(o[2],hAt(o[2],o[3])+20,o[3])}}
+ for(const[k,o]of want){let b=beams.get(k);if(!b){b=mkBeam(sqCol(k));scene.add(b);beams.set(k,b)}b.position.set(o[2],hAt(o[2],o[3]),o[3])}}
+/* v0.33.3 order beacons: a column of light (not hidden by fog) with a soft glow and a ring on the ground. It pulses gently and
+   fades as you get close, so it marks the spot without standing in your way once you're there. */
+function mkBeam(col){const g=new THREE.Group(),M=(o)=>new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:o,fog:false,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
+ const core=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,90,8,1,true),M(.5));core.position.y=45;const glow=new THREE.Mesh(new THREE.CylinderGeometry(1.3,.6,90,10,1,true),M(.12));glow.position.y=45;
+ const ring=new THREE.Mesh(new THREE.RingGeometry(3,3.5,32),M(.45));ring.rotation.x=-Math.PI/2;ring.position.y=.15;g.add(core,glow,ring);g.userData={core,glow,ring};return g}
+function beamsFrame(){const t=performance.now()/1000;for(const b of beams.values()){const u=b.userData;if(!u.core)continue;const d=Math.hypot(b.position.x-cam.position.x,b.position.z-cam.position.z),near=Math.min(1,Math.max(.15,(d-6)/30)),p=.85+.15*Math.sin(t*2.2);
+ u.core.material.opacity=.5*near*p;u.glow.material.opacity=.13*near*p;u.ring.material.opacity=.45*p;u.ring.scale.setScalar(1+.08*Math.sin(t*2.2))}
+ /* the waypoint marker: where your squad was ordered, its distance, pinned to the screen edge when it's off to the side or behind you */
+ const el=$('wp'),o=!me.officer&&deployed&&me.alive&&myOrder&&!myOrder.done&&me.sq>=0?myOrder:null;if(!o){if(el.style.display!=='none')el.style.display='none';return}
+ const dist=Math.hypot(o.x-me.x,o.z-me.z);if(dist<6){el.style.display='none';return}
+ _pv.set(o.x,hAt(o.x,o.z)+2.5,o.z).project(cam);let sx=(_pv.x+1)/2*innerWidth,sy=(1-_pv.y)/2*innerHeight;const behind=_pv.z>1,m=46;
+ if(behind){sx=innerWidth-sx;sy=innerHeight-m}let edge=behind||sx<m||sx>innerWidth-m||sy<m||sy>innerHeight-m;sx=Math.max(m,Math.min(innerWidth-m,sx));sy=Math.max(m,Math.min(innerHeight-m,sy));
+ el.style.display='block';el.style.transform=`translate(${sx|0}px,${sy|0}px)`;el.style.opacity=(1-.55*(adsT||0)).toFixed(2);el.className=edge?'edge':'';
+ const ar=el.firstChild;ar.style.transform=edge?`rotate(${Math.atan2(sy-innerHeight/2,sx-innerWidth/2)+Math.PI/2}rad)`:'';ar.style.borderBottomColor=sqCol(me.sq);
+ const tx=o.ty.toUpperCase()+' · '+Math.round(dist)+' m';if(el.lastChild.textContent!==tx)el.lastChild.textContent=tx}
 const crateSM=(()=>{const t=new THREE.TextureLoader().load('assets/crate.png');t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;return new THREE.SpriteMaterial({map:t,alphaTest:.5})})();
 function addCrate(c){const m=new THREE.Sprite(crateSM);m.scale.set(1.9,1.9,1);scene.add(m);crateM.set(c.id,{m,x:c.x,z:c.z,left:c.left})}
 /* ------------------------------------------------------------------ input */
@@ -800,7 +816,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wounded.</b> When you're knocked down, press Y to shout for a medic; bot medics come running. Medics can revive anyone, bots included.<br>
  <b>Weather.</b> Each round is overcast, foggy, rainy or at night. In the dark, flares (a utility, or the officer's star shells) light up the field.<br>
  <b>Fighting.</b> Bullets drop and take time to arrive. Sprinting lowers the gun; V stabs, sprint + hold V to charge with the bayonet. Being shot at near-misses suppresses you. TAB shows the full controls in game.
- </div></details><div class="ver">v0.33.2</div>`,'');
+ </div></details><div class="ver">v0.33.3</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -974,10 +990,15 @@ function scopeTick(dt,sc){const el=$('brt');
  const moving=dn('fwd')||dn('back')||dn('left')||dn('right'),A=.0075*(me.eye<1.3?.6:1)*(moving?2.2:1)*(1+supV*1.5)*swK;
  swT+=dt;const tx=(Math.sin(swT*1.05)+.6*Math.sin(swT*.43+1.7))*A,ty=(.8*Math.sin(swT*1.6+.4)+.5*Math.cos(swT*.71))*A*.8;swX+=(tx-swX)*Math.min(1,dt*8);swY+=(ty-swY)*Math.min(1,dt*8);
  el.style.display='block';el.firstChild.textContent=breathOut?'OUT OF BREATH':holding?'HOLDING BREATH':'HOLD ['+kn('sprint')+'] TO STEADY';const b=el.lastChild.firstChild;b.style.width=(breath/5*100)+'%';b.style.background=breathOut?'#c04030':'#d8c9a0'}
-/* spotted enemies: a red marker over their heads for the whole team, seen through cover */
-const SPT=(()=>{const c=document.createElement('canvas');c.width=c.height=12;const g=c.getContext('2d');g.fillStyle='#000';g.beginPath();g.moveTo(0,1);g.lineTo(12,1);g.lineTo(6,11);g.fill();g.fillStyle='#ff3424';g.beginPath();g.moveTo(2,2);g.lineTo(10,2);g.lineTo(6,9);g.fill();return pxTex(c,false)})(),sptS=[];
-function spotTick(){let n=0;if(deployed)for(const e of ents.values()){if(n>=40)break;if(!e.spotted||e.team===me.team||e.down||e.gone||!e.sp)continue;let m=sptS[n];if(!m){m=new THREE.Sprite(new THREE.SpriteMaterial({map:SPT,transparent:true,depthTest:false,fog:false}));scene.add(m);sptS.push(m)}
-  const P=e.sp.position,d=Math.hypot(cam.position.x-P.x,cam.position.z-P.z)||1,k=(.2+d*.0055)/(1+((ZOOM[gk()]||1.3)-1)*adsT*.8);m.visible=true;m.scale.set(k,k,1);m.position.set(P.x,P.y+1.3+k*.7,P.z);n++}   /* v0.29: about half the old size, just above the helmet */
+/* spotted enemies: a red marker over their heads for the whole team, seen through cover.
+   v0.33.3: friends get one too: blue over teammates, green over the players in your own squad (within 150 m; squadmates at any range) */
+const sptTex=col=>{const c=document.createElement('canvas');c.width=c.height=12;const g=c.getContext('2d');g.fillStyle='#000';g.beginPath();g.moveTo(0,1);g.lineTo(12,1);g.lineTo(6,11);g.fill();g.fillStyle=col;g.beginPath();g.moveTo(2,2);g.lineTo(10,2);g.lineTo(6,9);g.fill();return pxTex(c,false)};
+const SPT=sptTex('#ff3424'),SPTB=sptTex('#4a9cff'),SPTG=sptTex('#3ee05a'),sptS=[],sptM=[SPT,SPTB,SPTG].map(t=>new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false,fog:false}));
+function spotTick(){let n=0;if(deployed)for(const e of ents.values()){if(n>=90)break;if(e.down||e.gone||!e.sp||e.id===me.id)continue;
+  const P=e.sp.position,d=Math.hypot(cam.position.x-P.x,cam.position.z-P.z)||1;let c;
+  if(e.team!==me.team){if(!e.spotted)continue;c=0}else{if(e.mg&&e.bot&&d>60)continue;c=e.mysq?2:1;if(c===1&&d>150)continue}
+  let m=sptS[n];if(!m){m=new THREE.Sprite(sptM[c]);scene.add(m);sptS.push(m)}if(m.material!==sptM[c])m.material=sptM[c];
+  const k=(c?.85:1)*(.2+d*.0055)/(1+((ZOOM[gk()]||1.3)-1)*adsT*.8);m.visible=true;m.scale.set(k,k,1);m.position.set(P.x,P.y+1.3+k*.7,P.z);n++}   /* v0.29: about half the old size, just above the helmet */
  for(let i=n;i<sptS.length;i++)sptS[i].visible=false}
 /* ---- v0.25: kill feed, scoreboard, after-action report, quick chat, gas masks ---- */
 const kfL=[];const esc=t=>String(t).replace(/[<>&]/g,'').replace(/"/g,'&quot;').replace(/'/g,'&#39;');   /* safe in text and in quoted attributes */const TC=t=>t===0?'var(--bl)':t===1?'var(--rd)':'#aaa';
@@ -1422,7 +1443,7 @@ function frame(){
  cam.rotation.x+=punch;punch*=Math.max(0,1-dt*18);cam.updateMatrixWorld();soldiersDraw();
  if(shake>0){shake=Math.max(0,shake-dt*1.6);cam.position.x+=(Math.random()-.5)*shake*.25;cam.position.y+=(Math.random()-.5)*shake*.25}
  draw();
- tcTick();tcDownTick();orientTick();phudDraw(dt);const showMM=deployed&&S.mm>0;   /* v0.30.1: every soldier has the minimap (was squad leaders and officers only) */mm.style.display=showMM?'block':'none';if(showMM){mmT-=dt;if(mmT<=0){mmT=.08;drawMM()}}
+ tcTick();tcDownTick();orientTick();beamsFrame();phudDraw(dt);const showMM=deployed&&S.mm>0;   /* v0.30.1: every soldier has the minimap (was squad leaders and officers only) */mm.style.display=showMM?'block':'none';if(showMM){mmT-=dt;if(mmT<=0){mmT=.08;drawMM()}}
  hudT-=dt;if(hudT<=0&&deployed){hudT=.1;
   const bar=o=>{const n=Math.round((o.p+1)*5);return '█'.repeat(n)+'░'.repeat(10-n)},w=WPN[me.w];
   let h=RK[me.rank][0]+' · '+me.xp+' XP · '+(me.team?'GREEN':'BLUE')+' · '+(me.officer?'OFFICER':me.sq>=0?T.SQUADS[me.sq]+(me.lead?' (SQUAD LEADER)':''):'no squad')+'\n';

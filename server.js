@@ -121,7 +121,7 @@ const BOT_CLS = [['rifleman', 'bolt', .46], ['assault', 'smg', .14], ['assault',
 const BOT_W = { atr: [2.6, 120, 60, 150], hmg: [.14, 18, 8, 80], flame: [.1, 9, 5, 14], bolt: [1.2, 34, 14, 60], mark: [1.6, 45, 20, 80], sniper: [2.4, 60, 34, 130], carbine: [.8, 26, 11, 55], smg: [.32, 13, 6, 32], shotgun: [1.1, 55, 24, 22], lmg: [.28, 16, 7, 60] };
 function pickBotCls(b) { let r = rnd(); for (const [c, w, p] of BOT_CLS) { if ((r -= p) <= 0) { b.cls = c; b.w = w; return; } } b.cls = 'rifleman'; b.w = 'bolt'; }
 function addBot(team) {
-  const b = newEnt(team, true); pickBotCls(b); b.squad = botSeq++ % 3; b.ox = (rnd() - .5) * 50; b.oz = (rnd() - .5) * 3; b.scan = rnd(); b.td = 99; b.tgt = null; b.rt = .2 + rnd() * 2; b.kit = b.cls === 'medic' || rnd() < .15; b.kitScan = rnd() * 2; b.rvTgt = null; b.rvT = 0; return b;
+  const b = newEnt(team, true); pickBotCls(b); b.squad = botSeq++ % 3; b.ox = (rnd() - .5) * 60; b.oz = (rnd() - .5) * 3; b.scan = rnd(); b.td = 99; b.tgt = null; b.rt = .2 + rnd() * 2; b.kit = b.cls === 'medic' || rnd() < .15; b.kitScan = rnd() * 2; b.rvTgt = null; b.rvT = 0; return b;
 }
 function addGunner(n) {
   const b = newEnt(n.team, true); b.mg = true; b.cls = 'gunner'; b.w = 'lmg'; b.squad = 3; b.hx = n.x; b.hz = n.z; b.ox = 0; b.oz = 0; b.scan = rnd(); b.td = 99; b.tgt = null; b.rt = .1;
@@ -794,7 +794,7 @@ function goal(b) {
   if (b.depot != null && DP[b.depot]) { const d = DP[b.depot]; return { x: d.x + b.ox * .14, z: d.z + b.oz }; }   // side-objective raiders / sitters
   if (b.guard != null && OB[b.guard]) { const o = OB[b.guard]; return { x: o.x + b.ox, z: lineZ(o, o.x + b.ox) + (b.team === 0 ? 4 : -4) + b.oz, line: o }; }
   const od = orders[b.team].get(100 + b.squad);
-  if (od && !(od.at > tickNo)) { const k = od.ty === 'defend' ? .5 : od.ty === 'move' ? .15 : 1; return { x: od.x + b.ox * k, z: od.z + b.oz * k }; }
+  if (od && !(od.at > tickNo)) { const k = od.ty === 'defend' ? .5 : od.ty === 'move' ? .3 : 1; return { x: od.x + b.ox * k, z: od.z + b.oz * k }; }
   const own = spawnLine(b.team), en = spawnLine(1 - b.team), sq = SQS[b.team][b.squad];
   const o = ((b.squad < 2 || (op && b.team === op.att)) && wave.side === b.team && en && sq && sq.phase === 'push') ? en : own;
   return o ? { x: o.x + b.ox, z: lineZ(o, o.x + b.ox) + b.oz, line: o } : { x: 0, z: b.team === 0 ? HOME_Z : -HOME_Z };
@@ -922,12 +922,47 @@ function navMove(b, gx, gz, speed, line) {
       tx = s.x; tz = s.z;
     }
   }
-  const dx = tx - b.x, dz = tz - b.z, l = Math.hypot(dx, dz) || 1, st = Math.min(l, speed * DT * T.wireK(b.x, b.z));
+  let dx = tx - b.x, dz = tz - b.z, l = Math.hypot(dx, dz) || 1; const st = Math.min(l, speed * DT * T.wireK(b.x, b.z));
+  if (b.sepV && d > 4) {   // v0.33.3: walking with others close by: veer off a little so the file opens up into a loose line
+    const ex = dx / l + b.sepV[0] * 1.3, ez = dz / l + b.sepV[1] * 1.3, el = Math.hypot(ex, ez) || 1, nx = b.x + ex / el * st, nz = b.z + ez / el * st;
+    if (Math.abs(hAt(terr.H, nx, nz) - hAt(terr.H, b.x, b.z)) < .5 && !!T.roomAt(nx, nz) === !!T.roomAt(b.x, b.z)) { dx = ex / el * l; dz = ez / el * l; }
+  }
   // v0.29: in the line already and the next step towards my own spot would leave it (spot behind a wall, or just outside the band):
   // hold here. Before, the field stepped him back in and the direct step out again, every tick: a man spinning round on the spot.
   if (band && NAV.at(band, b.x + dx / l * Math.max(st, .3), b.z + dz / l * Math.max(st, .3)) >= 1) return false;
   botMove(b, dx / l * st, dz / l * st); b.yaw = Math.atan2(-dx, -dz); b.y = T.groundAt(terr.H, b.x, b.z, b.y + .3);
   return true;
+}
+// v0.33.3 personal space: bots used to stand inside each other (nothing kept them apart, and whole squads walked the same
+// path to nearly the same spot). Each tick a bot steps away from teammates closer than his spacing: wide when holding a line
+// or advancing in the open (so the line covers its front, not one spot), close in a dugout shelter, and tighter when his
+// squad is gathering for a push or following an officer's order. A step is only taken on level going (never up a trench
+// wall or out of a dugout), so the push slides men along the trench rather than over the parapet.
+function spacingOf(b) {
+  if (b.shelter) return .75;
+  const sq = SQS[b.team] && SQS[b.team][b.squad], od = orders[b.team].get(100 + b.squad);
+  if ((sq && (sq.phase === 'gather' || sq.phase === 'push')) || (od && !(od.at > tickNo))) return 1.5;
+  return 2.6;
+}
+function botsSpread() {
+  for (const b of ents.values()) {
+    b.sepV = null; if (!b.bot || !b.alive || b.mg || b.manned || b.climb || b.charging || b.rvTgt || b.inV) continue;
+    const R = spacingOf(b); let px = 0, pz = 0, n = 0;
+    forNear(b.x, b.z, R, o => { if (o === b || o.team !== b.team || o.mg || o.climb || o.inV) return; const dx = b.x - o.x, dz = b.z - o.z, d = Math.hypot(dx, dz); if (d >= R || Math.abs(o.y - b.y) > 1.5) return;
+      const w = (R - d) / R; if (d < .05) { const a = (b.id * 2.399) % 6.283; px += Math.cos(a) * w; pz += Math.sin(a) * w; } else { px += dx / d * w; pz += dz / d * w; } n++; });
+    if (!n) continue;
+    const l = Math.hypot(px, pz); if (l < 1e-3) continue;
+    if (b.moved) { b.sepV = [px / l * Math.min(1, l), pz / l * Math.min(1, l)]; continue; }   // walking: navMove steers off to the side instead (no extra step)
+    const st = Math.min(2.2 * DT * Math.min(2, l), .16), g0 = hAt(terr.H, b.x, b.z), r0 = !!T.roomAt(b.x, b.z); let mx = 0, mz = 0, ok = false;
+    for (const da of [0, .8, -.8, 1.5, -1.5]) {   // straight away, or slide off at an angle when a wall or a step is in the way
+      const a = Math.atan2(pz, px) + da, tx = Math.cos(a) * st, tz = Math.sin(a) * st, nx = b.x + tx, nz = b.z + tz;
+      if (Math.abs(hAt(terr.H, nx, nz) - g0) > .5 || Math.abs(nx) > T.W - 3 || Math.abs(nz) > T.W - 3 || !!T.roomAt(nx, nz) !== r0 || T.fortHit(nx, b.y, nz, .3, true)) continue;
+      mx = tx; mz = tz; ok = true; break;
+    }
+    if (!ok) continue;
+    botMove(b, mx, mz); b.y = T.groundAt(terr.H, b.x, b.z, b.y + .3); BSTAT.spread = (BSTAT.spread || 0) + 1;
+    if (!b.moved) { b.ox = clamp(b.ox + mx, -40, 40); b.oz = clamp(b.oz + mz, -4, 4); }   // standing at his spot: the spot moves with him, so he doesn't walk straight back
+  }
 }
 // grenade landing nearby: get out of the blast
 function grenadeNear(b) { for (const g of grenades) { const d = Math.hypot(g.tx - b.x, g.tz - b.z); if (d < 6) return g; } return null; }
@@ -1737,7 +1772,8 @@ function snapshot(p) {
     live.add(e.id);
     let c = sent.get(e.id); if (c && !due) continue; if (n >= 400) continue;
     const k = e.enc; if (!k || k[6] !== tickNo) encodeEnt(e);
-    const ec = e.enc, qx = ec[0], qy = ec[1], qz = ec[2], yw = ec[3], lk = ec[5], fl = ec[4] | (e.team !== p.team && e.sp[p.team] > tickNo ? 32 : 0);
+    const ec = e.enc, qx = ec[0], qy = ec[1], qz = ec[2], yw = ec[3], fl = ec[4] | (e.team !== p.team && e.sp[p.team] > tickNo ? 32 : 0);
+    const lk = ec[5] | (!e.bot && e !== p && e.team === p.team && p.sq >= 0 && e.sq === p.sq ? 64 : 0);   // v0.33.3: 64 = in the receiver's squad
     let m = 0, dx = 0, dy = 0, dz = 0;
     if (!c) { m = 1 | 4 | 8 | 16; c = [0, 0, 0, 0, 0, 0]; sent.set(e.id, c); }
     else {
@@ -1817,6 +1853,7 @@ function tickBody() {
   { const t = hr(); buildGrid(); computeLeaders(); prof('grid', hr() - t); } guard('nav', () => NAV.tick()); if (tickNo % 20 === 0) guard('squads', squadTick);
   { const due = sched.filter(s => s.at <= tickNo); if (due.length) { sched = sched.filter(s => s.at > tickNo); for (const s of due) { try { s.fn(); } catch (e) { console.error(e); } } } }
   for (const p of humans) guard('human', humanTick, p);
+  guard('spread', botsSpread);
   for (const e of ents.values()) if (e.bot) { const y0 = e.yaw; guard('bot', botTick, e);
     // v0.29: a man with nothing to shoot at turns his head at a human pace (max 0.5 rad a tick): no twitching on the spot
     if (e.alive && e.tgt && e.tgt.alive && !e.charging && !e.mg && !e.climb) e.yaw = Math.atan2(-(e.tgt.x - e.x), -(e.tgt.z - e.z));   // in a fight he keeps his eyes (and rifle) on his man, even while moving
