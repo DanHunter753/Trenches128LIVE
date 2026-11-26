@@ -483,6 +483,7 @@ function wetCell(k, H, x, z) {
   return Math.abs(z) < 26 ? 1 : 0;
 }
 function wetAt(H, x, z) { const i = Math.round((x + W) / ST), j = Math.round((z + W) / ST); if (i < 0 || j < 0 || i > N || j > N) return 0; return wetCell(j * (N + 1) + i, H, x, z); }
+const SLIDE = { t: .9, v0: 12, v1: 3.5, cd: 1.2 };   // seconds, start / end speed m/s, cooldown
 function step(p, cmd, H, spdMul) {
   if (p.cl) { p.cl.t += cmd.dt; const c = p.cl, q = climbAt(c, c.t); p.x = q.x; p.y = q.y; p.z = q.z; p.vy = 0; if (c.t >= c.dur) { p.x = c.x1; p.y = c.y1; p.z = c.z1; p.cl = null; } return; }
   if ((cmd.bits & 16) && p.y <= groundAt(H, p.x, p.z, p.y) + .1 && !(p.vy > 0)) {
@@ -495,15 +496,22 @@ function step(p, cmd, H, spdMul) {
   const wb = WPN[p.w], chg = (bits & 64) && (bits & 1) && f > 0 && wb && wb.bay && p.chg > .05 && !(bits & 2);
   p.charging = !!chg; p.chg = chg ? Math.max(0, p.chg - dt) : Math.min(CHG_MAX, p.chg + dt * .4);
   const mud = (WXS[WX.k] || WXS.overcast).mud;
-  const sp = (chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul * WET_SPD[wetAt(H, p.x, p.z)];
   const l = Math.hypot(f, s) || 1, yaw = cmd.yaw;
-  const mx = (-Math.sin(yaw) * f + Math.cos(yaw) * s) / l, mz = (-Math.cos(yaw) * f - Math.sin(yaw) * s) / l;
+  let mx = (-Math.sin(yaw) * f + Math.cos(yaw) * s) / l, mz = (-Math.cos(yaw) * f - Math.sin(yaw) * s) / l;
+  // v0.36 assault slide: crouch while sprinting forward and you slide on in that direction, fast at first, slowing over a
+  // second. Cancel it by standing up (release / toggle crouch), jumping (a hop out of it) or pulling back; a wall ends it too.
+  const pb = p.pb || 0; p.pb = bits; if (p.sldCd > 0) p.sldCd = Math.max(0, p.sldCd - dt);
+  if (p.sld > 0) { if (!(bits & 2) || (bits & 4) || f < 0) { p.sld = 0; p.sldCd = SLIDE.cd; p.sldX = 1; } }
+  else if (p.cls === 'assault' && !p.elite && (bits & 2) && !(pb & 2) && (pb & 1) && f > 0 && !chg && !(p.sldCd > 0) && p.y <= groundAt(H, p.x, p.z, p.y) + .1) { p.sld = SLIDE.t; p.sdx = mx; p.sdz = mz; p.sldX = 0; }
+  const sliding = p.sld > 0, su = sliding ? p.sld / SLIDE.t : 0;
+  if (sliding) { mx = p.sdx; mz = p.sdz; p.sld = Math.max(0, p.sld - dt); if (p.sld <= 0) { p.sldCd = SLIDE.cd; p.sldX = 0; } }
+  const sp = (sliding ? SLIDE.v1 + (SLIDE.v0 - SLIDE.v1) * su : chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul * WET_SPD[wetAt(H, p.x, p.z)];
   const nx = p.x + mx * sp * dt, nz = p.z + mz * sp * dt, sl = (groundAt(H, nx, nz, p.y) - groundAt(H, p.x, p.z, p.y)) / Math.max(.01, sp * dt);
   const k = (sl > 0 ? Math.max(.35, 1 - sl * .5) : 1) * wireK(p.x, p.z);
   // walls: moving is refused where the ground half a metre ahead is more than 0.62 m above the feet (steep trench walls, pit walls)
   const dx = mx * sp * dt * k, dz = mz * sp * dt * k, blocked = (ax, az) => { const L = Math.hypot(ax, az); if (L < 1e-6) return false; return groundAt(H, p.x + ax / L * .5, p.z + az / L * .5, p.y) - p.y > .62; };
   let ox = dx, oz = dz;
-  if (blocked(dx, dz)) { if (!blocked(dx, 0)) oz = 0; else if (!blocked(0, dz)) ox = 0; else { ox = 0; oz = 0; } }
+  if (blocked(dx, dz)) { if (!blocked(dx, 0)) oz = 0; else if (!blocked(0, dz)) ox = 0; else { ox = 0; oz = 0; } if (sliding) { p.sld = 0; p.sldCd = SLIDE.cd; } }
   if (!sbHit(H, p.x, p.y, p.z, 0) && sbHit(H, p.x + ox, p.y, p.z + oz, .3)) { if (!sbHit(H, p.x + ox, p.y, p.z, .3)) oz = 0; else if (!sbHit(H, p.x, p.y, p.z + oz, .3)) ox = 0; else { ox = 0; oz = 0; } }
   if ((FGRID.size || SGRID.size) && !fortHit(p.x, p.y, p.z, 0, true) && fortHit(p.x + ox, p.y, p.z + oz, .3, true)) { if (!fortHit(p.x + ox, p.y, p.z, .3, true)) oz = 0; else if (!fortHit(p.x, p.y, p.z + oz, .3, true)) ox = 0; else { ox = 0; oz = 0; } }
   p.x = Math.max(-W + 2, Math.min(W - 2, p.x + ox));
@@ -681,8 +689,8 @@ const WPN = {
 };
 const CLS = {
   rifleman: { n: 'Rifleman', d: 'Dependable all-rounder. Strong at range.', hp: 100, sp: 1, w: ['bolt', 'carbine'] },
-  assault: { n: 'Assault', d: 'Trench clearer. Extra health, a little faster.', hp: 125, sp: 1.06, w: ['shotgun', 'smg'] },
-  gunner: { n: 'Machine Gunner', d: 'Holds the line. Slow, with deep magazines.', hp: 100, sp: .85, w: ['lmg'] },
+  assault: { n: 'Assault', d: 'Trench clearer. Extra health, faster on his feet, reloads 30% quicker, slides (crouch while sprinting; stand, jump or pull back to cancel). [N] morphine (2 per life): 10 s faster, takes 40% less damage, +15 HP.', hp: 125, sp: 1.1, w: ['shotgun', 'smg'] },
+  gunner: { n: 'Machine Gunner', d: 'Holds the line. Slow, with deep magazines; crouch to brace the gun (tighter, steadier fire). [N] drops an ammo box (3 supply): teammates who walk over it get a full magazine, grenades and utility back.', hp: 100, sp: .85, w: ['lmg'] },
   medic: { n: 'Medic', d: 'Bandages heal 70 instead of 40.', hp: 100, sp: 1, w: ['carbine', 'smg'] },
   sapper: { n: 'Sapper', d: 'Digs bigger holes. Grenades cost 1 supply. [B] builds a field post your team respawns at.', hp: 100, sp: 1, w: ['shotgun', 'bolt'] },
   recon: { n: 'Recon', d: 'Sniper and spotter. Scoped rifles; headshots with a scope kill outright. [T] spots every enemy in your sights for the whole team (and the officer).', hp: 90, sp: 1.02, w: ['sniper', 'mark', 'carbine'] },
@@ -695,7 +703,7 @@ UT.flare = { n: 'Flare Pistol', d: 'H · fire a flare (3 per life). Lights 55 m 
 const ELITE = { flame: { n: 'Flamethrower', hp: 220, sp: .82, w: 'flame', d: 'Clears trenches: burns men and the ground, armoured' },
   atr: { n: 'Tank Hunter', hp: 200, sp: .9, w: 'atr', d: 'Anti-tank rifle and bundle charges' },
   hmg: { n: 'Sentry', hp: 300, sp: .72, w: 'hmg', d: 'Armoured heavy machine gunner. Cannot sprint', nosprint: 1 } };
-const spOf = p => p.elite && ELITE[p.elite] ? ELITE[p.elite].sp : CLS[p.cls] ? CLS[p.cls].sp : 1;
+const spOf = p => (p.elite && ELITE[p.elite] ? ELITE[p.elite].sp : CLS[p.cls] ? CLS[p.cls].sp : 1) * (p.mph ? 1.2 : 1);   // v0.36: morphine
 // v0.26 vehicles and crewed guns (server simulates them; the client draws and drives them)
 const VEH = { plane: { n: 'Biplane', hp: 300 }, tank: { n: 'Tank', hp: 2000, len: 8.2, wid: 4.1, hgt: 2.6, spd: 2.6, rev: 1.2, turn: .36, rl: 4.5, v: 130 },
   fgun: { n: 'Field gun', hp: 450, rl: 5, v: 85, arc: .6, pmin: -.08, pmax: .45 },
@@ -726,7 +734,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
