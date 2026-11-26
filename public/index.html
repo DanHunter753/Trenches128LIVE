@@ -204,10 +204,18 @@ function applyCrater(c,fx){T.dig(terr,c[0],c[1],c[2],c[3]);dirtyRect(c[0],c[1],c
 const dm=new THREE.Object3D(),sbM=new THREE.MeshLambertMaterial({color:0xa89870,map:TXP('tx_burlap',true)}),woodM=new THREE.MeshLambertMaterial({color:0xb0a090,map:TXP('tx_timber',true)}),mgM=new THREE.MeshLambertMaterial({color:0x222222});
 function box(w,h,d,m,x,y,z,ry){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);b.position.set(x,y,z);b.rotation.y=ry||0;scene.add(b);return b}
 /* v0.32 ruins and wrecks (T.STRUCT): each solid box drawn with its material; wrecks get a few extra non-solid details */
-{const brM=new THREE.MeshLambertMaterial({color:0xa89c90,map:TXP('tx_brick',true)}),stM=new THREE.MeshLambertMaterial({color:0x9c988e,map:TXP('tx_stone',true)}),
-  rustM=new THREE.MeshLambertMaterial({color:0x4a3a2c}),darkM=new THREE.MeshLambertMaterial({color:0x2a2622}),charM=new THREE.MeshLambertMaterial({color:0x3a3028,map:TXP('tx_timber',true)}),
+{const BM=(c,m)=>new THREE.MeshBasicMaterial({color:c,map:m||null,vertexColors:true}),   /* v0.34.2: unlit like the rest of the world, with the light baked into each face */
+  hz=(a,b)=>{const v=Math.sin(a*12.9898+b*78.233)*43758.5453;return v-Math.floor(v)},
+  tx=(w,h,f)=>{const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');for(let j=0;j<h;j++)for(let i=0;i<w;i++){const [r,gg,b]=f(i,j);g.fillStyle=`rgb(${r|0},${gg|0},${b|0})`;g.fillRect(i,j,1,1)}return pxTex(c,true)},
+  /* weathered brick: courses of 8 x 4 bricks, staggered, grey mortar, the odd scorched or missing brick */
+  brickT=tx(32,32,(i,j)=>{const row=j>>2,bx=((i+(row&1)*4)>>3),mort=(j&3)===3||((i+(row&1)*4)&7)===7,n=(hz(i,j)-.5)*18,v=hz(bx,row);if(mort)return[128+n,122+n,112+n];if(v<.08)return[58+n,46+n,40+n];const r=v<.5?150:v<.8?132:168;return[r+n,r*.52+n,r*.42+n]}),
+  /* rough stone: irregular blocks of pale limestone with dark seams and lichen */
+  stoneT=tx(32,32,(i,j)=>{const row=Math.floor(j/6),bx=Math.floor((i+row*5)/10),seam=j%6===5||(i+row*5)%10===9,n=(hz(i,j)-.5)*22,v=hz(bx,row);if(seam)return[78+n,74+n,68+n];const b=150+v*40;return v>.9?[b*.75+n,b*.82+n,b*.6+n]:[b+n,b*.96+n,b*.88+n]}),
+  /* charred planks: vertical boards, black char where the fire took them */
+  woodT=tx(32,32,(i,j)=>{const bd=i>>2,gap=(i&3)===3,n=(hz(i,j)-.5)*16,ch=hz(bd,j>>3)<.18;if(gap)return[34,28,24];return ch?[60+n,50+n,42+n]:[146+n+hz(bd,1)*24,118+n,86+n]}),
+  brM=BM(0xffffff,brickT),stM=BM(0xffffff,stoneT),rustM=BM(0x7a5a44),darkM=BM(0x3a342c),charM=BM(0xffffff,woodT),hayM=BM(0xb39a58),
   M={brick:brM,stone:stM,wood:charM,metal:rustM};
- const MG=new Map(),addG=(g,m,x,y,z,rx,ry,rz)=>{const o=new THREE.Object3D();o.position.set(x,y,z);o.rotation.set(rx||0,ry||0,rz||0);o.updateMatrix();let q=g.index?g.toNonIndexed():g;q.applyMatrix4(o.matrix);if(!MG.has(m))MG.set(m,[]);MG.get(m).push(q)},
+ const MG=new Map(),addG=(g,m,x,y,z,rx,ry,rz)=>{const o=new THREE.Object3D();o.position.set(x,y,z);o.rotation.order='YXZ';o.rotation.set(rx||0,ry||0,rz||0);o.updateMatrix();let q=g.index?g.toNonIndexed():g;q.applyMatrix4(o.matrix);if(!MG.has(m))MG.set(m,[]);MG.get(m).push(q)},
   boxT=(w,h,d,m,x,y,z,ry)=>{const g=new THREE.BoxGeometry(w,h,d),uv=g.attributes.uv;if(uv)for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*Math.max(w,d)/2,uv.getY(i)*h/2);addG(g,m,x,y,z,0,ry)},
   cyl=(r,h,m,x,y,z,rx,ry,rz)=>addG(new THREE.CylinderGeometry(r,r,h,10),m,x,y,z,rx,ry,rz);   /* every piece is merged into one mesh per material: a few draw calls for the lot */
  for(const S of T.STRUCT){for(const b of S.parts)boxT(b.hx*2,b.y1-b.y0,b.hz*2,M[b.mat]||stM,b.cx,(b.y0+b.y1)/2,b.cz,b.yaw);
@@ -216,12 +224,18 @@ function box(w,h,d,m,x,y,z,ry){const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,
   else if(S.k==='lorry'){for(const sx of[-1,1])for(const lz of[-1.9,.2,1.9]){const[x,z]=L(sx*1.1,lz);cyl(.45,.25,darkM,x,g0+.7,z,0,S.yaw,Math.PI/2)}}
   else if(S.k==='plane'){const[x,z]=L(0,3.2);boxT(2.6,.08,.8,charM,x,g0+.7,z,S.yaw);boxT(.08,1,.7,charM,x,g0+1.1,z,S.yaw);const[ex,ez]=L(.5,-3.2);boxT(.9,.9,.9,darkM,ex,g0+.6,ez,S.yaw)}
   else if(S.k==='gun'){for(const sx of[-1,1]){const[x,z]=L(sx*1.1,.2);cyl(.7,.12,charM,x,g0+.4,z,.5,S.yaw,Math.PI/2.4)}const[x,z]=L(0,-1.4);boxT(.18,.18,2.4,darkM,x,g0+.9,z,S.yaw)}
+  else if(S.k==='barn'){const B=(w,h,d,m,lx,y,lz,rx,rz)=>{const[x,z]=L(lx,lz);addG(new THREE.BoxGeometry(w,h,d),m,x,g0+y,z,rx,S.yaw,rz)};   /* the roof came down: a fallen ridge beam, rafters leaning on the posts, a slab of boards, spilled hay */
+   B(10.5,.28,.28,charM,0,1.3,.4,0,.2);for(const lx of[-4.2,-1.4,1.4,4.2])B(.2,.2,5.2,charM,lx,1.25,hz(lx,S.x)<.5?-1.6:1.6,hz(lx,S.z)<.5?.48:-.48,0);
+   B(4.6,.1,3.2,charM,2.2,.85,-1.1,.32,0);B(1.3,.75,1,hayM,-3.2,.38,1.6,0,0);B(1.1,.6,.9,hayM,-2,.3,2.2,0,.3);B(1.2,.5,1,hayM,-3.4,1,1.7,.1,0)}
   else if(S.k==='wagon'){const[x,z]=L(.9,1);cyl(.6,.1,charM,x,g0+.35,z,1.2,S.yaw,0)}}
  for(const [m,L] of MG){let n=0;for(const g of L)n+=g.attributes.position.count;const P=new Float32Array(n*3),Nn=new Float32Array(n*3),U=new Float32Array(n*2);let o=0;
   for(const g of L){const c=g.attributes.position.count;P.set(g.attributes.position.array,o*3);if(g.attributes.normal)Nn.set(g.attributes.normal.array,o*3);if(g.attributes.uv)U.set(g.attributes.uv.array,o*2);o+=c;g.dispose&&g.dispose()}
-  const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(P,3));G.setAttribute('normal',new THREE.BufferAttribute(Nn,3));G.setAttribute('uv',new THREE.BufferAttribute(U,2));G.computeBoundingSphere&&G.computeBoundingSphere();scene.add(new THREE.Mesh(G,m))}}
+  const Cc=new Float32Array(n*3);for(let i=0;i<n;i++){const nx=Nn[i*3],ny=Nn[i*3+1],nz=Nn[i*3+2],py=P[i*3+1],gy=hAt(P[i*3],P[i*3+2]),k=Math.max(.42,Math.min(1,.62+.3*ny+.16*nx-.08*nz))*Math.min(1,.72+.28*Math.min(1,Math.max(0,(py-gy)/2.2)));Cc[i*3]=k;Cc[i*3+1]=k*.98;Cc[i*3+2]=k*.94}   /* faces toward the sky and the light are brighter; the bottoms of walls are dirtier */
+  const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.BufferAttribute(P,3));G.setAttribute('normal',new THREE.BufferAttribute(Nn,3));G.setAttribute('uv',new THREE.BufferAttribute(U,2));G.setAttribute('color',new THREE.BufferAttribute(Cc,3));G.computeBoundingSphere&&G.computeBoundingSphere();scene.add(new THREE.Mesh(G,m))}}
 /* v0.33 airfields: a mown strip with marker boards, a windsock and a canvas hangar */
-T.AIRF.forEach((a,t)=>{const dir=-Math.sign(a.x),stripM=new THREE.MeshLambertMaterial({color:0x6f7a48});for(let k=0;k<=110;k+=5){const x=a.x+dir*k,y=hAt(x,a.z);const b=box(5.2,.06,14,stripM,x,y+.04,a.z);b.rotation.x=0}
+T.AIRF.forEach((a,t)=>{const dir=-Math.sign(a.x),stripM=new THREE.MeshBasicMaterial({color:0x58603a,transparent:true,opacity:.32,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
+ {const NX=56,NZ=6,P=[],I=[];for(let i=0;i<=NX;i++)for(let j=0;j<=NZ;j++){const x=a.x+dir*(i*2-2),z=a.z-7+j*14/NZ;P.push(x,hAt(x,z)+.05,z)}for(let i=0;i<NX;i++)for(let j=0;j<NZ;j++){const q=i*(NZ+1)+j;I.push(q,q+1,q+NZ+1,q+1,q+NZ+2,q+NZ+1)}
+  const G=new THREE.BufferGeometry();G.setAttribute('position',new THREE.Float32BufferAttribute(P,3));G.setIndex(I);const m=new THREE.Mesh(G,stripM);m.material.side=THREE.DoubleSide;scene.add(m)}   /* the mown strip: one sheet draped over the ground */
  for(let k=0;k<=110;k+=22)for(const sz of[-1,1])box(1.2,.25,.4,woodM,a.x+dir*k,hAt(a.x+dir*k,a.z+sz*7.5)+.12,a.z+sz*7.5);
  const hx=a.x-dir*10,hz=a.z+(t?-14:14),hy=hAt(hx,hz),hm=new THREE.MeshLambertMaterial({color:0x9a8e6c,map:TXP('tx_burlap',true)});box(12,4.2,9,hm,hx,hy+2.1,hz);box(12.4,.3,9.4,woodM,hx,hy+4.3,hz);
  box(.12,5,.12,woodM,a.x-dir*4,hAt(a.x-dir*4,a.z-8)+2.5,a.z-8);const ws=box(1.6,.5,.5,new THREE.MeshLambertMaterial({color:0xd86a2a}),a.x-dir*4.9,hAt(a.x-dir*4,a.z-8)+4.8,a.z-8);ws.rotation.y=.6});
@@ -480,6 +494,14 @@ function tracer(x,y,z,dx,dy,dz,len,own,vel){const o=trc[trI++%trc.length],s=own?
 function trTick(dt){for(const o of trc){if(!(o.t>0))continue;o.t-=dt;o.vy-=T.GRAV*dt;const sp=Math.hypot(o.vx,o.vy,o.vz)||1;o.x+=o.vx*dt;o.y+=o.vy*dt;o.z+=o.vz*dt;o.d+=sp*dt;
  const g=hAt(o.x,o.z);if(o.d>=o.len||o.y<g||o.t<=0){if(o.y<g+.3&&o.d<o.len+2&&Math.hypot(o.x-me.x,o.z-me.z)<70)puff(o.x,g,o.z);o.t=0;o.l.visible=false;continue}
  const a=o.l.geometry.attributes.position.array,k=Math.min(4,o.d)/sp;a[0]=o.x-o.vx*k;a[1]=o.y-o.vy*k;a[2]=o.z-o.vz*k;a[3]=o.x;a[4]=o.y;a[5]=o.z;o.l.geometry.attributes.position.needsUpdate=true;o.l.visible=true}}
+/* v0.34.2 smouldering wrecks: a slow smoke column and a low fire glow over the burnt-out tanks, lorries and planes */
+let WRK=null;const fireTex=()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d'),r=g.createRadialGradient(16,18,1,16,18,15);r.addColorStop(0,'rgba(255,220,140,1)');r.addColorStop(.35,'rgba(255,130,40,.8)');r.addColorStop(1,'rgba(120,30,0,0)');g.fillStyle=r;g.fillRect(0,0,32,32);return new THREE.CanvasTexture(c)};
+function wrecksFrame(dt){if(!WRK){WRK=[];const ft=fireTex();T.STRUCT.forEach((S,i)=>{if(!/tank|lorry|plane/.test(S.k))return;const y=(S.parts[0]?S.parts[0].y0:hAt(S.x,S.z))+(S.k==='tank'?2:1),w={x:S.x,y,z:S.z,sm:[],fi:null,ph:T.hash(i,77)*9};
+  for(let k=0;k<6;k++){const m=new THREE.Sprite(spMat('smoke'+(k&1)).clone());m.material.transparent=true;m.material.alphaTest=0;m.material.depthWrite=false;m.material.color.setRGB(.26,.24,.22);m.visible=false;scene.add(m);w.sm.push(m)}
+  if(S.k!=='lorry'){const f=new THREE.Sprite(new THREE.SpriteMaterial({map:ft,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true}));f.position.set(S.x,y-.4,S.z);f.visible=false;scene.add(f);w.fi=f}WRK.push(w)})}
+ const t=performance.now()/1000;for(const w of WRK){const near=Math.hypot(w.x-cam.position.x,w.z-cam.position.z)<170;
+  w.sm.forEach((m,k)=>{m.visible=near;if(!near)return;const u=((t*.09+k/6+w.ph)%1);m.position.set(w.x+u*u*3.2+Math.sin(t*.3+k)*.4,w.y+u*11,w.z+u*1.2);const s=1.4+u*5.5;m.scale.set(s,s,1);m.material.opacity=Math.min(1,u*6)*(1-u)*.55});
+  if(w.fi){w.fi.visible=near;if(near){const f=.9+.25*Math.sin(t*13+w.ph)+.15*Math.sin(t*29);w.fi.scale.set(1.6*f,1.3*f,1);w.fi.material.opacity=.75}}}}
 function puff(x,g,z){if(debris.length>140)return;const sm=smokeS(Math.random()<.5?0:1);sm.material.transparent=true;sm.material.alphaTest=0;sm.material.color.setRGB(.55,.45,.33);sm.center.set(.5,.1);sm.position.set(x,g,z);scene.add(sm);debris.push({m:sm,smoke:1,sx:.35,sy:.5,vx:0,vy:.8,vz:0,t:0,life:.45})}
 const flashes=[],debris=[],corpses=[];let shake=0,boomLight=null;
 /* explosion: fireball, flash light, dirt clods thrown out, smoke that rises and spreads, screen shake when close */
@@ -828,7 +850,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wrecked guns.</b> Shells knock out MG nests, field guns and AA guns; hold E beside one to repair it (sappers are fastest).<br>
  <b>Phones.</b> Touch controls turn on by themselves; play in landscape. The ✎ button lets you move the buttons where you like.<br>
  <b>Your career.</b> Every game earns XP toward 100 levels and the ranks up to General. Your service record is on this screen.
- </div></details><div class="ver">v0.34.1</div>`,'');
+ </div></details><div class="ver">v0.34.2</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -1402,7 +1424,7 @@ function tutTick(dt){const el=$('tut');if(!S.tut||!deployed||!me.alive||me.offic
 function tutEnd(){S.tut=false;saveS();TUT.i=-1;$('tut').style.display='none'}
 $('tutx').onclick=e=>{e.stopPropagation();tutEnd()};
 function frame(){
- requestAnimationFrame(frame);const now=performance.now(),dtms=Math.max(1,Math.min(50,Math.round(now-last)));last=now;const dt=dtms/1000;tutTick(dt);planesFrame(dt);
+ requestAnimationFrame(frame);const now=performance.now(),dtms=Math.max(1,Math.min(50,Math.round(now-last)));last=now;const dt=dtms/1000;tutTick(dt);planesFrame(dt);wrecksFrame(dt);
  if(deployed&&me.officer){const sp=(dn('sprint')?90:45)*dt,mr=(dn('right')?1:0)-(dn('left')?1:0),mf=(dn('fwd')?1:0)-(dn('back')?1:0),sy=Math.sin(ofyaw),cy_=Math.cos(ofyaw);ofx=Math.max(-W+10,Math.min(W-10,ofx+(mr*cy_-mf*sy)*sp));ofz=Math.max(-W+5,Math.min(W-5,ofz+(-mr*sy-mf*cy_)*sp));ofyaw+=((dn('leanL')?1:0)-(dn('use')?1:0))*1.6*dt}
  else if(deployed){
   const lk=lockedNow(),f=lk?(dn('fwd')?1:0)-(dn('back')?1:0):0,s=lk?(dn('right')?1:0)-(dn('left')?1:0):0;
