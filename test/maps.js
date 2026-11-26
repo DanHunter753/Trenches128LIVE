@@ -42,6 +42,6 @@ function client(name, extra) {
   const bots = [...X.ents.values()].filter(e => e.bot), alive = bots.filter(e => e.alive), moved = alive.filter(e => { const p = pos.get(e.id); return p && Math.hypot(e.x - p[0], e.z - p[1]) > 3; });
   R.bots = alive.length + ' alive, ' + moved.length + ' moved'; ck('botsPlayOnNewMap', alive.length >= bots.length * .6 && moved.length >= alive.length * .4);
   // seed 0 is the classic map
-  T.setMap(0); ck('classicSeed', T.OBX.join() === '-52,34,-18,22,-44,58' && T.NEST[0].x === -84);
+  T.setMap(0); ck('classicSeed', T.OBX.join() === '-65,42,-22,28,-55,72' && T.NEST[0].x === -105);
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);
 })().catch(e => { console.log('TEST ERROR', e); process.exit(1); });
