@@ -12,7 +12,7 @@ module.exports = function (C) {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v)), rnd = Math.random, wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
   const now = () => C.tickNo();
   const fwd = yaw => [-Math.sin(yaw), -Math.cos(yaw)], rgt = yaw => [Math.cos(yaw), -Math.sin(yaw)];
-  const KIDX = { tank: 0, fgun: 1, mortar: 2 };
+  const KIDX = { tank: 0, fgun: 1, mortar: 2, plane: 3 };
   const TANK_ARC = [1.7, .9];        // main-gun traverse each side of the nose: Mark IV sponson guns (blue) cover the flanks, the A7V bow gun (green) only the front
   const TANK_NAME = ['Mark IV tank', 'A7V tank'];
   const MAX_TANKS = 1;               // per team at a time
@@ -47,31 +47,90 @@ module.exports = function (C) {
     return v;
   }
 
+  // ---------------------------------------------------------------- v0.33 biplanes: one per side, parked at its airfield (T.AIRF)
+  // Flown by a player with the shared flight model (T.flyStep, stepped once per input command like a soldier's movement, so
+  // the pilot's screen predicts it). Twin machine guns fire along the nose; 4 bombs drop from the bombsight (hold RMB, click).
+  // Bullets and the enemy's AA guns shoot it down; it rearms and patches up standing still on its own strip. Respawns 60 s
+  // after it is lost.
+  const PLANE_RESPAWN = 60, BOMBS = 4;
+  function spawnPlane(team) {
+    if (V.some(v => v.k === 'plane' && v.team === team)) return null;
+    const a = T.AIRF[team], D = VEH.plane;
+    const v = { id: vid++, k: 'plane', team, x: a.x, y: hAt(a.x, a.z) + T.PL.wheel, z: a.z, yaw: a.yaw, pitch: 0, roll: 0, gy: 0, gp: 0, my: 0, spd: 0, thr: 0, air: false,
+      hp: D.hp, hpMax: D.hp, seats: [null], dead: false, rl: 0, mrl: 0, heat: 0, over: false, bombs: BOMBS, fl: 0, mfl: 0, born: now(), ack: 0 };
+    V.push(v); return v;
+  }
+  function planeCrash(v, by) {   // into the ground: the pilot dies, the wreck blows up
+    const x = v.x, z = v.z, pilot = v.seats[0], killer = by || v.lastBy || null;
+    if (!v.dead) destroy(v, killer && killer.team !== v.team ? killer : null, 'crash');
+    if (pilot && pilot.alive) C.damage(pilot, 999, killer && killer.team !== v.team ? killer : null, false, [x, z], 'shell');
+    C.explode(x, z, killer && killer.team !== v.team ? killer : null, .9);
+  }
+  function planeMg(v, by) {
+    if (v.mrl > 0 || v.over || v.dead) return;
+    v.mrl = .085; v.shots = (v.shots || 0) + 1; v.heat = Math.min(1, v.heat + .022); if (v.heat >= 1) { v.over = true; if (!by.bot) C.tell(by, 'Guns overheated!'); }
+    const cp = Math.cos(v.pitch), fx = -Math.sin(v.yaw) * cp, fy = Math.sin(v.pitch), fz = -Math.cos(v.yaw) * cp, [rx, rz] = rgt(v.yaw), side = (v.mfl & 1) ? .35 : -.35, sp = .01 + .02 * v.heat;
+    C.fireBullet(by, v.x + fx * 3.2 + rx * side, v.y + .6 + fy * 3.2, v.z + fz * 3.2 + rz * side, v.yaw + (rnd() - .5) * sp, v.pitch + (rnd() - .5) * sp, 220, 22, 'mg', 600);
+    v.mfl = 3;
+  }
+  function planeBomb(v, by) {
+    if (v.bombs <= 0 || v.rl > 0 || v.dead || !v.air) { if (v.bombs <= 0 && !by.bot && (by.msgCd || 0) <= now()) { C.tell(by, 'No bombs left: land on your airfield to rearm'); by.msgCd = now() + 2 * TICK; } return; }
+    v.bombs--; v.rl = .6; fireShell(v.x, v.y - 1, v.z, v.yaw, v.pitch, v.spd, by, 1.5, v.team, v);
+  }
+  // called for every input command of the pilot (dt = that command's frame time)
+  function planeInput(p, v, f, s, bits, yaw, pitch, dt, seq) {
+    if (v.dead) return;
+    v.mrl = Math.max(0, v.mrl - dt); v.rl = Math.max(0, v.rl - dt);   // the guns cycle on the pilot's own clock, like his movement
+    const r = T.flyStep(v, { dt, f, s, yaw, pitch }, C.terr().H); v.ack = seq;
+    if (r === 'crash') { planeCrash(v, null); return; }
+    if (bits & 8) { if (bits & 32) { if (!p.hold) planeBomb(v, p); } else if (v.air) planeMg(v, p); }
+    p.hold = !!(bits & 8);
+  }
+  function planeTick(v) {
+    if (v.dead) { if (now() > v.deadAt + PLANE_RESPAWN * TICK) { V.splice(V.indexOf(v), 1); C.bcast({ t: 'vh', rm: [v.id] }); spawnPlane(v.team); C.teamTell(v.team, 'A new biplane is waiting on the airfield'); } return; }
+    const pilot = v.seats[0];
+    if (!pilot) { v.rl = Math.max(0, v.rl - DT); v.mrl = Math.max(0, v.mrl - DT); } v.heat = Math.max(0, v.heat - DT * .3); if (v.over && v.heat < .35) v.over = false;
+    if (v.fl > 0) v.fl--; if (v.mfl > 0) v.mfl--;
+    if (!pilot && (v.air || v.spd > 0)) { const r = T.flyStep(v, { dt: DT, f: -1, s: 0, yaw: v.yaw, pitch: -.25 }, C.terr().H); if (r === 'crash') { planeCrash(v, null); return; } }   // nobody at the stick: it glides down
+    if (v.air) { const dps = C.aaDps ? C.aaDps(v.team, v.x, v.z) : 0; if (dps > 0) hurt(v, dps * DT * (.6 + rnd() * .8), null, 'flak'); if (v.dead) return; }
+    const a = T.AIRF[v.team];
+    if (!v.air && v.spd < .5 && Math.abs(v.z - a.z) < 14 && Math.abs(v.x - a.x + Math.sign(a.x) * 50) < 75) {   // standing on its own strip: rearm and patch up
+      v.rearm = (v.rearm || 0) + DT; if (v.rearm > 4 && v.bombs < BOMBS) { v.rearm = 0; v.bombs++; } v.hp = Math.min(v.hpMax, v.hp + 12 * DT);
+    }
+    if (pilot) { pilot.x = v.x; pilot.z = v.z; pilot.y = v.y - .6; pilot.vy = 0; C.send(pilot, { t: 'pls', a: v.ack, s: [r2(v.x), r2(v.y), r2(v.z), r4(v.yaw), r4(v.pitch), r4(v.roll), r2(v.spd), r4(v.thr), v.air ? 1 : 0], b: v.bombs, hp: Math.max(0, Math.round(100 * v.hp / v.hpMax)), ht: Math.round(v.heat * 100), ov: v.over ? 1 : 0 }); }
+  }
+  const r2 = x => Math.round(x * 100) / 100, r4 = x => Math.round(x * 10000) / 10000;
+
   // ---------------------------------------------------------------- seats
   function vehNear(p) {
     let best = null, bd = 1e9;
     for (const v of V) {
       if (v.dead || v.team !== p.team || !v.seats.includes(null)) continue;
-      const tx = v.k === 'tank' ? v.x : v.seat.x, tz = v.k === 'tank' ? v.z : v.seat.z, R = v.k === 'tank' ? 6.5 : 2.6, d = Math.hypot(p.x - tx, p.z - tz);
+      const big = v.k === 'tank' || v.k === 'plane', tx = big ? v.x : v.seat.x, tz = big ? v.z : v.seat.z, R = v.k === 'tank' ? 6.5 : v.k === 'plane' ? 5.5 : 2.6, d = Math.hypot(p.x - tx, p.z - tz);
+      if (v.k === 'plane' && (v.air || v.spd > 2)) continue;
       if (d < R && d < bd && Math.abs(p.y - v.y) < 3) { bd = d; best = v; }
     }
     return best;
   }
   function enter(p) {
     const v = vehNear(p); if (!v) return false;
-    const seat = v.seats.indexOf(null); v.seats[seat] = p; p.veh = v; p.seat = seat; p.inV = v.k === 'tank'; p.ads = false; p.rel = 0; p.charging = false;
-    if (v.k !== 'tank') { if (v.crew) v.crew.manned = true; p.x = v.seat.x; p.z = v.seat.z; p.y = hAt(p.x, p.z); p.yaw = v.base.yaw + v.gy; p.pitch = v.k === 'mortar' ? 0 : v.gp; }
+    const seat = v.seats.indexOf(null); v.seats[seat] = p; p.veh = v; p.seat = seat; p.inV = v.k === 'tank' || v.k === 'plane'; p.ads = false; p.rel = 0; p.charging = false;
+    if (v.k === 'plane') { p.x = v.x; p.z = v.z; p.y = v.y - .6; p.yaw = v.yaw; p.pitch = 0; v.ack = p.ack || 0; }
+    else if (v.k !== 'tank') { if (v.crew) v.crew.manned = true; p.x = v.seat.x; p.z = v.seat.z; p.y = hAt(p.x, p.z); p.yaw = v.base.yaw + v.gy; p.pitch = v.k === 'mortar' ? 0 : v.gp; }
     else { p.x = v.x; p.z = v.z; p.y = v.y + .4; p.yaw = v.yaw + (seat ? v.my : v.gy); p.pitch = 0; }
     p.vy = 0; p.cl = null; p.crouch = false;
     C.send(p, { t: 'veh', id: v.id, seat, k: v.k });
-    C.tell(p, v.k === 'tank' ? (seat === 0 ? 'Driving: WASD to move, mouse lays the main gun, click to fire. [F] get out, [C] outside view.' : 'Hull machine gun: hold click to fire. [F] get out, [C] outside view.')
+    C.tell(p, v.k === 'plane' ? 'Biplane: W throttle up (S down), steer with the mouse, pull up to take off. LMB guns; hold RMB for the bombsight, click to drop. [C] outside view, [F] get out once landed.' : v.k === 'tank' ? (seat === 0 ? 'Driving: WASD to move, mouse lays the main gun, click to fire. [F] get out, [C] outside view.' : 'Hull machine gun: hold click to fire. [F] get out, [C] outside view.')
       : v.k === 'fgun' ? 'Field gun: aim with the mouse (the sight shows the range), click to fire. 1 supply a shell. [F] leave.' : 'Trench mortar: mouse left/right to traverse, up/down sets the range. Click to fire. 1 supply a bomb. [F] leave.');
     return true;
   }
   function leave(p, quiet) {
     const v = p.veh; if (!v) return;
+    if (v.k === 'plane' && !v.dead && !quiet && (v.air || v.spd > 3)) { if ((p.msgCd || 0) <= now()) { C.tell(p, 'Land first (and slow down) to get out'); p.msgCd = now() + 2 * TICK; } return; }
     v.seats[p.seat] = null; p.veh = null; p.inV = false;
-    if (v.k === 'tank') {
+    if (v.k === 'plane') {
+      const [rx, rz] = rgt(v.yaw); p.x = v.x + rx * 4.5; p.z = v.z + rz * 4.5; p.y = T.groundAt(C.terr().H, p.x, p.z, 99); p.vy = 0;
+    } else if (v.k === 'tank') {
       if (p.seat === 0) { v.thr = 0; v.steer = 0; }
       const [rx, rz] = rgt(v.yaw), [fx, fz] = fwd(v.yaw); let ok = false;
       for (const [a, b] of [[1, -.2], [-1, -.2], [0, -1], [1, .3], [-1, .3]]) {   // climb out of a side door (or the back)
@@ -132,6 +191,7 @@ module.exports = function (C) {
   function blast(x, z, by, pow, src) {   // an explosion: vehicles and guns nearby take damage. Hand grenades barely dent a tank; a tank hunter's bundle charges wreck it
     for (const v of V) {
       if (v.dead || (by && by.team === v.team)) continue;
+      if (v.k === 'plane' && v.y - hAt(v.x, v.z) > 5) continue;   // a ground burst can't reach a plane in the air
       const R = 5.5 * Math.sqrt(pow), d = distTo(v, x, z); if (d >= R) continue;
       const nade = src !== 'shell' && by && !by.cmd, bundle = nade && by.elite === 'atr';
       const base = v.k !== 'tank' ? 260 : bundle ? 330 : nade ? 40 : 150;
@@ -139,6 +199,7 @@ module.exports = function (C) {
     }
   }
   function bulletHit(b, x, y, z) {   // bullets stop on armour; only anti-tank rifle rounds hurt it
+    for (const v of V) if (v.k === 'plane' && !v.dead && b.by && b.by.team !== v.team && b.by.veh !== v && Math.abs(v.y + .3 - y) < 1.6 && Math.hypot(v.x - x, v.z - z) < 3.2) { hurt(v, (b.dmg || 20) * .7, b.by, 'bullet'); return true; }   // v0.33: fabric and wire: every bullet counts
     { const w = T.WPN[b.wk]; if (w && w.at) for (const v of V) if (v.k !== 'tank' && !v.dead && b.by && b.by.team !== v.team && distTo(v, x, z) < 1.3 && y > v.y && y < v.y + 1.8) { hurt(v, w.at * .6, b.by, 'atr'); return true; } }   // v0.31: anti-tank rounds wreck guns and mortars too
     for (const v of V) {
       if (v.k !== 'tank' || b.by === v.crew || b.by.veh === v) continue;
@@ -156,12 +217,22 @@ module.exports = function (C) {
     if (by && !by.bot && by.team !== v.team) C.send(by, { t: 'hm', h: 0, k: v.hp <= 0 ? 1 : 0, m: 0, v: 1 });
     for (const p of v.seats) if (p) C.send(p, { t: 'vhit', d: Math.round(dmg), hp: Math.max(0, Math.round(100 * v.hp / v.hpMax)) });
     if (v.k === 'tank' && v.hp > 0 && v.hp < v.hpMax * .3 && !v.warned) { v.warned = true; for (const p of v.seats) if (p) C.tell(p, 'The tank is burning! Get it back or get out.'); }
+    if (v.k === 'plane' && v.hp > 0 && v.hp < v.hpMax * .35 && !v.warned) { v.warned = true; for (const p of v.seats) if (p) C.tell(p, 'Your plane is badly shot up! Head home and land to patch it up.'); }
     if (v.hp <= 0) destroy(v, by, kind);
   }
   function destroy(v, by, kind) {
     v.dead = true; v.hp = 0; v.v = 0; v.thr = 0; v.steer = 0;
     for (const p of v.seats.slice()) if (p) { leave(p, true); if (p.alive) C.damage(p, 55, by, false, [v.x, v.z], 'shell'); }
     const name = v.k === 'tank' ? TANK_NAME[v.team] : VEH[v.k].n.toLowerCase();
+    if (v.k === 'plane') {
+      const pilot = v.seats[0], air = v.air; v.seats[0] = null; v.deadAt = now(); v.spd = 0;
+      if (air) { v.y = hAt(v.x, v.z) + .4; v.pitch = -.25; v.roll = .6; v.air = false; }   // the wreck comes down where it was hit
+      if (pilot) { pilot.veh = null; pilot.inV = false; C.send(pilot, { t: 'veh', id: 0 }); if (pilot.alive) C.damage(pilot, air ? 999 : 60, by && by.team !== v.team ? by : null, false, [v.x, v.z], 'shell'); }
+      if (by && by.team !== v.team) { C.addXp(by, 60); if (!by.bot) C.tell(by, 'Enemy plane shot down (+60 XP)'); }
+      C.killFeedRaw(by && by.team !== v.team ? by : null, v.team, 'Biplane', kind === 'flak' ? 'flak' : kind === 'crash' ? 'crash' : 'mg');
+      C.teamTell(v.team, 'Our biplane is down. A new one will be on the airfield in ' + PLANE_RESPAWN + ' s.'); if (air && kind !== 'crash') C.later(1200, () => C.explode(v.x, v.z, by && by.team !== v.team ? by : null, .9));
+      return;
+    }
     if (by && by.team !== v.team) { C.addXp(by, v.k === 'tank' ? 100 : 40); if (!by.bot) C.tell(by, (v.k === 'tank' ? 'Tank destroyed' : 'Enemy ' + name + ' knocked out') + ' (+' + (v.k === 'tank' ? 100 : 40) + ' XP)'); }
     C.killFeedRaw(by, v.team, v.k === 'tank' ? TANK_NAME[v.team] : VEH[v.k].n, kind === 'atr' ? 'atr' : kind === 'bundle' ? 'bundle' : kind === 'shell' ? 'shell' : 'grenade');
     if (v.k === 'tank') {
@@ -202,8 +273,9 @@ module.exports = function (C) {
     v.rl = D.rl; v.fl = 4; return true;
   }
   // the player's inputs while seated (called once per input command)
-  function input(p, f, s, bits, yaw, pitch) {
+  function input(p, f, s, bits, yaw, pitch, dt, seq) {
     const v = p.veh; if (!v || v.dead) return;
+    if (v.k === 'plane') return planeInput(p, v, f, s, bits, yaw, pitch, dt || 0, seq);
     if (v.k === 'tank') {
       if (p.seat === 0) { v.thr = f; v.steer = s; const a = TANK_ARC[v.team]; v.gy = clamp(wrap(yaw - v.yaw), -a, a); v.gp = clamp(pitch, -.16, .32); if (bits & 8) fireMain(v, p); }
       else { v.my = clamp(wrap(yaw - v.yaw), -2.4, 2.4); v.mp = clamp(pitch, -.3, .45); if (bits & 8) tankMg(v, p); }
@@ -368,7 +440,8 @@ module.exports = function (C) {
   }
   let vstT = 0;
   function tick() {
-    for (const v of V) v.k === 'tank' ? tankTick(v) : emplTick(v);
+    for (const v of V.slice()) v.k === 'tank' ? tankTick(v) : v.k === 'plane' ? planeTick(v) : emplTick(v);
+    for (const t of [0, 1]) if (!V.some(v => v.k === 'plane' && v.team === t)) spawnPlane(t);
     shellsTick();
     if (now() % 2 === 0) {   // changed vehicles at 10 Hz
       const ch = []; for (const v of V) { const a = enc(v), k = a.join(','); if (k !== v.last) { v.last = k; ch.push(a); } }
@@ -381,12 +454,13 @@ module.exports = function (C) {
   function enc(v) {
     const crewed = v.seats.some(Boolean) || (v.crew && v.crew.alive && !v.crew.manned && v.k !== 'tank') || (v.k === 'tank' && !v.dead);
     return [v.id, KIDX[v.k], v.team, r1(v.x), r1(v.y), r1(v.z), r3(v.yaw), r3(v.pitch), r3(v.roll), r3(v.gy), r3(v.gp), r3(v.my || 0), Math.max(0, Math.round(100 * v.hp / v.hpMax)),
-      (v.dead ? 1 : 0) | (v.hp < v.hpMax * .3 ? 2 : 0) | (v.seats[0] && !v.seats[0].bot ? 4 : 0) | (crewed ? 8 : 0) | (v.fl > 0 ? 16 : 0) | (v.mfl > 0 ? 32 : 0) | (v.lost ? 64 : 0), r1(v.v || 0)];
+      (v.dead ? 1 : 0) | (v.hp < v.hpMax * .3 ? 2 : 0) | (v.seats[0] && !v.seats[0].bot ? 4 : 0) | (crewed ? 8 : 0) | (v.fl > 0 ? 16 : 0) | (v.mfl > 0 ? 32 : 0) | (v.lost ? 64 : 0) | (v.air ? 128 : 0), r1(v.k === 'plane' ? v.spd : v.v || 0)];
   }
   const fullMsg = () => ({ t: 'vh', l: V.map(enc), full: 1 });
 
   function reset() {
     for (const v of V) for (const p of v.seats) if (p) leave(p, true);
+    for (let i = V.length - 1; i >= 0; i--) if (V[i].k === 'plane') V.splice(i, 1);
     for (let i = V.length - 1; i >= 0; i--) if (V[i].k === 'tank') { if (V[i].crew) C.ents.delete(V[i].crew.id); V.splice(i, 1); }
     V.forEach((v, i) => {   // v0.30: guns and mortars move with the map (V holds the emplacements in T.EMPL order once tanks are gone)
       const q = T.EMPL[i]; if (!q || q.k !== v.k) return; const [fx, fz] = fwd(q.yaw);
@@ -406,5 +480,5 @@ module.exports = function (C) {
   const nearEnemyTank = (e, r) => V.find(v => v.k === 'tank' && !v.dead && v.team !== e.team && Math.hypot(v.x - e.x, v.z - e.z) < r) || null;
   const tanks = () => V.filter(v => v.k === 'tank');
   function fixNow(v) { if (!v.dead || v.lost) return; v.dead = false; v.hp = v.hpMax; v.repair = 0; C.teamTell(v.team, 'The ' + VEH[v.k].n.toLowerCase() + ' is back in action'); }   // v0.31: repaired by hand
-  return { fixNow, V, shells, tick, input, enter, leave, vehNear, spawnTank, fireShell, fireMain, fireGun, tankMg, hurt, blast, bulletHit, inTank, crewTick, fullMsg, reset, groundLost, nearEnemyTank, tanks, lobPitch, tankGoal, artyTarget, TANK_NAME };
+  return { spawnPlane, planes: () => V.filter(v => v.k === 'plane'), fixNow, V, shells, tick, input, enter, leave, vehNear, spawnTank, fireShell, fireMain, fireGun, tankMg, hurt, blast, bulletHit, inTank, crewTick, fullMsg, reset, groundLost, nearEnemyTank, tanks, lobPitch, tankGoal, artyTarget, TANK_NAME };
 };

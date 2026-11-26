@@ -203,6 +203,7 @@ function spawnEnt(e) {
     applyLoadout(e); e.cmd = e.cls === 'officer';
     if (e.cmd) { x = 0; z = e.team === 0 ? 104 : -104; }
     else if (e.spawnPick === 0) { /* chose home base */ }
+    else if (e.spawnPick === -99) { const a = T.AIRF[e.team]; x = a.x - Math.sign(a.x) * 3; z = a.z + (e.team ? -6 : 6); }   // v0.33: the airfield
     else if (e.spawnPick < 0 && flagSpawnOk(e.team, -e.spawnPick - 1)) { const o = OB[-e.spawnPick - 1]; x = o.x + (rnd() - .5) * 14; z = lineZ(o, x) + (e.team === 0 ? .4 : -.4); }   // v0.31.1: a flag your side holds
     else {
       if (e.spawnPick < 0) tell(e, 'That flag is under attack: respawning elsewhere');
@@ -758,7 +759,7 @@ function processCmds(p) {
     const bits = c[4] | 0, f = clamp(Math.round(+c[2] || 0), -1, 1), s = clamp(Math.round(+c[3] || 0), -1, 1);
     p.cd -= dt; p.bloom = Math.max(0, (p.bloom || 0) - dt * .08);
     p.sprOut = (bits & 1) && (f || s) && p.mg == null ? .18 : (p.sprOut || 0) - dt;   // sprint-to-fire delay
-    if (p.veh) { VEHM.input(p, f, s, bits, yaw, pitch); p.yaw = yaw; p.pitch = pitch; p.ads = false; continue; }
+    if (p.veh) { VEHM.input(p, f, s, bits, yaw, pitch, dt, seq); p.yaw = yaw; p.pitch = pitch; p.ads = false; continue; }
     if (p.mg != null) {
       const nn = NESTS[p.mg], base = nn.yaw != null ? nn.yaw : faceYaw(p.team); let d = yaw - base; d = Math.atan2(Math.sin(d), Math.cos(d));
       yaw = base + clamp(d, -1.25, 1.25); pitch = clamp(pitch, -.35, .45); const n = NESTS[p.mg]; p.x = n.x; p.z = n.z; p.y = hAt(terr.H, n.x, n.z); p.crouch = false;
@@ -2058,7 +2059,7 @@ server.on('upgrade', (req, socket) => {
 });
 
 fs.mkdirSync(path.join(__dirname, 'public'), { recursive: true });
-VEHM = require('./vehicles.js')({ T, ents, humans, DT, TICK, terr: () => terr, tickNo: () => tickNo, damage, explode, send, bcast, tell, teamTell, addXp, supply: () => supply, fireBullet,
+VEHM = require('./vehicles.js')({ aaDps: (team, x, z) => aaFor(1 - team).filter(a => Math.hypot(a.x - x, a.z - z) < AA_R).length * AA_DPS * 1.6, T, ents, humans, DT, TICK, terr: () => terr, tickNo: () => tickNo, damage, explode, send, bcast, tell, teamTell, addXp, supply: () => supply, fireBullet,
   forNear, op: () => op, opTarget, lineZ, spawnLine, wave: () => wave, removeFort, alert, smokeBlocks, sightAt, addCrew, homeZ, faceYaw, later, killFeedRaw });
 T.WX.k = pickWx();
 NAV.rebuild(); fillBots(); op = newOp(0); wave.side = op.att; roundStartExtras();   // bots and flag guards exist before the first tick, so guards start on their flag
