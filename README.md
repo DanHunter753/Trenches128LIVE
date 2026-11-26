@@ -73,6 +73,22 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.33.3 - bots spread out, friend markers, order beacons
+- **Bots keep their distance.** Nothing used to keep bots apart: they stood inside each other, and squads walked one path
+  to nearly one spot. Now each bot steps away from teammates closer than his spacing: about 2.6 m when holding a line or
+  advancing (so a line covers its front), 1.5 m while his squad gathers for a push or follows an officer's order, and
+  0.75 m in a dugout shelter. Men walking together veer apart into a loose line instead of a file. Steps are only taken
+  on level going, so the push slides men along a trench, never up its wall. Move orders spread a squad wider too.
+  Measured over a full 128 v 128 battle, bots standing within 0.8 m of a teammate (same level, outside shelters) went
+  from 30-69% to 3-15%. Test: `spacing`.
+- **Friend markers:** a blue marker over teammates (within 150 m) and a green one over the players in your own squad, like
+  the red one over spotted enemies. Test: `browser_marks`.
+- **Order beacons for soldiers:** when the officer gives your squad an order, its beacon (a column of light in the
+  squad's colour, not hidden by fog, with a ring on the ground) stands at the spot, and an on-screen marker shows the
+  order and the distance, pinned to the screen edge with an arrow when it's off to the side or behind you. The beacon
+  pulses gently and fades as you get close; the marker goes once you're there or the order is done. Officers' beacons
+  use the same look. Test: `browser_orders`.
+
 ## v0.33.2 - knocked down on a phone
 - Phones had no way to shout for a medic or give up while knocked down (the touch buttons hide when you're down). Two
   big buttons now appear: CALL MEDIC (the Y shout) and HOLD TO RESPAWN (the held E, with the same 1.2 s bar), and the
