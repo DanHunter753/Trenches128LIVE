@@ -33,42 +33,66 @@ module.exports = function makeNav(T, getH) {
     return c;
   }
   const NB = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [1, 1, 1], [1, -1, 1], [-1, 1, 1], [-1, -1, 1]];
-  // Dijkstra from the goal over reversed edges: d[c] = cost to walk from c to the goal
-  function solve(goals) {
+  // Dijkstra from the goal over reversed edges: d[c] = cost to walk from c to the goal.
+  // v0.32.1: a map-wide field is ~160k cells (about 50 ms on the 400 m map), far too long for one 50 ms tick, so it is solved
+  // in slices of SLICE_MS a tick by one resumable job at a time; until a new field is ready, bots keep using the stale one.
+  const SLICE_MS = 4, heapB = new Int32Array(NN * 4), doneB = new Uint8Array(NN), queue = [];
+  const DI = Int32Array.from(NB.map(q => q[0])), DJ = Int32Array.from(NB.map(q => q[1])), DG = Uint8Array.from(NB.map(q => q[2])), DC = Float32Array.from(NB.map(q => q[2] ? 1.414 : 1));
+  let job = null, lastNow = 0, sliceMs = 0, sliceMax = 0;
+  const clock = typeof performance !== 'undefined' ? () => performance.now() : () => Date.now();
+  function jobStart(key, goals) {
     if (!Array.isArray(goals)) goals = [goals];
-    const d = new Float32Array(NN).fill(INF); const heap = new Int32Array(NN * 4); let hn = 0;
-    const push = c => { let k = hn++; heap[k] = c; while (k > 0) { const p = (k - 1) >> 1; if (d[heap[p]] <= d[heap[k]]) break; const t = heap[p]; heap[p] = heap[k]; heap[k] = t; k = p; } };
-    const pop = () => { const top = heap[0]; heap[0] = heap[--hn]; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < hn && d[heap[l]] < d[heap[m]]) m = l; if (r < hn && d[heap[r]] < d[heap[m]]) m = r; if (m === k) break; const t = heap[m]; heap[m] = heap[k]; heap[k] = t; k = m; } return top; };
-    const done = new Uint8Array(NN); for (const g of goals) if (!blk[g] && d[g] !== 0) { d[g] = 0; push(g); }
-    while (hn) {
-      const v = pop(); if (done[v]) continue; done[v] = 1; const vi = v % N, vj = (v / N) | 0;
-      for (const [di, dj, dg] of NB) {
-        const ui = vi + di, uj = vj + dj; if (ui < 0 || uj < 0 || ui >= N || uj >= N) continue; const u = uj * N + ui;
-        if (done[u]) continue;
-        if (dg && (blk[vj * N + ui] || blk[uj * N + vi])) continue;   // no corner cutting past walls
-        const c = cost(u, v, dg); if (c >= INF) continue;
-        const nd = d[v] + c; if (nd < d[u]) { d[u] = nd; if (hn < heap.length) push(u); }
+    const d = new Float32Array(NN).fill(INF); doneB.fill(0); job = { key, d, hn: 0, ver, made: lastNow };
+    for (const g of goals) if (g >= 0 && !blk[g] && d[g] !== 0) { d[g] = 0; hpush(g); }
+  }
+  function hpush(c) { const d = job.d, heap = heapB; let k = job.hn++; heap[k] = c; while (k > 0) { const p = (k - 1) >> 1; if (d[heap[p]] <= d[heap[k]]) break; const t = heap[p]; heap[p] = heap[k]; heap[k] = t; k = p; } }
+  function hpop() { const d = job.d, heap = heapB, top = heap[0], hn = --job.hn; heap[0] = heap[hn]; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < hn && d[heap[l]] < d[heap[m]]) m = l; if (r < hn && d[heap[r]] < d[heap[m]]) m = r; if (m === k) break; const t = heap[m]; heap[m] = heap[k]; heap[k] = t; k = m; } return top; }
+  function jobRun(deadline) {   // true when the job finished
+    const d = job.d; let n = 0;
+    while (job.hn) {
+      if ((++n & 1023) === 0 && clock() > deadline) return false;
+      const v = hpop(); if (doneB[v]) continue; doneB[v] = 1; const vi = v % N, vj = (v / N) | 0, dv = d[v], hv = h[v], rv = room[v], drv = door[v];
+      for (let q = 0; q < 8; q++) {
+        const ui = vi + DI[q], uj = vj + DJ[q]; if (ui < 0 || uj < 0 || ui >= N || uj >= N) continue; const u = uj * N + ui;
+        if (doneB[u] || blk[v]) continue;
+        if (DG[q] && (blk[vj * N + ui] || blk[uj * N + vi])) continue;   // no corner cutting past walls
+        if (room[u] !== rv && !door[u] && !drv) continue;                // dugout walls (cost(u, v) inlined)
+        const dh = hv - h[u]; if (dh > 3.2) continue;
+        let c = DC[q]; if (dh > .62) c += 5 + dh; else if (dh < -2.5) c += 1; if (wir[v]) c *= 2.5;
+        const nd = dv + c; if (nd < d[u]) { d[u] = nd; if (job.hn < heapB.length) hpush(u); }
       }
     }
-    return d;
+    return true;
+  }
+  function jobFinish() { solved++; fields.set(job.key, { d: job.d, ver: job.ver, used: lastNow, made: job.made }); job = null; }
+  function solve(goals) { const keep = job; job = null; jobStart('_sync', goals); jobRun(Infinity); const d = job.d; job = keep; if (keep) doneB.fill(0), restart(keep); return d; }
+  function restart(j) { const q = { key: j.key, goals: j.goals }; job = null; queue.unshift(q); }
+  function enqueue(key, goals) { if ((job && job.key === key) || queue.some(q => q.key === key)) return; if (queue.length >= 12) queue.shift(); queue.push({ key, goals }); }
+  function work() {   // called once a tick
+    const t0 = clock(), dl = t0 + SLICE_MS;
+    while (clock() < dl) { if (!job) { const q = queue.shift(); if (!q) break; jobStart(q.key, typeof q.goals === 'function' ? q.goals() : q.goals); job.goals = q.goals; } if (jobRun(dl)) jobFinish(); else break; }
+    const ms = clock() - t0; sliceMs += ms; if (ms > sliceMax) sliceMax = ms;
   }
   const fields = new Map(); let budget = 0, solved = 0;
-  function tick() { budget = 1; lbudget = 10; if (fields.size > 40) { const old = [...fields.entries()].sort((a, b) => a[1].used - b[1].used).slice(0, fields.size - 30); for (const [k] of old) fields.delete(k); } }
-  // distance field for a goal (quantised to 3 m); null if not yet computed this tick (callers fall back to walking straight)
-  function field(x, z, now) {
+  function tick() { lbudget = 10; work(); if (fields.size > 40) { const old = [...fields.entries()].sort((a, b) => a[1].used - b[1].used).slice(0, fields.size - 30); for (const [k] of old) fields.delete(k); } }
+  // distance field for a goal (quantised to 6 m); null until first computed (callers fall back to walking straight).
+  // sync = true solves it on the spot (tools and tests).
+  function field(x, z, now, sync) {
+    if (now > lastNow) lastNow = now;
     const gi = idx(Math.round(x / 6) * 6, Math.round(z / 6) * 6); if (gi < 0) return null;
     const k = gi; let f = fields.get(k);
-    if (f && (f.ver === ver || now - f.made < 160 || budget <= 0)) { f.used = now; return f.d; }   // a field up to 8 s stale is still good
-    if (budget <= 0) return null;
-    budget--; solved++; f = { d: solve(blk[gi] ? nearestOpen(gi) : gi), ver, used: now, made: now }; fields.set(k, f); return f.d;
+    if (f && (f.ver === ver || now - f.made < 160)) { f.used = now; return f.d; }   // a field up to 8 s stale is still good
+    const goal = () => blk[gi] ? nearestOpen(gi) : gi;
+    if (sync) { f = { d: solve(goal()), ver, used: now, made: now }; solved++; fields.set(k, f); return f.d; }
+    enqueue(k, goal); if (f) { f.used = now; return f.d; } return null;
   }
   // field toward a whole area (a trench line's capture zone): one shared field for every bot holding or attacking it
   function areaField(key, x0, z0, x1, z1, now, keep) {   // keep(x, z): optional filter for which cells count as the goal
+    if (now > lastNow) lastNow = now;
     let f = fields.get(key);
-    if (f && (f.ver === ver || now - f.made < 160 || budget <= 0)) { f.used = now; return f.d; }
-    if (budget <= 0) return null;
-    const src = []; for (let z = Math.ceil(z0); z < z1; z++) for (let x = Math.ceil(x0); x < x1; x++) { const c = idx(x, z); if (c >= 0 && !blk[c] && (!keep || keep(x, z))) src.push(c); }
-    budget--; solved++; f = { d: solve(src), ver, used: now, made: now }; fields.set(key, f); return f.d;
+    if (f && (f.ver === ver || now - f.made < 160)) { f.used = now; return f.d; }
+    const src = () => { const a = []; for (let z = Math.ceil(z0); z < z1; z++) for (let x = Math.ceil(x0); x < x1; x++) { const c = idx(x, z); if (c >= 0 && !blk[c] && (!keep || keep(x, z))) a.push(c); } return a; };
+    enqueue(key, src); if (f) { f.used = now; return f.d; } return null;
   }
   // v0.27: short trips (under ~25 m: charges, revives, dugouts) use a bounded search in a box around start and goal instead of a
   // map-wide field. Returns a field object { loc, d, i0, j0, w, h } that at() and step() understand.
@@ -110,5 +134,5 @@ module.exports = function makeNav(T, getH) {
     return { x: cx(best), z: cz(best), dh: h[best] - h[c], left: here };
   }
   const passable = (x, z) => { const c = idx(x, z); return c >= 0 && !blk[c]; };
-  return { clear: () => fields.clear(), rebuild, tick, field, areaField, local, at, step, passable, stats: () => ({ fields: fields.size, solved, solvedLocal, ver }), _h: h, _blk: blk };
+  return { clear: () => fields.clear(), rebuild, tick, field, areaField, local, at, step, passable, stats: () => { const r = { fields: fields.size, solved, solvedLocal, ver, queue: queue.length + (job ? 1 : 0), sliceMs: +sliceMs.toFixed(1), sliceMax: +sliceMax.toFixed(1) }; sliceMs = 0; sliceMax = 0; return r; }, _h: h, _blk: blk };
 };

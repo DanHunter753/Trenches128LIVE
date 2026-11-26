@@ -742,12 +742,17 @@ function botMove(b, mx, mz) {
 }
 
 // ------------------------------------------------------------------ per-tick simulation
+// v0.32.1 movement time bank: a player may move as much time as really passed, banked up to MOVE_BANK s. The old flat cap
+// (0.12 s of movement a tick) threw away movement whenever inputs arrived bunched up (network jitter, or after a slow server
+// tick). The player's own screen had already moved him the full distance, so he was snapped back: worst when sprinting.
+// The bank still stops speed hacks: over any stretch of time nobody moves faster than the clock.
+const MOVE_BANK = .6;
 function processCmds(p) {
-  let budget = .12;
+  p.tBank = Math.min(MOVE_BANK, (p.tBank == null ? .25 : p.tBank) + DT);
   const q = p.q; p.q = [];
   for (const c of q) {
     const seq = +c[0]; if (!Number.isFinite(seq) || seq <= p.ack) continue; p.ack = seq;
-    let dt = clamp((c[1] | 0) / 1000, 0, .05); if (dt > budget) dt = budget; budget -= dt;
+    let dt = clamp((c[1] | 0) / 1000, 0, .05); if (dt > p.tBank) dt = Math.max(0, p.tBank); p.tBank -= dt;
     if (!p.alive || p.cmd) continue;
     let yaw = +c[5], pitch = clamp(+c[6], -1.45, 1.45); if (!isFinite(yaw) || !isFinite(pitch)) continue;
     const bits = c[4] | 0, f = clamp(Math.round(+c[2] || 0), -1, 1), s = clamp(Math.round(+c[3] || 0), -1, 1);
@@ -1763,7 +1768,7 @@ const CLASS_IDX = { rifleman: 0, assault: 1, gunner: 2, medic: 3, sapper: 4, off
 const W_IDX = { bolt: 0, carbine: 1, shotgun: 2, smg: 3, lmg: 4, mark: 5, sniper: 6 };
 // shown as the shouldered-rifle pose: humans aiming down sights or firing, bots with a target in sight
 const aiming = e => e.alive && (e.bot ? !!(e.tgt && e.td < 70) || e.flash > 0 : !!e.ads || e.flash > 0);
-let bytesOut = 0, tickMs = 0, tickMax = 0;
+let bytesOut = 0, tickMs = 0, tickMax = 0, slowN = 0, gapMax = 0, lastTickAt = 0, slowLogAt = 0; const SLOW_MS = 40;
 function broadcastState() {
   let objMsgs = null;
   if (tickNo % 10 === 0) {
@@ -1798,12 +1803,17 @@ function tick() {
 }
 // One faulty subsystem (or one bad entity) must never stop the whole tick: snapshots still go out, the error is logged once a minute.
 const guardAt = new Map();
-function guard(name, fn, a) { try { fn(a); } catch (e) { const n = guardAt.get(name) || 0; if (Date.now() - n > 60000) { guardAt.set(name, Date.now()); console.error('[' + name + '] error (game keeps running):', e && e.stack || e); } } }
+// v0.32.1 tick profiler: time per subsystem (summed over the tick), so a slow tick can say what was slow
+const PROF = new Map(); let profOn = true;
+const hr = () => Number(process.hrtime.bigint()) / 1e6;
+function prof(name, ms) { PROF.set(name, (PROF.get(name) || 0) + ms); }
+function guard(name, fn, a) { const t = profOn ? hr() : 0; try { fn(a); } catch (e) { const n = guardAt.get(name) || 0; if (Date.now() - n > 60000) { guardAt.set(name, Date.now()); console.error('[' + name + '] error (game keeps running):', e && e.stack || e); } } finally { if (profOn) prof(name, hr() - t); } }
 function tickBody() {
-  const t0 = process.hrtime.bigint(); tickNo++;
+  const t0 = process.hrtime.bigint(); tickNo++; PROF.clear();
+  { const now = hr(); if (lastTickAt) { const gap = now - lastTickAt; if (gap > gapMax) gapMax = gap; } lastTickAt = now; }
   if (round.state === 'ended') { round.t -= DT; if (round.t <= 0) resetRound(); }
   if (tickNo % TICK === 0) { guard('nestfix', nestAutofix); guard('phonefix', phoneAutofix); }
-  buildGrid(); computeLeaders(); guard('nav', () => NAV.tick()); if (tickNo % 20 === 0) guard('squads', squadTick);
+  { const t = hr(); buildGrid(); computeLeaders(); prof('grid', hr() - t); } guard('nav', () => NAV.tick()); if (tickNo % 20 === 0) guard('squads', squadTick);
   { const due = sched.filter(s => s.at <= tickNo); if (due.length) { sched = sched.filter(s => s.at > tickNo); for (const s of due) { try { s.fn(); } catch (e) { console.error(e); } } } }
   for (const p of humans) guard('human', humanTick, p);
   for (const e of ents.values()) if (e.bot) { const y0 = e.yaw; guard('bot', botTick, e);
@@ -1818,15 +1828,17 @@ function tickBody() {
   if (tickNo % 40 === 0) guard('fill', fillBots);
   if (tickNo % 10 === 0) { guard('orders', orderTick); guard('crates', crateTick); }
   if (tickNo % 20 === 0) guard('sqs', sendSqs);
-  broadcastState();
+  { const t = hr(); broadcastState(); prof('send', hr() - t); }
   if (bodies.length) { bcast({ t: 'bd', b: bodies.splice(0) }); }
   shots.length = 0; for (const e of ents.values()) if (e.flash > 0) e.flash--;
   const ms = Number(process.hrtime.bigint() - t0) / 1e6; tickMs += ms; tickMax = Math.max(tickMax, ms);
+  if (ms > SLOW_MS) { slowN++; const top = [...PROF].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => k + ' ' + v.toFixed(1)).join(', ');
+    if (Date.now() - slowLogAt > 5000) { slowLogAt = Date.now(); console.log(`[slow tick ${tickNo}] ${ms.toFixed(1)} ms: ${top} (${humans.size} humans, ${ents.size} soldiers)`); } }
   if (xpDirty && tickNo % 200 === 0) saveXp();
   if (tickNo % (TICK * 15) === 0) {
     const bots = [...ents.values()].filter(e => e.bot).length;
-    console.log(`[tick ${tickNo}] humans ${humans.size} bots ${bots} | avg ${(tickMs / (TICK * 15)).toFixed(2)} ms, max ${tickMax.toFixed(1)} ms | out ${(bytesOut / 15 / 1024).toFixed(1)} KB/s | supply ${supply} | wave ${wave.side === 0 ? 'blue' : 'red'}`);
-    tickMs = 0; tickMax = 0; bytesOut = 0;
+    console.log(`[tick ${tickNo}] humans ${humans.size} bots ${bots} | avg ${(tickMs / (TICK * 15)).toFixed(2)} ms, max ${tickMax.toFixed(1)} ms, slow ${slowN}, gap ${gapMax.toFixed(0)} ms | out ${(bytesOut / 15 / 1024).toFixed(1)} KB/s | supply ${supply} | wave ${wave.side === 0 ? 'blue' : 'red'}`);
+    tickMs = 0; tickMax = 0; bytesOut = 0; slowN = 0; gapMax = 0;
   }
 }
 function saveXp() { xpDirty = false; try { fs.writeFileSync(XPFILE + '.tmp', JSON.stringify(xpdb)); fs.renameSync(XPFILE + '.tmp', XPFILE); } catch (e) { console.error('xp save failed', e.message); } }   // atomic
@@ -2058,4 +2070,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

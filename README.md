@@ -73,6 +73,20 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.32.1 - lag spikes
+- **Bot pathfinding no longer stalls the server.** A map-wide walking field (about 160k cells on the 400 m map) took
+  about 50 ms to compute, a whole tick, and the fields expire every 8 s, so ticks ran late on a steady beat. Fields are
+  now solved a slice at a time (4 ms a tick, one job at a time) while bots keep using the previous one. Results are
+  identical. Load test with 64 players and 205 bots: worst tick 27-46 ms (was 80-90 ms).
+- **No more snap-back when sprinting.** The server applied at most 0.12 s of a player's movement per tick and threw the
+  rest away, so bunched-up inputs (network jitter, or after a slow tick) left the server behind the player's own
+  screen, and he was pulled back; the faster he moved, the further. Movement now draws on a time bank (real time,
+  banked up to 0.6 s), so bursts are applied in full but nobody can move faster than the clock. Test: `movebank`.
+- **Tick profiler:** the log line every 15 s now shows slow ticks and the longest gap between ticks, and a slow tick
+  (over 40 ms) logs which parts took the time, at most every 5 s, e.g.
+  `[slow tick 1473] 41.0 ms: bot 17.4, send 17.0, human 2.5, vehicles 1.8`. On the server:
+  `docker compose logs --tail 300 | grep -E "slow|tick "`.
+
 ## v0.32 - a bigger, ruined battlefield
 - **Map 400 x 400 m** (was 320 x 320; about 1.6x the area). The front is 25% wider: wire gaps, communication trenches,
   dugouts, nests, HQs, guns, mines and the flank depots (now at x ±170-180) spread out to match. The six lines keep
