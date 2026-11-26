@@ -73,6 +73,30 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.33 - fly the biplanes; phones in landscape
+- **Flyable biplanes:** each side has one parked at a new airfield behind its home camp (a mown strip with a hangar and a
+  windsock; also a choice on the spawn map). [F] climbs in. W/S throttle, the mouse steers (the plane turns and climbs
+  toward where you look, banking into turns), A/D rudder; roll down the strip and pull up past about 83 km/h to take off.
+  Built like the tanks: boxes and cylinders with small canvas textures (khaki dope and roundels for blue, lozenge
+  camouflage and crosses for green); the AI bomber, recon and fighter runs use the same model now.
+  - **Views:** cockpit (default), outside chase view ([C]), and the bombsight: hold RMB (AIM on phones) to look
+    straight down, with a cross on where a bomb would land; click drops one (4 bombs).
+  - **Pilot HUD:** speed and altitude, compass, throttle, airframe, bombs, gun heat, the gun cross against the aim
+    circle, and warnings (stall, pull up, leaving the battlefield, take-off help).
+  - **Combat:** twin machine guns along the nose; bullets from the ground hit planes, enemy AA guns fire flak at them,
+    a plane shot down or flown into the ground kills its pilot and leaves a wreck; a new plane is on the strip 60 s
+    later. Standing still on its own strip it rearms (a bomb every 4 s) and patches up. You can't get out in the air.
+  - **Netcode:** the flight model is shared (`T.flyStep`), stepped per input on the server like a soldier's movement
+    and predicted on the pilot's screen, which is corrected from the server's state 20 times a second.
+  - Tests: `flying`, `browser_plane`.
+- **Phones:** the game plays in landscape. Deploying goes full screen and locks the screen sideways where the browser
+  allows (Android); otherwise (iPhone) a "turn your phone sideways" card covers the game while it's upright. PCs are
+  unchanged.
+- **Phone HUD tidied:** smaller kill feed (4 lines), status line, minimap and corner buttons (moved off the settings
+  gear); ammo and supplies in a compact block at the bottom centre; hints and messages up top, clear of the buttons;
+  the touch buttons are more see-through and shrink to fit short screens; the rifle is pulled left from behind the
+  FIRE button (in portrait it was drawn off the side of the screen).
+
 ## v0.32.1 - lag spikes
 - **Bot pathfinding no longer stalls the server.** A map-wide walking field (about 160k cells on the 400 m map) took
   about 50 ms to compute, a whole tick, and the fields expire every 8 s, so ticks ran late on a steady beat. Fields are

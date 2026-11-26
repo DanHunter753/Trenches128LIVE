@@ -32,7 +32,7 @@ const input = (c, f, s, bits, yaw, pitch, n) => { const cmds = []; for (let i = 
   for (let i = 0; i < 20 && !(a.alive && b.alive && d.alive); i++) await sleep(250);
   X.setSupply(0, 300); X.setSupply(1, 300);
   // ---- emplacements
-  const guns = V.V.filter(v => v.k !== 'tank');
+  const guns = V.V.filter(v => v.k === 'fgun' || v.k === 'mortar');   // (v0.33: planes are vehicles too)
   ck('emplacements', guns.filter(v => v.k === 'fgun').length === 4 && guns.filter(v => v.k === 'mortar').length === 4 && guns.every(v => v.crew && v.crew.gun === v && v.crew.mg === true));
   ck('joinGetsVehicles', A.got('vh', m => m.full && m.l.length >= 8).length >= 1);
   const fg = guns.find(v => v.k === 'fgun' && v.team === 0);

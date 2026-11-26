@@ -326,6 +326,7 @@ function structOK(x, z, R) {
   if (az > CZ0 - 8 && az < CZ1 + 8 && CT.some(c => Math.abs(x - c) < R + 8)) return false;
   if (az < NML && GAPS.some(g => Math.abs(x - g) < R + 7)) return false;
   if (Math.abs(az - HOME_Z) < R + 12 && Math.abs(x) < 80) return false;   // the home camp
+  if (AIRF.some(a => Math.abs(z - a.z) < R + 12 && Math.abs(x - a.x + Math.sign(a.x) * 50) < R + 70)) return false;   // the airfield strip
   if (MINES.some(m => Math.hypot(x - m[0], z - m[1]) < m[2] + R + 3)) return false;
   if (HQS.some(q => Math.hypot(x - q.x, z - q.z) < R + 11) || NEST.some(n => Math.hypot(x - n.x, z - n.z) < R + 7)) return false;
   if (EMPL.some(q => Math.hypot(x - q.x, z - q.z) < R + 9) || AA.some(a => Math.hypot(x - a.x, z - a.z) < R + 7)) return false;
@@ -519,6 +520,54 @@ function buildTunnels() {
     TUNNELS.push({ team: t, x, z: +trenchC(t ? -30 : 30, x).toFixed(2), tx: x, tz: +trenchC(t ? 30 : -30, x).toFixed(2) });
   }
 }
+// v0.33 airfields: each side's flyable biplane is parked at the near end of a grass strip behind its home camp. The strip runs
+// along x toward the centre line of the map; AIRF[team] = { x, z, yaw } is where the plane stands, facing down the strip.
+const AIRF = [{ x: 140, z: 177, yaw: Math.PI / 2 }, { x: -140, z: -177, yaw: -Math.PI / 2 }];
+// v0.33 flight model, shared so the pilot's own screen predicts his plane exactly like the server flies it. Mouse aim: the
+// plane turns and climbs toward where the pilot is looking (cmd.yaw / cmd.pitch), banking into turns; W/S set the throttle,
+// A/D add rudder. Below PL.vStall the nose drops; a hard or steep touch-down is a crash ('crash' is returned).
+const PL = { vStall: 19, vMin: 24, vMax: 52, lift: 23, turn: .85, pRate: .9, climb: .5, ceil: 150, thr: .45, wheel: 1.3 };
+function flyStep(v, c, H) {
+  const dt = c.dt; if (!(dt > 0)) return null;
+  const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a)), cl = (x, a, b) => Math.max(a, Math.min(b, x));
+  v.thr = cl((v.thr || 0) + (c.f || 0) * PL.thr * dt, 0, 1);
+  let wantYaw = c.yaw, wantP = cl(c.pitch, -.75, PL.climb);
+  if (v.air && (Math.abs(v.x) > W + 25 || Math.abs(v.z) > W + 25)) { wantYaw = Math.atan2(v.x, v.z); wantP = .05; }   // off the map: the plane turns back by itself
+  if (v.air && v.y > PL.ceil) wantP = Math.min(wantP, 0);
+  const g = hAt(H, v.x, v.z);
+  if (v.air) {
+    const dy = wrapA(wantYaw - v.yaw), rate = cl(dy * 1.6 + (c.s || 0) * -.35, -PL.turn, PL.turn);
+    v.yaw = wrapA(v.yaw + rate * dt); v.roll += (cl(-rate / PL.turn * .95, -1, 1) - v.roll) * Math.min(1, dt * 3);
+    if (v.spd < PL.vStall) wantP = -.6;   // stalled: the nose falls until the speed comes back
+    v.pitch += cl(wantP - v.pitch, -PL.pRate * dt, PL.pRate * dt);
+    const want = PL.vMin + (PL.vMax - PL.vMin) * v.thr;
+    v.spd += ((want - v.spd) * .35 - Math.sin(v.pitch) * 9.8 * .9) * dt; v.spd = cl(v.spd, 8, 75);
+    const cp = Math.cos(v.pitch);
+    v.x += -Math.sin(v.yaw) * cp * v.spd * dt; v.z += -Math.cos(v.yaw) * cp * v.spd * dt; v.y += Math.sin(v.pitch) * v.spd * dt;
+    const g2 = hAt(H, v.x, v.z);
+    if (v.y < g2 + PL.wheel) {
+      if (v.pitch > -.22 && v.spd < 36 && Math.abs(v.roll) < .4) { v.air = false; v.y = g2 + PL.wheel; v.pitch = 0; v.roll = 0; }   // a landing
+      else { v.y = g2 + PL.wheel; return 'crash'; }
+    }
+  } else {   // rolling on the ground: taxi with the mouse and A/D, take off above PL.lift with the nose pulled up
+    const dy = wrapA(wantYaw - v.yaw), rate = cl(dy * 1.2 - (c.s || 0) * .6, -.7, .7) * cl(v.spd / 6, .15, 1);
+    v.yaw = wrapA(v.yaw + rate * dt); v.roll = 0;
+    const want = (PL.vMin + 8) * v.thr * 1.15;
+    v.spd += (want > v.spd ? (want - v.spd) * .3 : (want - v.spd) * .8 - 1.5) * dt; v.spd = cl(v.spd, 0, 45);
+    if ((c.f || 0) < 0 && v.thr === 0) v.spd = Math.max(0, v.spd - 6 * dt);   // brakes
+    v.x += -Math.sin(v.yaw) * v.spd * dt; v.z += -Math.cos(v.yaw) * v.spd * dt;
+    v.y = hAt(H, v.x, v.z) + PL.wheel; v.pitch = 0;
+    if (v.spd > PL.lift && c.pitch > .06) { v.air = true; v.pitch = .14; v.y += .3; }
+    if (Math.abs(v.x) > W - 2 || Math.abs(v.z) > W - 2) { v.x = cl(v.x, -W + 2, W - 2); v.z = cl(v.z, -W + 2, W - 2); v.spd = 0; }
+  }
+  return null;
+}
+// v0.33 where a bomb dropped now lands (both sides use it: the server's bombs fall with the shells' gravity)
+function bombImpact(v, H) {
+  const cp = Math.cos(v.pitch); let x = v.x, y = v.y - 1, z = v.z, vx = -Math.sin(v.yaw) * cp * v.spd, vy = Math.sin(v.pitch) * v.spd, vz = -Math.cos(v.yaw) * cp * v.spd;
+  for (let t = 0; t < 12; t += .05) { vy -= SHELL_G * .05; x += vx * .05; y += vy * .05; z += vz * .05; if (y <= hAt(H, x, z)) return { x, z, t }; }
+  return null;
+}
 // v0.31 anti-aircraft guns: two per side between the HQ dugouts, AA[i] = { team, x, z }
 const AA = [];
 function buildAA() {
@@ -608,7 +657,7 @@ const ELITE = { flame: { n: 'Flamethrower', hp: 220, sp: .82, w: 'flame', d: 'Cl
   hmg: { n: 'Sentry', hp: 300, sp: .72, w: 'hmg', d: 'Armoured heavy machine gunner. Cannot sprint', nosprint: 1 } };
 const spOf = p => p.elite && ELITE[p.elite] ? ELITE[p.elite].sp : CLS[p.cls] ? CLS[p.cls].sp : 1;
 // v0.26 vehicles and crewed guns (server simulates them; the client draws and drives them)
-const VEH = { tank: { n: 'Tank', hp: 2000, len: 8.2, wid: 4.1, hgt: 2.6, spd: 2.6, rev: 1.2, turn: .36, rl: 4.5, v: 130 },
+const VEH = { plane: { n: 'Biplane', hp: 300 }, tank: { n: 'Tank', hp: 2000, len: 8.2, wid: 4.1, hgt: 2.6, spd: 2.6, rev: 1.2, turn: .36, rl: 4.5, v: 130 },
   fgun: { n: 'Field gun', hp: 450, rl: 5, v: 85, arc: .6, pmin: -.08, pmax: .45 },
   mortar: { n: 'Trench mortar', hp: 220, rl: 2.4, arc: 1.0, rmin: 25, rmax: 170, th: 1.0 } };
 const SHELL_G = 19.6;   // shells fall at twice real gravity so flight times suit the map (a 170 m mortar shot is ~5 s)
@@ -631,7 +680,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { PHONES, phoneDist, TUNNELS, AA, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
