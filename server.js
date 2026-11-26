@@ -199,8 +199,8 @@ function spawnEnt(e) {
     op.tk--; if (op.tk === 0 && !op.stall) attackStalls();
   }
   if (e.veh && VEHM) VEHM.leave(e, true); if (e.elite) eliteLost(e); e.burn = 0; e.goTo = null; e.job = null;
-  e.died = false; e.hist = null; e.mask = 0; e.hitBy = null; e.lastHit = null; e.supp = 0; e.chg = T.CHG_MAX; e.charging = false; e.bloom = 0;
-  e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = grMax(e); e.gCd = 0; e.bd = bdMax(e); e.sld = 0; e.sldCd = 0; e.pb = 0; e.mph = false; e.mphU = 0; e.mphN = e.cls === 'assault' ? MPH_DOSES : 0; e.boxCd = 0; e.healCd = 0; e.mgCd = 0; e.para = false;
+  e.died = false; e.hist = null; e.mask = 0; e.hitBy = null; e.lastHit = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; e.bloom = 0;
+  e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = grMax(e); e.gCd = 0; e.bd = bdMax(e); e.sld = 0; e.sldCd = 0; e.pb = 0; e.rg = 0; e.rgAt = 0; e.rgCd = 0; e.mph = false; e.mphU = 0; e.mphN = e.cls === 'assault' ? MPH_DOSES : 0; e.boxCd = 0; e.healCd = 0; e.mgCd = 0; e.para = false;
   let { x, z } = home(e.team), py = null;
   const atPost = q => { x = q.x + (rnd() - .5) * (q.fort ? 1.2 : 3); z = q.z + (rnd() - .5) * (q.fort ? 1.2 : 3); py = q.fort ? null : q.y; };
   if (e.mg === true) { x = e.hx; z = e.hz; }
@@ -239,7 +239,7 @@ function damagePost(q, dmg, by) {
 }
 function abilityAct(p) {
   if (!p.alive || p.down > 0 || p.cmd || (p.mg != null && p.mg !== false) || p.inV || p.elite) return;
-  if (p.cls === 'gunner') dropAmmo(p); else if (p.cls === 'assault') morphine(p);
+  if (p.cls === 'gunner') dropAmmo(p); else if (p.cls === 'assault') morphine(p); else if (p.cls === 'rifleman') { if (p.rg) rgUnload(p); else rgFit(p); }
 }
 /** Gunner: put down an ammo box at your feet. Teammates who walk over it get a full magazine, their grenades and utility back. */
 function dropAmmo(p) {
@@ -264,6 +264,23 @@ function aboxTick() {
   });
 }
 /** Assault: a morphine syrette. 10 s faster and much harder to drop, and a little health back. Two per life. */
+/** Rifleman: fit a rifle grenade to the muzzle (1 s); the trigger then launches it, [N] or R takes it off. Costs a grenade. */
+function rgFit(p) {
+  if (!(p.gr > 0)) { if (!p.bot) tell(p, 'No grenades left for the cup'); return false; }
+  if (supply[p.team] < gCost(p)) { if (!p.bot) tell(p, 'Need ' + gCost(p) + ' supply for a rifle grenade'); return false; }
+  p.rg = 1; p.rgAt = tickNo + Math.round(T.RG.fit * TICK); p.rel = 0; if (!p.bot) send(p, { t: 'rg', s: 1, f: T.RG.fit }); return true;
+}
+function rgUnload(p) { p.rg = 0; if (!p.bot) send(p, { t: 'rg', s: 0 }); }
+function fireRifleGrenade(p) {
+  const c = gCost(p); if (!(p.gr > 0) || supply[p.team] < c) { rgUnload(p); if (!p.bot) tell(p, !(p.gr > 0) ? 'Out of grenades' : 'Need ' + c + ' supply'); return false; }
+  supply[p.team] -= c; p.gr--; p.rg = 0; p.cd = T.RG.cd; p.flash = 3;
+  const ey = p.y + eyeH(p), path = T.rgPath(terr.H, p.x, ey, p.z, p.yaw, p.pitch);
+  grenades.push({ tx: path.x, tz: path.z, t: path.t, by: p, pow: T.RG.pow });
+  bcast({ t: 'rgf', f: [+p.x.toFixed(2), +ey.toFixed(2), +p.z.toFixed(2)], v: [+path.vx.toFixed(3), +path.vy.toFixed(3), +path.vz.toFixed(3)], T: +path.t.toFixed(3), to: [+path.x.toFixed(1), +path.y.toFixed(1), +path.z.toFixed(1)], tm: p.team, id: p.id });
+  if (!p.bot) send(p, { t: 'rg', s: 0 }); return true;
+}
+/** Low-arc launch angle to land a rifle grenade d metres away, dh metres higher (null when out of reach). */
+function rgAim(d, dh) { const V = T.RG.v, g = T.RG.g, q = V ** 4 - g * (g * d * d + 2 * dh * V * V); if (q < 0) return null; return Math.atan((V * V - Math.sqrt(q)) / (g * d)); }
 function morphine(p) {
   if (p.mph) return false;
   if (!(p.mphN > 0)) { if (!p.bot) tell(p, 'No morphine left'); return false; }
@@ -273,6 +290,19 @@ function morphine(p) {
 function botAbility(b) {
   if (!b.alive || b.down > 0 || (b.mg != null && b.mg !== false) || b.inV || b.elite) return;
   if (b.cls === 'assault' && !b.mph && b.mphN > 0 && b.tgt && b.hp < 60) morphine(b);
+  else if (b.cls === 'rifleman' && b.gr > 0 && (b.rgCd || 0) <= tickNo && supply[b.team] >= 8) {   // rifle grenades onto manned enemy guns, or a knot of enemies
+    let best = null, bs = 0;
+    const cand = e => { if (e.team === b.team || !e.alive || e.cmd || e.inV || (e.rgTgt || 0) > tickNo) return; const d = Math.hypot(e.x - b.x, e.z - b.z); if (d < 35 || d > 110) return;
+      const gun = e.mg != null && e.mg !== false; let n = 0; if (!gun) forNear(e.x, e.z, 5, q => { if (q.team === e.team && q.alive && Math.hypot(q.x - e.x, q.z - e.z) < 4) n++; });
+      const sc = gun ? 10 : n >= 3 ? n : 0; if (sc > bs && T.los(terr.H, b.x, b.y + 1.6, b.z, e.x, e.y + 1.4, e.z)) { bs = sc; best = e; } };
+    for (const e of ents.values()) if (e.manned && e.mg != null && e.mg !== false) cand(e);   // men on guns are not in the grid
+    forNear(b.x, b.z, 110, cand);
+    if (best) { const d = Math.hypot(best.x - b.x, best.z - b.z), a = rgAim(d, best.y - (b.y + 1.6)); if (a != null) {
+      const y0 = b.yaw, p0 = b.pitch; b.yaw = Math.atan2(-(best.x - b.x), -(best.z - b.z)) + (rnd() - .5) * .06; b.pitch = a + (rnd() - .5) * .07;   // a lob, not a sniper shot
+      if (fireRifleGrenade(b)) { b.rgCd = tickNo + Math.round((40 + rnd() * 30) * TICK); best.rgTgt = tickNo + 15 * TICK;   // one rifle grenade per target every 15 s, side-wide
+        BSTAT.rg = (BSTAT.rg || 0) + 1; } b.yaw = y0; b.pitch = p0; } }
+    if (!best) b.rgCd = tickNo + 3 * TICK;
+  }
   else if (b.cls === 'gunner' && (b.aboxCd || 0) <= tickNo && supply[b.team] >= 15 && rnd() < .25 && !aboxes.some(q => q.team === b.team && Math.hypot(q.x - b.x, q.z - b.z) < 30)) {
     let n = 0; forNear(b.x, b.z, 12, e => { if (e.team === b.team && e.alive && e !== b && !e.cmd && Math.hypot(e.x - b.x, e.z - b.z) < 12) n++; });
     if (n >= 3) dropAmmo(b);
@@ -413,7 +443,7 @@ function fireBullet(by, ox, oy, oz, yw, pt, rng, dmg, wk, vel, sw) {
   bullets.push(b); shots.push([ox, oy, oz, dx, dy, dz, Math.min(rng, 140), by.id, wk, vel]); return b;
 }
 function suppress(e, wk, by) {
-  if (e.cmd || !e.alive) return; e.supp = Math.min(1, (e.supp || 0) + (SUPW[wk] || .15));
+  if (e.cmd || !e.alive) return; e.supp = Math.min(1, (e.supp || 0) + (SUPW[wk] || .15) * (e.cls === 'rifleman' && !e.elite ? .5 : 1));   // v0.37: riflemen keep their nerve
   if (!e.bot) { e.supSrc = [by.x, by.z]; e.supSend = true; }
 }
 function bulletStep(b, dt) {   // true when the bullet is spent
@@ -450,6 +480,7 @@ const enemiesNear = (p, r) => { const a = []; forNear(p.x, p.z, r, e => { if (e.
 const eyeH = p => p.crouch ? 1.0 : 1.65;
 
 function startReload(p) {
+  if (p.rg) { rgUnload(p); return; }   // R with a rifle grenade fitted takes it off again
   if (p.rel > 0 || p.mg != null) return; const w = WPN[p.w]; if (p.ammo >= w.mag) return;
   const cost = w.flame ? 3 : 1;   // a fresh fuel tank costs more than a clip
   if (supply[p.team] < cost) { tell(p, 'Out of supplies. Hold more lines.'); return; }
@@ -457,8 +488,9 @@ function startReload(p) {
 }
 function fireWeapon(p) {
   const w = WPN[p.w]; if (p.cd > 0 || p.rel > 0 || p.charging || p.sprOut > 0 || (p.mask && tickNo < p.mask)) return;   // no firing while sprinting or charging
+  if (p.rg) { if (tickNo >= p.rgAt) fireRifleGrenade(p); return; }   // v0.37: a rifle grenade is fitted: the trigger launches it
   if (p.ammo <= 0) { startReload(p); return; }
-  p.ammo--; p.cd = w.cd; p.flash = 3;
+  p.ammo--; p.cd = w.cd * (p.cls === 'rifleman' && p.w === 'bolt' && !p.elite ? .8 : 1); p.flash = 3;   // v0.37: riflemen work the bolt faster
   if (w.flame) { flameJet(p, p.yaw, p.pitch); return; }
   const ey = p.y + eyeH(p);
   // aiming down sights is far tighter than hip fire; suppression and sustained automatic fire (bloom) open the cone
@@ -1504,7 +1536,7 @@ function resetRound() {
   VEHM.reset(); ekits.length = 0; fires.length = 0; flares.length = 0; alarms.length = 0; setWx(pickWx()); roundStartExtras(); cmdPts = [CP_START, CP_START]; smokes.length = 0; gases.length = 0; recons.length = 0; marks.length = 0; SQM.clear(); alertAt.clear(); vis[0].clear(); vis[1].clear(); for (const d of DP) { d.owner = -1; d.p = 0; } for (const e of ents.values()) e.depot = null;
   for (const p of humans) if (p.mg != null) dismount(p, true);
   for (const n of NESTS) { n.belt = 150; n.heat = 0; n.over = false; n.occ = null; if (n.bot) leaveFortNest(n.bot); }
-  for (const e of ents.values()) { e.died = false; e.oob = 0; e.alive = false; e.down = 0; e.rt = .5 + rnd(); e.placed = false; e.para = false; e.hold = null; e.climb = null; e.cov = null; e.supp = 0; e.chg = T.CHG_MAX; e.charging = false; }
+  for (const e of ents.values()) { e.died = false; e.oob = 0; e.alive = false; e.down = 0; e.rt = .5 + rnd(); e.placed = false; e.para = false; e.hold = null; e.climb = null; e.cov = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; }
   bullets.length = 0;
   round = { state: 'play', t: 0, win: -1 };
   if (!changed) bcast({ t: 'reset', map: mapSeed });
@@ -1938,7 +1970,7 @@ function tickBody() {
     else if (e.alive && !e.charging && !e.mg && y0 != null) { const d = Math.atan2(Math.sin(e.yaw - y0), Math.cos(e.yaw - y0)); if (Math.abs(d) > .5) e.yaw = y0 + Math.sign(d) * .5; } }
   guard('vehicles', () => VEHM.tick()); guard('fires', firesTick);
   guard('bullets', bulletsTick); guard('planes', planesTick); histTick();
-  for (let i = grenades.length - 1; i >= 0; i--) { const g = grenades[i]; g.t -= DT; if (g.t <= 0) { grenades.splice(i, 1); guard('explode', () => explode(g.tx, g.tz, g.by)); } }
+  for (let i = grenades.length - 1; i >= 0; i--) { const g = grenades[i]; g.t -= DT; if (g.t <= 0) { grenades.splice(i, 1); guard('explode', () => explode(g.tx, g.tz, g.by, g.pow)); } }
   for (const n of NESTS) if (n.heat > 0) { n.heat = Math.max(0, n.heat - DT * (n.over ? .3 : .2)); if (n.over && n.heat <= .35) n.over = false; }
   if (round.state === 'play') guard('objectives', objectivesTick);
   if (tickNo % 40 === 0) guard('fill', fillBots);
@@ -2188,4 +2220,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

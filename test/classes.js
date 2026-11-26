@@ -42,6 +42,23 @@ let nid = 9800; const mk = (cls, w, team) => { const p = { id: nid++, team: team
     ck('cancelByStanding', go() && (run(c, 1, 1, 1), c.sld === 0)); 
     ck('cancelByPullingBack', go() && (run(c, 3, -1, 1), c.sld === 0));
     const r = mkp('rifleman'); r.w = 'bolt'; run(r, 1, 1, 10); run(r, 3, 1, 1); ck('onlyAssault', !(r.sld > 0)); }
+  // ---- rifleman: bolt rifle is his alone, faster bolt, nerve, longer charge, rifle grenades
+  ck('boltRiflemanOnly', Object.keys(T.CLS).every(k => (k === 'rifleman') === T.CLS[k].w.includes('bolt')) && T.fixLoadout(5000, { cls: 'sapper', w: 'bolt' }).w !== 'bolt');
+  const rf = mk('rifleman', 'bolt'), md = mk('medic', 'carbine'); rf.cd = 0; rf.rel = 0; rf.ammo = 8; rf.sprOut = 0; X.fireWeapon(rf); ck('fasterBolt', Math.abs(rf.cd - T.WPN.bolt.cd * .8) < 1e-6);
+  rf.supp = 0; md.supp = 0; X.suppress(rf, 'mg', red); X.suppress(md, 'mg', red); ck('keepsNerve', rf.supp > 0 && Math.abs(rf.supp * 2 - md.supp) < 1e-6);
+  ck('longerCharge', T.chgMax(rf) === T.CHG_MAX * 1.5 && T.chgMax(md) === T.CHG_MAX && rf.chg === T.chgMax(rf));
+  { const H = X.terrH(), y = T.hAt(H, 0, 125) + 1.6, a80 = X.rgAim(80, T.hAt(H, 80, 125) - y), P = T.rgPath(H, 0, y, 125, -Math.PI / 2, a80); R.rg80 = +P.x.toFixed(1);
+    ck('rgAimLands', Math.abs(P.x - 80) < 4); const far = T.rgPath(H, 0, y, 125, -Math.PI / 2, .7); R.rgMax = +far.x.toFixed(0); ck('rgReach', far.x > 100 && far.x < 125); }
+  X.setSupply(0, 50); rf.gr = 2; rf.cd = 0; X.abilityAct(rf); ck('rgFitted', rf.rg === 1);
+  const ng = X.grenades.length; rf.cd = 0; X.fireWeapon(rf); ck('rgNotBeforeFitted', X.grenades.length === ng && rf.rg === 1);
+  X.abilityAct(rf); ck('rgUnload', rf.rg === 0 && rf.gr === 2); X.abilityAct(rf); await sleep(1150);
+  rf.cd = 0; rf.pitch = .3; const sup0 = X.supply()[0], am0 = rf.ammo; X.fireWeapon(rf); const g1 = X.grenades[X.grenades.length - 1];
+  ck('rgLaunched', X.grenades.length === ng + 1 && g1.pow === T.RG.pow && g1.t > 1 && rf.gr === 1 && rf.rg === 0 && rf.ammo === am0 && X.supply()[0] === sup0 - 2);
+  // a bot rifleman lobs one onto a manned enemy gun 70 m off
+  { const H = X.terrH(), b = mk('rifleman', 'bolt'), gn = mk('gunner', 'lmg', 1); b.gr = 2; b.rgCd = 0; X.setSupply(0, 50);
+    b.x = 0; b.z = 125; b.y = T.hAt(H, 0, 125); gn.x = 70; gn.z = 125; gn.y = T.hAt(H, 70, 125); gn.mg = 0; gn.manned = true; await sleep(200);
+    const n0 = X.grenades.length; b.bot = true; X.botAbility(b); b.bot = false; const gg = X.grenades[X.grenades.length - 1]; R.botRg = gg && [+gg.tx.toFixed(1), +gg.tz.toFixed(1)];
+    ck('botRifleGrenade', X.grenades.length === n0 + 1 && Math.hypot(gg.tx - 70, gg.tz - 125) < 8); gn.mg = null; gn.manned = false; }
   // ---- bots use them
   const ab = mk('assault', 'smg'); ab.bot = true; ab.tgt = red; ab.hp = 50; X.botAbility(ab); ck('botMorphine', ab.mph);
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);

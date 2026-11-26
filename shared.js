@@ -494,7 +494,7 @@ function step(p, cmd, H, spdMul) {
   // bayonet charge: hold the melee key while sprinting forward with a bayonet weapon; 3 s of stamina, refills at 0.4 s/s
   if (p.chg == null) p.chg = CHG_MAX;
   const wb = WPN[p.w], chg = (bits & 64) && (bits & 1) && f > 0 && wb && wb.bay && p.chg > .05 && !(bits & 2);
-  p.charging = !!chg; p.chg = chg ? Math.max(0, p.chg - dt) : Math.min(CHG_MAX, p.chg + dt * .4);
+  p.charging = !!chg; p.chg = chg ? Math.max(0, p.chg - dt) : Math.min(chgMax(p), p.chg + dt * (p.cls === 'rifleman' ? .6 : .4));
   const mud = (WXS[WX.k] || WXS.overcast).mud;
   const l = Math.hypot(f, s) || 1, yaw = cmd.yaw;
   let mx = (-Math.sin(yaw) * f + Math.cos(yaw) * s) / l, mz = (-Math.cos(yaw) * f - Math.sin(yaw) * s) / l;
@@ -673,7 +673,22 @@ function terrainFor(seed) { const used = setMap(seed); const t = makeTerrain(); 
 function adoptTerrain(H, F) { if (!(H instanceof Float32Array) || !(F instanceof Uint8Array) || H.length !== NV || F.length !== NV) return false; PRISTINE = H.slice(); FLOOR = F; return true; }
 // the page that loads this file picks up the map it was told to build (a reload after the server changed maps)
 setMap(typeof sessionStorage !== 'undefined' ? (() => { try { return +sessionStorage.getItem('t128map') || 0; } catch (e) { return 0; } })() : 0);
-const CHG_MAX = 3, GRAV = 9.8;   // bayonet-charge stamina (s), bullet gravity (m/s²)
+const CHG_MAX = 3, GRAV = 9.8;
+const chgMax = p => CHG_MAX * (p && p.cls === 'rifleman' && !p.elite ? 1.5 : 1);   // v0.37: riflemen charge for longer
+// v0.37 rifle grenades: a grenade fired from a cup on the rifle's muzzle. Same flight on server and client (the client draws
+// the predicted impact while one is fitted). Returns the impact point and the flight time.
+const RG = { v: 40, g: 14, pow: .85, fit: 1, cd: 1.2, maxT: 7 };
+function rgPath(H, x, y, z, yaw, pitch) {
+  const cp = Math.cos(pitch), vx = -Math.sin(yaw) * cp * RG.v, vy = Math.sin(pitch) * RG.v, vz = -Math.cos(yaw) * cp * RG.v, dt = .025;
+  let px = x, py = y, pz = z, t = 0, wy = vy;
+  for (; t < RG.maxT; t += dt) {
+    const nx = px + vx * dt, ny = py + wy * dt - .5 * RG.g * dt * dt, nz = pz + vz * dt; wy -= RG.g * dt;
+    if (Math.abs(nx) > W || Math.abs(nz) > W) break;
+    if (t > .06 && (ny <= hAt(H, nx, nz) || (SGRID.size || FGRID.size) && fortHit(nx, ny, nz, 0, false))) { px = nx; py = Math.max(ny, hAt(H, nx, nz)); pz = nz; t += dt; break; }
+    px = nx; py = ny; pz = nz;
+  }
+  return { x: px, y: py, z: pz, t, vx, vy, vz };
+}   // bayonet-charge stamina (s), bullet gravity (m/s²)
 const WPN = {
   bolt: { n: 'Bolt Rifle', d: 'Slow. One-shot kills in its 40–80 m sweet spot. Bayonet.', dmg: 50, cd: .6, mag: 8, pel: 1, spr: 0, rng: 130, hip: .025, rl: 1.5, auto: 0, vel: 420, rcl: .055, blm: 0, bay: 1, sw: [40, 80, 100] },
   carbine: { n: 'Semi-auto Carbine', d: 'Quicker follow-up shots. Bayonet.', dmg: 34, cd: .35, mag: 10, pel: 1, spr: .012, rng: 110, hip: .03, rl: 1.5, auto: 0, vel: 380, rcl: .03, blm: .006, bay: 1 },
@@ -688,11 +703,11 @@ const WPN = {
   sniper: { n: 'Sniper Rifle', d: '6x telescopic sight, sways while scoped: hold Shift to hold your breath. One-shot kills at 90–200 m. The scope glints.', dmg: 90, cd: 1.4, mag: 5, pel: 1, spr: 0, rng: 230, hip: .06, rl: 2.4, auto: 0, vel: 620, rcl: .085, blm: 0, sw: [90, 200, 100], scope: 6 },
 };
 const CLS = {
-  rifleman: { n: 'Rifleman', d: 'Dependable all-rounder. Strong at range.', hp: 100, sp: 1, w: ['bolt', 'carbine'] },
+  rifleman: { n: 'Rifleman', d: 'The only class with the bolt-action rifle. Works the bolt and aims faster, shrugs off suppression, and charges with the bayonet for longer. [N] fits a rifle grenade to the muzzle: lob it 30–110 m onto a machine-gun nest or a knot of men.', hp: 100, sp: 1, w: ['bolt', 'carbine'] },
   assault: { n: 'Assault', d: 'Trench clearer. Extra health, faster on his feet, reloads 30% quicker, slides (crouch while sprinting; stand, jump or pull back to cancel). [N] morphine (2 per life): 10 s faster, takes 40% less damage, +15 HP.', hp: 125, sp: 1.1, w: ['shotgun', 'smg'] },
   gunner: { n: 'Machine Gunner', d: 'Holds the line. Slow, with deep magazines; crouch to brace the gun (tighter, steadier fire). [N] drops an ammo box (3 supply): teammates who walk over it get a full magazine, grenades and utility back.', hp: 100, sp: .85, w: ['lmg'] },
   medic: { n: 'Medic', d: 'Bandages heal 70 instead of 40.', hp: 100, sp: 1, w: ['carbine', 'smg'] },
-  sapper: { n: 'Sapper', d: 'Digs bigger holes. Grenades cost 1 supply. [B] builds a field post your team respawns at.', hp: 100, sp: 1, w: ['shotgun', 'bolt'] },
+  sapper: { n: 'Sapper', d: 'Digs bigger holes. Grenades cost 1 supply. [B] builds a field post your team respawns at.', hp: 100, sp: 1, w: ['shotgun', 'carbine'] },
   recon: { n: 'Recon', d: 'Sniper and spotter. Scoped rifles; headshots with a scope kill outright. [T] spots every enemy in your sights for the whole team (and the officer).', hp: 90, sp: 1.02, w: ['sniper', 'mark', 'carbine'] },
   officer: { n: 'Officer', d: 'Command view: order squads, call in bombers, barrages and supply drops. Max 2 per team.', hp: 100, sp: 1, w: ['carbine'] },
 };
@@ -734,7 +749,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
