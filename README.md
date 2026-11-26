@@ -73,6 +73,17 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.34.2 - an immersion pass on the ruins and wrecks
+- **Ruins you can actually see.** Under real WebGL the farmhouses, chapels and barns rendered nearly black (dim lighting on
+  very dark textures). They are now drawn unlit like the rest of the world with the light baked into each face, on new
+  weathered brick, pale limestone and charred-plank textures; wall bases are dirtier than the tops.
+- **Barns look bombed.** The roof has come down: a fallen ridge beam, rafters leaning on the posts, a slab of boards and spilled
+  hay (scenery only, no new collision).
+- **Smouldering wrecks.** Burnt-out tanks, lorries and planes trail a slow smoke column you can spot across the map, and the
+  tanks and planes still have a low fire flickering in the hull. Only wrecks within 170 m are animated.
+- **Airfield strip** is now one sheet laid over the ground, toned close to the grass, instead of green slabs that poked out
+  of hillsides.
+
 ## v0.34.1 - respawn picks and phantom markers
 - **Fix: the respawn pick was ignored.** You pick on the death map while dead, and the server dropped every action from a
   dead player before reaching the pick, so everyone came back at the default spawn. The pick is now taken while dead.
