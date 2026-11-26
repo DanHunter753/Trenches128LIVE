@@ -828,7 +828,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wrecked guns.</b> Shells knock out MG nests, field guns and AA guns; hold E beside one to repair it (sappers are fastest).<br>
  <b>Phones.</b> Touch controls turn on by themselves; play in landscape. The ✎ button lets you move the buttons where you like.<br>
  <b>Your career.</b> Every game earns XP toward 100 levels and the ranks up to General. Your service record is on this screen.
- </div></details><div class="ver">v0.34</div>`,'');
+ </div></details><div class="ver">v0.34.1</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -1020,10 +1020,10 @@ function scopeTick(dt,sc){const el=$('brt');
 /* spotted enemies: a red marker over their heads for the whole team, seen through cover.
    v0.33.3: friends get one too: blue over teammates, green over the players in your own squad (within 150 m; squadmates at any range) */
 const sptTex=col=>{const c=document.createElement('canvas');c.width=c.height=12;const g=c.getContext('2d');g.fillStyle='#000';g.beginPath();g.moveTo(0,1);g.lineTo(12,1);g.lineTo(6,11);g.fill();g.fillStyle=col;g.beginPath();g.moveTo(2,2);g.lineTo(10,2);g.lineTo(6,9);g.fill();return pxTex(c,false)};
-const SPT=sptTex('#ff3424'),SPTB=sptTex('#4a9cff'),SPTG=sptTex('#3ee05a'),sptS=[],sptM=[SPT,SPTB,SPTG].map(t=>new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false,fog:false}));
+const SPT=sptTex('#ff3424'),SPTB=sptTex('#4a9cff'),SPTG=sptTex('#3ee05a'),sptS=[],sptM=[SPT,SPTB,SPTG].map((t,i)=>new THREE.SpriteMaterial({map:t,transparent:true,depthTest:i!==1,fog:false}));sptM[0].depthTest=false;sptM[2].depthTest=false;   /* v0.34.1: blue team markers hide behind cover like the men under them; red (spotted) and green (your squad) show through */
 function spotTick(){let n=0;if(deployed)for(const e of ents.values()){if(n>=90)break;if(e.down||e.gone||!e.sp||e.id===me.id)continue;
   const P=e.sp.position,d=Math.hypot(cam.position.x-P.x,cam.position.z-P.z)||1;let c;
-  if(e.team!==me.team){if(!e.spotted)continue;c=0}else{if(e.mg&&e.bot&&d>60)continue;c=e.mysq?2:1;if(c===1&&d>150)continue}
+  if(e.team!==me.team){if(!e.spotted)continue;c=0}else{if(e.mg&&e.bot&&d>60)continue;c=e.mysq?2:1;if(c===1&&(d>Math.min(150,sdFar)||e.row==null||e.sp.visible===false))continue}   /* only over a man who is actually drawn (fog hides bodies beyond sdFar) */
   let m=sptS[n];if(!m){m=new THREE.Sprite(sptM[c]);scene.add(m);sptS.push(m)}if(m.material!==sptM[c])m.material=sptM[c];
   const k=(c?.85:1)*(.2+d*.0055)/(1+((ZOOM[gk()]||1.3)-1)*adsT*.8);m.visible=true;m.scale.set(k,k,1);m.position.set(P.x,P.y+1.3+k*.7,P.z);n++}   /* v0.29: about half the old size, just above the helmet */
  for(let i=n;i<sptS.length;i++)sptS[i].visible=false}
@@ -1246,8 +1246,8 @@ function staticDraw(far){const cx=cam.position.x,cz=cam.position.z,o=me.officer&
    const y=it[i+1]-it[i+4]*it[i+5],hw=it[i+3]/2,h=it[i+4],j=m*12;P[j]=x-R[0]*hw;P[j+1]=y-R[1]*hw;P[j+2]=z-R[2]*hw;P[j+3]=x+R[0]*hw;P[j+4]=y+R[1]*hw;P[j+5]=z+R[2]*hw;P[j+6]=P[j+3]+U[0]*h;P[j+7]=P[j+4]+U[1]*h;P[j+8]=P[j+5]+U[2]*h;P[j+9]=P[j]+U[0]*h;P[j+10]=P[j+1]+U[1]*h;P[j+11]=P[j+2]+U[2]*h;
    for(let v=0;v<4;v++){C[j+v*3]=k;C[j+v*3+1]=k;C[j+v*3+2]=kb}m++}
   q.geo.setDrawRange(0,m*6);q.geo.attributes.position.needsUpdate=true;q.geo.attributes.color.needsUpdate=true;drawn+=m}return drawn}
-let ssN=0;function soldiersDraw(){const m=cam.matrixWorld.elements;CR[0]=m[0];CR[1]=m[1];CR[2]=m[2];CU[0]=m[4];CU[1]=m[5];CU[2]=m[6];
- const far=Math.min(400,1.98/Math.max(.002,scene.fog.density||.011)),cx=cam.position.x,cz=cam.position.z;lodN=0;
+let ssN=0,sdFar=150;function soldiersDraw(){const m=cam.matrixWorld.elements;CR[0]=m[0];CR[1]=m[1];CR[2]=m[2];CU[0]=m[4];CU[1]=m[5];CU[2]=m[6];
+ const far=Math.min(400,1.98/Math.max(.002,scene.fog.density||.011)),cx=cam.position.x,cz=cam.position.z;lodN=0;sdFar=far;
  for(const e of ents.values()){const P=e.sp.position;if(e.sp.visible===false||e.row==null)continue;const dx=P.x-cx,dz=P.z-cz,d=Math.hypot(dx,dz);if(d>far&&!me.officer)continue;lodN++;
   const S=e.sp.scale;BODY.add(P.x,P.y,P.z,S.x,S.y,e.row,e.col,sprK*(e.spotted&&e.team!==me.team?1.08:1),CR,CU);
   if(!ART.armed&&!e.down&&S.y>1.5&&d<120){const l=d||1,k=e.vw===2?-.06:.06;GUNB.add(P.x+dx/l*-k,P.y,P.z+dz/l*-k,1.3*160/96,1.95,e.gl||0,(e.aim?4:0)+(e.vw||0),sprK,CR,CU)}}

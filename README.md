@@ -73,6 +73,16 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.34.1 - respawn picks and phantom markers
+- **Fix: the respawn pick was ignored.** You pick on the death map while dead, and the server dropped every action from a
+  dead player before reaching the pick, so everyone came back at the default spawn. The pick is now taken while dead.
+  New end-to-end test `browser_respawn` (die, pick a flag, check where you come back; then the airfield).
+- **Fix: "invisible" teammates.** The blue teammate markers were drawn through walls and out to 150 m, but bodies are only
+  drawn out to the fog distance (about 100 m in fog or rain) and are hidden by trench walls, so markers floated over men
+  you couldn't see. Blue markers now hide behind cover like the man under them and only show where his body is drawn.
+  Green (your squad) and red (spotted enemies) still show through cover on purpose. Checked with real WebGL rendering:
+  soldiers draw normally on desktop and on an emulated phone.
+
 ## v0.34 - service record, bots on the wire, demo polish
 - **Service record on the start screen:** account level 1-100 from total XP (level n needs 100(n-1) + 20(n-1)(n-2) XP:
   level 10 at 2,340, 50 at 51,940, 100 at 203,940), an XP bar to the next level, and the rank ladder from Private to
