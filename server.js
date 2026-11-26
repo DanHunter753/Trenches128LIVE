@@ -193,7 +193,7 @@ function spawnEnt(e) {
     if (op.tk <= 0 || op.regroup > 0) { e.rt = 1; return; }      // no tickets: wait for the next battalion
     op.tk--; if (op.tk === 0 && !op.stall) attackStalls();
   }
-  if (e.veh && VEHM) VEHM.leave(e, true); if (e.elite) eliteLost(e); e.burn = 0; e.goTo = null;
+  if (e.veh && VEHM) VEHM.leave(e, true); if (e.elite) eliteLost(e); e.burn = 0; e.goTo = null; e.job = null;
   e.died = false; e.hist = null; e.mask = 0; e.hitBy = null; e.lastHit = null; e.supp = 0; e.chg = T.CHG_MAX; e.charging = false; e.bloom = 0;
   e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = e.cls === 'assault' ? 4 : e.cls === 'sapper' ? 3 : 2; e.gCd = 0; e.bd = e.u === 'gasnade' || e.u === 'smokenade' ? 2 : e.u === 'flare' ? 3 : e.cls === 'medic' ? 5 : 3; e.healCd = 0; e.mgCd = 0; e.para = false;
   let { x, z } = home(e.team), py = null;
@@ -619,6 +619,30 @@ function tunnelAct(p, dt) {
   return false;
 }
 tunReset();
+// v0.34 bots join in: a bot near a cut telephone wire of his side splices it; one near the listening post over an enemy
+// gallery that has been heard countermines it; sapper bots near one of their shafts dig the mine (two at most per shaft).
+// A job is dropped the moment an enemy shows up, the work is done, or it takes too long.
+function botJobFind(b) {
+  let best = null, bd = 60;
+  T.PHONES.forEach((L, l) => { if (L.team !== b.team) return; for (let s = 0; s < L.pts.length - 1; s++) if (phoneCut.has(l + ':' + s)) {
+    const a = L.pts[s], c = L.pts[s + 1], x = (a[0] + c[0]) / 2, z = (a[1] + c[1]) / 2, d = Math.hypot(x - b.x, z - b.z); if (d < bd) { bd = d; best = { k: 'splice', x: x + .6, z, done: () => !phoneCut.has(l + ':' + s) }; } } });
+  if (best) return best; bd = 40;
+  T.TUNNELS.forEach((q, i) => { const u = TUN[i]; if (q.team === b.team || !u.heard) return; const d = Math.hypot(q.tx - b.x, q.tz - b.z); if (d < bd) { bd = d; best = { k: 'counter', x: q.tx + 1, z: q.tz, done: () => !TUN[i].heard }; } });
+  if (best) return best;
+  if (b.cls === 'sapper' && rnd() < .3) T.TUNNELS.forEach((q, i) => { const u = TUN[i]; if (q.team !== b.team || u.cd > tickNo) return; const d = Math.hypot(q.x - b.x, q.z - b.z);
+    if (d < 30 && [...ents.values()].filter(e => e.job && e.job.k === 'dig' && e.job.i === i).length < 2) best = { k: 'dig', i, x: q.x + .8, z: q.z, done: () => TUN[i].p === 0 && TUN[i].cd > tickNo }; });
+  return best;
+}
+function botJobTick(b) {
+  if (b.mg || b.gun || b.fortNest || b.buildF || b.kit && b.rvTgt) return false;   // (a sapper raising a building finishes it first)
+  if (b.job && (b.job.done() || tickNo > b.job.until)) b.job = null;
+  if (!b.job) { b.jobScan = (b.jobScan || rnd() * 2) - DT; if (b.jobScan > 0) return false; b.jobScan = 1.5 + rnd(); const j = botJobFind(b); if (!j) return false; j.until = tickNo + (j.k === 'dig' ? 120 : 45) * TICK; b.job = j; }
+  const j = b.job, d = Math.hypot(j.x - b.x, j.z - b.z);
+  if (d > 1.6) { b.crouch = false; b.moved = navMove(b, j.x, j.z, 3.6); return true; }
+  b.crouch = true; b.moved = false; b.wkAt = 0;
+  if (j.k === 'splice') phoneAct(b, DT); else tunnelAct(b, DT);
+  BSTAT[j.k] = (BSTAT[j.k] || 0) + 1; return true;
+}
 // v0.31 aircraft: the officer's bomber run, recon flight and the new strafing run are flown by biplanes that cross the map
 // from their own side. Bullets hit them; each side's two AA guns (T.AA) fire at enemy planes within AA_R m. A plane shot
 // down drops nothing more (a recon plane stops spotting) and crashes. AA guns are wrecked by shells and repaired like nests.
@@ -819,7 +843,7 @@ function botBuildTick() {
     const own = spawnLine(t); if (!own) continue;
     const mine = [...T.FORTS.values()].filter(q => q.team === t && !T.FORT[q.k].small);
     if (mine.length >= 3 || supply[t] < 45 || mine.some(q => q.done < 1)) continue;
-    const sap = [...ents.values()].find(e => e.bot && e.alive && e.team === t && e.cls === 'sapper' && !e.tgt && !e.buildF && !e.fortNest && Math.abs(e.z - lineZ(own, e.x)) < 30);
+    const sap = [...ents.values()].find(e => e.bot && e.alive && e.team === t && e.cls === 'sapper' && !e.tgt && !e.buildF && !e.fortNest && !(e.job && e.job.k === 'dig') && Math.abs(e.z - lineZ(own, e.x)) < 30);
     if (!sap) continue;
     const k = supply[t] >= 90 ? 'blockhouse' : 'redoubt', yaw = faceYaw(t);
     for (let tries = 0; tries < 24; tries++) {   // the ground is cratered: it takes a few tries to find a flat spot
@@ -1094,6 +1118,7 @@ function botTick(b) {
   if (shelterTick(b)) return;
   if (!b.tgt && b.hp < 55 && !b.bandaged && !b.climb) { b.bandT = (b.bandT || 0) + DT; b.crouch = true; if (b.bandT > 2.5) { b.bandaged = true; b.bandT = 0; b.hp = Math.min(maxHp(b), b.hp + 35); BSTAT.bandages++; } return; }   // patch himself up in a quiet moment
   if (botBuildWork(b)) return;
+  if (!b.tgt && !b.shelter && !b.charging && botJobTick(b)) return;   // v0.34: wire, tunnels
   const g = goal(b), role = botRole(b), eng = b.tgt && b.td < 45;
   b.moved = false;
   if (b.climb) { navMove(b, g.x, g.z, 3.4, g.line); b.crouch = false; return; }
@@ -2039,6 +2064,7 @@ async function api(req, res, u) {
     if (u === '/api/register' && req.method === 'POST') { const m = await body(req, 2048), r = await ACC.register(m.name, m.pass, ip, xpdb[String(m.name || '').toLowerCase()]); if (!r.err) { delete xpdb[String(m.name).toLowerCase()]; xpDirty = true; } return json(res, r.err ? 400 : 200, r); }   // callsign XP moves to the new account
     if (u === '/api/login' && req.method === 'POST') { const m = await body(req, 2048), r = await ACC.login(m.name, m.pass, ip); return json(res, r.err ? 401 : 200, r); }
     if (u === '/api/logout' && req.method === 'POST') { const m = await body(req, 2048); ACC.logout(String(m.token || '')); return json(res, 200, { ok: 1 }); }
+    if (u === '/api/record') { const n = String(new URL(req.url, 'http://x').searchParams.get('n') || '').slice(0, 16).toLowerCase(); const xp = n && Object.prototype.hasOwnProperty.call(xpdb, n) ? +xpdb[n] || 0 : 0; return json(res, 200, { xp, rank: T.rankOf(xp), lv: T.levelOf(xp).lv }); }   // v0.34: a guest callsign's service record for the start screen
     if (u === '/api/me') { const t = new URL(req.url, 'http://x').searchParams.get('token'), a = ACC.session(t); return a ? json(res, 200, { name: a.name, xp: a.xp || 0, rank: T.rankOf(a.xp || 0) }) : json(res, 401, { err: 'not logged in' }); }
   } catch (e) { return json(res, 400, { err: 'bad request' }); }
   json(res, 404, { err: 'not found' });
@@ -2108,4 +2134,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

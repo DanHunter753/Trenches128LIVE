@@ -73,6 +73,21 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.34 - service record, bots on the wire, demo polish
+- **Service record on the start screen:** account level 1-100 from total XP (level n needs 100(n-1) + 20(n-1)(n-2) XP:
+  level 10 at 2,340, 50 at 51,940, 100 at 203,940), an XP bar to the next level, and the rank ladder from Private to
+  General: six new ranks past Major (Lt. Colonel 5,000 XP up to General 200,000), each shown with its level. Perk points
+  (one a level) are counted for the coming perk tree. Accounts read it from `/api/me`, guest callsigns from the new
+  `/api/record`; the last one seen in a game is cached. In game: a "LEVEL UP (+1 perk point)" message, the level in the
+  loadout header, and a career line (rank, XP earned this round, level bar) on the after-action report. The six old ranks
+  still gate the same unlocks. Test: `browser_record`.
+- **Bots use the wire and the mines:** a bot within 60 m of a cut wire of his side splices it; bots near the listening
+  post over an enemy gallery that has been heard countermine it; sapper bots near one of their shafts dig the mine (two
+  at most per shaft). A job is dropped when an enemy shows up, it's done, or it runs too long. So these happen in
+  bot-heavy games too. Test: `botjobs`.
+- **Polish:** "How to play" covers the respawn map, order beacons and markers, biplanes, telephone lines, mines, repairs,
+  phone controls and the career; the pilot HUD moves under the minimap on phones (clear of the stick) with touch wording.
+
 ## v0.33.3 - bots spread out, friend markers, order beacons
 - **Bots keep their distance.** Nothing used to keep bots apart: they stood inside each other, and squads walked one path
   to nearly one spot. Now each bot steps away from teammates closer than his spacing: about 2.6 m when holding a line or

@@ -665,7 +665,13 @@ const mortarV = r => Math.sqrt(r * SHELL_G / Math.sin(2 * VEH.mortar.th));
 // v0.26 weather, chosen per round by the server. sight scales how far bots and spotting see; mud slows movement in the rain
 const WXS = { overcast: { n: 'Overcast', sight: 1, mud: 1 }, fog: { n: 'Fog', sight: .55, mud: 1 }, rain: { n: 'Rain', sight: .8, mud: .86 }, night: { n: 'Night', sight: .45, mud: 1 } };
 const WX = { k: 'overcast' };
-const RK = [['Private', 0], ['Corporal', 100], ['Sergeant', 300], ['Lieutenant', 700], ['Captain', 1300], ['Major', 2000]];
+const RK = [['Private', 0], ['Corporal', 100], ['Sergeant', 300], ['Lieutenant', 700], ['Captain', 1300], ['Major', 2000],
+  // v0.34 the long career: ranks past Major are earned with total account XP (no new unlocks yet; the perk tree will hang off levels)
+  ['Lt. Colonel', 5000], ['Colonel', 12000], ['Brigadier', 25000], ['Major General', 50000], ['Lt. General', 100000], ['General', 200000]];
+// v0.34 account levels 1-100 from total XP: level n needs 100(n-1) + 20(n-1)(n-2) XP in all (level 2 at 100, 10 at 2,340,
+// 50 at 51,940, 100 at 203,940). levelOf(xp) -> { lv, at (XP where this level began), next (XP for the next one, or null) }
+const LV_MAX = 100, lvXp = n => 100 * (n - 1) + 20 * (n - 1) * (n - 2);
+function levelOf(xp) { let lv = 1; while (lv < LV_MAX && xp >= lvXp(lv + 1)) lv++; return { lv, at: lvXp(lv), next: lv < LV_MAX ? lvXp(lv + 1) : null }; }
 const REQ = { 'cls:medic': 1, 'cls:gunner': 1, 'cls:recon': 1, 'cls:sapper': 2, 'cls:officer': 3, 'w:carbine': 1, 'w:smg': 2, 'w:mark': 2, 'u:nade': 1, 'u:smokenade': 1, 'u:gasnade': 2, 'u:flare': 0 };
 const rankOf = xp => { let r = 0; RK.forEach((k, i) => { if (xp >= k[1]) r = i; }); return r; };
 // Server-side validation of a requested loadout against rank. Returns a safe loadout.
@@ -680,7 +686,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
