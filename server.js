@@ -29,7 +29,7 @@ const CFG = {
   // Default random when run as a server; classic for tests (T128_TEST, or loaded in-process).
   // v0.30.1: where /download sends players when this server holds no installer of its own (public/launcher/latest.yml)
   launcherUrl: (v => /^https:\/\/[^\s"'<>]+$/.test(v) ? v : '')(String(sarg('launcher-url', process.env.T128_LAUNCHER_URL || ''))),
-  maps: (v => v === 'random' || v === 'classic' || /^\d{1,10}$/.test(v) ? v : 'random')(String(sarg('maps', process.env.T128_MAPS || (require.main === module && !process.env.T128_TEST ? 'random' : 'classic')))),
+  maps: (v => v === 'random' || v === 'classic' || v === 'wake' || /^\d{1,10}$/.test(v) ? v : 'random')(String(sarg('maps', process.env.T128_MAPS || (require.main === module && !process.env.T128_TEST ? 'random' : 'classic')))),
 };
 fs.mkdirSync(CFG.data, { recursive: true });
 const ACC = CFG.accounts === 'off' ? null : require('./accounts.js')(CFG.data);
@@ -38,7 +38,8 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = Math.random;
 
 // ------------------------------------------------------------------ world state
-const mapPick = () => CFG.maps === 'random' ? T.newSeed() : CFG.maps === 'classic' ? 0 : +CFG.maps;
+const mapPick = () => CFG.maps === 'random' ? T.newSeed() : CFG.maps === 'classic' ? 0 : CFG.maps === 'wake' ? T.WAKE_SEED : +CFG.maps;
+const isWake = () => T.MP.kind === 'wake';   // v0.43 Wake Atoll: an imported island played as Domination (no lines, no Operations)
 let mapSeed = T.setMap(mapPick()), nextMap = null;   // v0.30: this round's layout; the next one is generated in a worker during the end screen
 let terr = T.makeTerrain(), craters = [];
 let posts = [], postId = 1;
@@ -51,8 +52,8 @@ const POST_HP = 300, POST_COST = 10, POST_MAX = 3;
 const ents = new Map();      // id -> entity (humans and bots share one id space)
 const humans = new Set();
 let nextId = 1, tickNo = 0, botSeq = 0;
-const OB = T.LINES.map((n, i) => ({ n, t: T.FL[i], x: T.OBJ[i].x, z: T.OBJ[i].z, owner: i < 3 ? 0 : 1, p: i < 3 ? 1 : -1, lock: 0 }));   // objectives staggered along the bending lines
-const lineZ = (o, x) => T.trenchC(o.t, x);   // the line's centre at x
+const OB = T.LINES.map((n, i) => ({ n: T.OBJ[i].n || n, t: T.FL[i], x: T.OBJ[i].x, z: T.OBJ[i].z, owner: i < 3 ? 0 : 1, p: i < 3 ? 1 : -1, lock: 0 }));   // objectives staggered along the bending lines
+const lineZ = (o, x) => isWake() ? o.z : T.trenchC(o.t, x);   // the line's centre at x (a flag on Wake is a point)
 let supply = [12, 12], wave = { side: 0, t: 0 }, sT = 0, round = { state: 'play', t: 0, win: -1 };
 // ---- Operations: one team attacks the other's three lines (sectors) in order, on a ticket pool, with three battalions
 const OPS = { nsec: 3, nbat: 3, regroup: 15, stallMax: 30, oobGrace: 10 };
@@ -107,7 +108,7 @@ try { xpdb = JSON.parse(fs.readFileSync(XPFILE, 'utf8')); } catch (e) { }
 
 // ------------------------------------------------------------------ helpers
 const spawnLine = t => t === 0 ? OB.filter(o => o.owner === 0).pop() : OB.find(o => o.owner === 1);
-const nearO = (u, o) => Math.abs(u.x - o.x) < 34 && Math.abs(u.z - lineZ(o, u.x)) < 12;
+const nearO = (u, o) => isWake() ? Math.hypot(u.x - o.x, u.z - o.z) < DOM.r : Math.abs(u.x - o.x) < 34 && Math.abs(u.z - lineZ(o, u.x)) < 12;
 const canCap = (i, t) => { if (op) return t === op.att && OB[i] === opTarget() && !op.regroup && !(OB[i].lock > 0); const o = OB[i]; if (o.owner === t || o.lock > 0) return false; const n = t === 0 ? OB[i - 1] : OB[i + 1]; return !!n && n.owner === t; };
 const maxHp = e => e.elite && T.ELITE[e.elite] ? T.ELITE[e.elite].hp : e.bot ? 100 : CLS[e.cls].hp;
 const faceYaw = t => t === 0 ? 0 : Math.PI;
@@ -190,7 +191,9 @@ function homeZ(t, x) {
   }
   return t === 0 ? HOME_Z : -HOME_Z;
 }
-let home = t => { const x = (rnd() - .5) * 140; return { x, z: homeZ(t, x) }; };
+let home = t => {
+  if (isWake()) { const s = T.MP.meta.start.find(q => q.team === t) || T.MP.meta.start[t]; for (let k = 0; k < 30; k++) { const a = rnd() * Math.PI * 2, d = Math.sqrt(rnd()) * s.r, x = s.x + Math.cos(a) * d, z = s.z + Math.sin(a) * d; if (hAt(terr.H, x, z) > .4 && NAV.passable(x, z)) return { x, z }; } return { x: s.x, z: s.z }; }
+  const x = (rnd() - .5) * 140; return { x, z: homeZ(t, x) }; };
 // v0.31.1 spawn map: a flag can be picked when your side fully holds it and no enemy is within 25 m of it
 function flagSpawnOk(team, i) { const o = OB[i]; if (!o || o.owner !== team || Math.abs(o.p) < .99) return false;
   for (const q of ents.values()) if (q.team !== team && q.alive && !q.cmd && Math.hypot(q.x - o.x, q.z - lineZ(o, q.x)) < 25) return false; return true; }
@@ -462,6 +465,7 @@ const RW = [0, 0, 0, 0];
 // hit boxes follow the soldier art (measured on assets/soldiers.png, 1.95 m cell): standing head 1.54-1.83 m, kneeling figure 1.38 m tall with the head at 1.08-1.38 m
 const HEAD_STAND = 1.52, HIT_KNEEL = 1.42, HEAD_KNEEL = 1.08;
 const bullets = [], SUPW = { mg: .3, lmg: .22, smg: .1, shotgun: .12, bolt: .18, carbine: .14, mark: .25, hmg: .3, atr: .35 };
+const ZERO_D = 100, sightZero = w => w && (w.vel || 400) >= 360 && !w.flame ? T.GRAV * (w.scope ? 150 : ZERO_D) / (2 * (w.vel || 400) ** 2) : 0;   // pitch that puts the bullet back on the line of sight at 100 m (scoped rifles: 150 m)
 function fireBullet(by, ox, oy, oz, yw, pt, rng, dmg, wk, vel, sw) {
   const cp = Math.cos(pt), dx = -Math.sin(yw) * cp, dy = Math.sin(pt), dz = -Math.cos(yw) * cp, b = { by, team: by.team, x: ox, y: oy, z: oz, vx: dx * vel, vy: dy * vel, vz: dz * vel, d: 0, rng, dmg, wk, sw, sup: null, rw: by.bot ? 0 : clamp(by.rw || 0, 0, LAGC_MAX) };
   bullets.push(b); shots.push([ox, oy, oz, dx, dy, dz, Math.min(rng, 140), by.id, wk, vel]); return b;
@@ -522,7 +526,8 @@ function fireWeapon(p) {
   const brace = p.cls === 'gunner' && !p.elite && p.crouch && (p.mg == null || p.mg === false);   // v0.36: a gunner who kneels to fire braces the gun
   const sp = ((p.ads ? w.spr * .35 : w.spr + (w.hip || 0)) * (1 + (p.supp || 0) * 1.2) + (p.bloom || 0)) * (brace ? .55 : 1);
   p.bloom = Math.min(.05, (p.bloom || 0) + (w.blm || 0) * (brace ? .4 : 1));
-  for (let q = 0; q < w.pel; q++) fireBullet(p, p.x, ey, p.z, p.yaw + (rnd() - .5) * sp, p.pitch + (rnd() - .5) * sp, w.rng, w.dmg, p.w, w.vel || 400, w.sw);
+  const zero = sightZero(w);   // v0.42 sights zeroed at 100 m: the round rises through the line of sight and falls back to it there
+  for (let q = 0; q < w.pel; q++) fireBullet(p, p.x, ey, p.z, p.yaw + (rnd() - .5) * sp, p.pitch + zero + (rnd() - .5) * sp, w.rng, w.dmg, p.w, w.vel || 400, w.sw);
 }
 // melee: bayonet (bolt, carbine, trench gun) kills outright; the others club for 60. A charge strikes automatically on contact.
 function meleeStrike(p, auto) {
@@ -549,7 +554,7 @@ function mgFire(p) {
   if (n.belt <= 0) { startBelt(p); return; }
   n.belt--; n.heat = Math.min(1, n.heat + .04); if (n.heat >= 1) { n.over = true; tell(p, 'MG overheated! Let it cool.'); }
   p.cd = .085; p.flash = 3; const sp = .008 + .045 * n.heat;
-  fireBullet(p, p.x, p.y + 1.35, p.z, p.yaw + (rnd() - .5) * sp, p.pitch + (rnd() - .5) * sp, 140, 24, 'mg', 420);
+  fireBullet(p, p.x, p.y + 1.35, p.z, p.yaw + (rnd() - .5) * sp, p.pitch + T.GRAV * ZERO_D / (2 * 420 * 420) + (rnd() - .5) * sp, 200, 24, 'mg', 420);
 }
 function mount(p) {
   if (!p.alive || p.mg != null) return;
@@ -948,6 +953,7 @@ function humanTick(p) {
 }
 function goal(b) {
   if (b.mg) return { x: b.hx, z: b.hz };
+  if (isWake()) { if (b.goTo && tickNo < b.goTo.until) return { x: b.goTo.x, z: b.goTo.z }; if (b.hold && tickNo < b.hold.until) return { x: b.hold.x + b.ox * .25, z: b.hold.z + b.oz * 2 }; const g = domGoal(b); if (g) return g; }
   if (b.goTo && tickNo < b.goTo.until) return { x: b.goTo.x, z: b.goTo.z };   // an errand (fetching an elite kit)
   if (b.fortNest && !b.fortNest.dead) return { x: b.fortNest.x, z: b.fortNest.z };
   if (b.hold && tickNo < b.hold.until) return { x: b.hold.x + b.ox * .25, z: b.hold.z + b.oz * 2 };   // paratroopers hold where they landed
@@ -1285,7 +1291,58 @@ function botTick(b) {
   b.moved = navMove(b, g.x, g.z, pushing && !eng ? 4.2 : 3.2, g.line);
   if (!b.moved) b.y = T.groundAt(terr.H, b.x, b.z, b.y);
 }
+// ---- v0.43 Domination (Wake Atoll). Five static flags, either side can take any of them: more friendlies than enemies inside
+// DOM.r for about 20 s flips a flag (owned -> neutral -> taken). Every DOM.every seconds a team scores a point per flag held;
+// first to DOM.win wins. When the leader passes a mark in DOM.marks the trailing team gets a rally once per mark.
+const DOM = { r: 14, win: 100, every: 8, cap: .05, marks: [25, 50, 75, 90], nflags: 5 };
+let dom = null;
+const domFlags = () => OB.slice(0, DOM.nflags);
+function domReset() {
+  dom = { score: [0, 0], t: 0, mk: [0, 0], rallyAt: [0, 0] };
+  OB.forEach(o => { o.owner = -1; o.p = 0; o.lock = 0; });
+  const st = T.MP.meta.start; for (const sz of st) { let best = null, bd = 1e9; for (const o of domFlags()) { const d = Math.hypot(o.x - sz.x, o.z - sz.z); if (d < bd) { bd = d; best = o; } } if (best) { best.owner = sz.team; best.p = sz.team === 0 ? 1 : -1; } }   // each side starts holding the flag at its start zone
+}
+function domRally(t, mark) {
+  dom.rallyAt[t] = tickNo; moraleBoost(t, 40); supply[t] = Math.min(400, supply[t] + 30);
+  for (const e of ents.values()) if (e.team === t && !e.alive && !(e.down > 0)) e.rt = Math.min(e.rt, 1);
+  // a free paratroop drop beside the trailing side's nearest flag that is not theirs
+  let best = null, bd = 1e9; const sz = T.MP.meta.start.find(q => q.team === t); for (const o of domFlags()) if (o.owner !== t) { const d = sz ? Math.hypot(o.x - sz.x, o.z - sz.z) : 0; if (d < bd) { bd = d; best = o; } }
+  if (best) later(2500, () => { if (round.state === 'play') dropPara(t, best.x, best.z); });
+  teamTell(t, 'RALLY! The enemy has ' + mark + ' points. Reinforcements are jumping in' + (best ? ' at ' + best.n : '') + '. Everyone forward!');
+  teamTell(1 - t, 'The enemy is rallying: expect a counterattack' + (best ? ' at ' + best.n : '') + '.');
+  bcast({ t: 'opn', k: 'rally', att: t, mark });
+}
+function domTick() {
+  if (!dom) domReset();
+  const F = domFlags(), cnt = F.map(() => [0, 0]);
+  for (const e of ents.values()) if (e.alive && !e.cmd && !e.inV) F.forEach((o, i) => { if (nearO(e, o)) cnt[i][e.team]++; });
+  F.forEach((o, i) => {
+    const bl = cnt[i][0], rd = cnt[i][1], net = bl - rd;
+    if (net) o.p = clamp(o.p + Math.sign(net) * DT * DOM.cap * Math.min(3, Math.abs(net)), -1, 1);
+    else if (o.owner >= 0) o.p = clamp(o.p + (o.owner === 0 ? 1 : -1) * DT * .03, -1, 1);
+    if (o.owner === 0 && o.p <= 0 || o.owner === 1 && o.p >= 0) { const was = o.owner; o.owner = -1; teamTell(was, o.n + ' is being taken!'); teamTell(1 - was, o.n + ' neutralised. Hold it to raise the flag.'); }
+    if (o.owner < 0 && (o.p >= 1 || o.p <= -1)) {
+      const to = o.p >= 1 ? 0 : 1; o.owner = to; teamTell(to, 'Captured ' + o.n + '.'); teamTell(1 - to, 'The enemy holds ' + o.n + '.');
+      for (const p of humans) if (p.deployed && p.alive && p.team === to && (p.cmd || nearO(p, o))) { if (!p.cmd) st(p).cap++; addXp(p, p.cmd ? 40 : 60); }
+      for (const e of ents.values()) if (e.team === 1 - to && !e.alive && !(e.down > 0)) e.rt = Math.min(e.rt, 1.5);
+    }
+  });
+  dom.t += DT; if (dom.t >= DOM.every) { dom.t = 0; for (const t of [0, 1]) dom.score[t] += F.filter(o => o.owner === t).length; }
+  for (const t of [0, 1]) { const lead = dom.score[t], u = 1 - t; while (dom.mk[u] < DOM.marks.length && lead >= DOM.marks[dom.mk[u]]) { const mark = DOM.marks[dom.mk[u]++]; if (lead > dom.score[u]) domRally(u, mark); } }
+  sT += DT; if (sT > 4) { sT = 0; for (const t of [0, 1]) supply[t] = Math.min(400, supply[t] + 2 + 2 * F.filter(o => o.owner === t).length); }
+  commandTick();
+  if (dom.score[0] >= DOM.win || dom.score[1] >= DOM.win) endRound(dom.score[0] >= dom.score[1] ? 0 : 1);
+}
+function domGoal(b) {   // bots: AI squads 0 and 1 go for the nearest flag that is not theirs (spreading over two when both are near); squad 2 holds the nearest own flag
+  const F = domFlags(); if (!F.length) return null; const sq = b.squad | 0;
+  const sz = T.MP.meta.start.find(q => q.team === b.team) || { x: 0, z: 0 };
+  const dist = o => Math.hypot(o.x - sz.x, o.z - sz.z);
+  const take = F.filter(o => o.owner !== b.team).sort((a, c) => dist(a) - dist(c)), own = F.filter(o => o.owner === b.team).sort((a, c) => dist(c) - dist(a));
+  const o = sq === 2 ? (own[0] || take[0]) : (take[Math.min(sq, take.length - 1)] || own[0]);
+  if (!o) return null; return { x: o.x + b.ox * .4, z: o.z + b.oz * .4, line: o };
+}
 function objectivesTick() {
+  if (isWake()) return domTick();
   const cnt = OB.map(() => [0, 0]);
   for (const e of ents.values()) if (e.alive && !e.cmd) OB.forEach((o, i) => { if (nearO(e, o)) cnt[i][e.team]++; });
   OB.forEach((o, i) => {
@@ -1575,7 +1632,7 @@ function switchMap() {
   const t0 = Date.now(); mapSeed = T.setMap(job.seed);
   if (!(job.H && job.used === mapSeed && T.adoptTerrain(job.H, job.F))) console.log('[map] worker not ready: generating here');
   terr = T.makeTerrain();
-  OB.forEach((o, i) => { o.x = T.OBJ[i].x; o.z = T.OBJ[i].z; });
+  OB.forEach((o, i) => { o.x = T.OBJ[i].x; o.z = T.OBJ[i].z; o.n = T.OBJ[i].n || T.LINES[i]; });
   DP.forEach((d, i) => Object.assign(d, { n: T.DEPOTS[i].n, x: T.DEPOTS[i].x, z: T.DEPOTS[i].z }));
   console.log('[map] round map ' + mapSeed + ' (' + (Date.now() - t0) + ' ms)'); return true;
 }
@@ -1587,7 +1644,7 @@ function resetRound() {
   for (const p of humans) if (p.mg != null && NESTS[p.mg].fort) dismount(p, true);
   T.clearForts(); NESTS.length = BASE_NESTS; bcast({ t: 'fo', f: [] }); NAV.rebuild(); if (changed) NAV.clear();   // (routes cached on the old map would mislead bots for seconds)
   OB.forEach((o, i) => { o.owner = i < 3 ? 0 : 1; o.p = i < 3 ? 1 : -1; o.lock = 0; });
-  supply = [12, 12]; op = newOp(op ? op.def : 0); wave = { side: op.att, t: 0 };
+  supply = [12, 12]; op = isWake() ? null : newOp(op ? op.def : 0); wave = { side: op ? op.att : 0, t: 0 }; dom = null;
   orders[0].clear(); orders[1].clear(); crates.length = 0; sched = []; supCd = [supZero(), supZero()]; for (const e of ents.values()) { e.st = null; e.elite = null; if (e.w0) { e.w = e.w0; e.w0 = null; } e.burn = 0; e.goTo = null; } for (const p of humans) p.st = null;
   VEHM.reset(); ekits.length = 0; fires.length = 0; flares.length = 0; alarms.length = 0; setWx(pickWx()); roundStartExtras(); cmdPts = [CP_START, CP_START]; smokes.length = 0; gases.length = 0; recons.length = 0; marks.length = 0; SQM.clear(); alertAt.clear(); vis[0].clear(); vis[1].clear(); for (const d of DP) { d.owner = -1; d.p = 0; } for (const e of ents.values()) e.depot = null;
   for (const p of humans) if (p.mg != null) dismount(p, true);
@@ -1905,14 +1962,14 @@ function crateTick() {
 }
 
 // ------------------------------------------------------------------ snapshots (binary)
-const Q = 100;
+const Q = () => T.W > 320 ? 50 : 100;   // position quantum per metre: 1 cm on the 400 m maps, 2 cm on the 800 m island (int16 reach)
 // Snapshots are deltas against what this client was last sent (WebSocket is reliable and ordered, so the client's copy always
 // matches p.sent). Per entity: u16 id, u8 mask [1 full pos i16×3 | 2 small move i8×3 (cm) | 4 yaw | 8 flags | 16 look], then
 // removals: u16 count + u16 ids. Unchanged entities cost nothing; far ones are refreshed at half / third rate.
 const vis_ = vis;
 function encodeEnt(e) {   // once per entity per tick, shared by every client's snapshot
   const k = e.enc || (e.enc = new Int32Array(7));
-  k[0] = Math.round(e.x * Q); k[1] = Math.round(e.y * Q); k[2] = Math.round(e.z * Q);
+  const q = Q(); k[0] = Math.round(e.x * q); k[1] = Math.round(e.y * q); k[2] = Math.round(e.z * q);
   k[3] = Math.floor(((e.yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) / (2 * Math.PI) * 256) & 255;
   k[4] = (e.team ? 1 : 0) | (e.bot ? 2 : 0) | ((e.mg != null && e.mg !== false) ? 4 : 0) | (e.crouch ? 8 : 0) | (e.flash > 0 ? 16 : 0) | (e.down > 0 ? 64 : 0) | (aiming(e) ? 128 : 0);
   if (e.para) k[4] |= 68;   // a parachutist: the 'mounted gun' and 'down' bits together (never both at once otherwise), so the client draws a canopy only for the paratroopers call-in
@@ -1975,7 +2032,7 @@ let bytesOut = 0, tickMs = 0, tickMax = 0, slowN = 0, gapMax = 0, lastTickAt = 0
 function broadcastState() {
   let objMsgs = null;
   if (tickNo % 10 === 0) {
-    const base = { t: 'o', o: OB.map(o => [o.owner, +o.p.toFixed(2), Math.ceil(o.lock)]), w: [wave.side, Math.round(wave.t)], r: round.state, hv: [...humans].filter(p => p.deployed).length,
+    const base = { t: 'o', ds: dom ? [dom.score[0], dom.score[1], DOM.win] : undefined, o: OB.map(o => [o.owner, +o.p.toFixed(2), Math.ceil(o.lock)]), w: [wave.side, Math.round(wave.t)], r: round.state, hv: [...humans].filter(p => p.deployed).length,
       dp: DP.map(d => [d.owner, +d.p.toFixed(2)]), op: op && [op.att, op.sector, OPS.nsec, op.tk, op.tkMax, op.bat, OPS.nbat, Math.ceil(op.regroup), op.stall ? 1 : 0, OB.indexOf(opTarget())] };
     const fpFor = t => posts.filter(q => q.team === t || [...humans].some(h => h.team === t && h.alive && !h.cmd && Math.hypot(h.x - q.x, h.z - q.z) < 110)).map(q => [q.id, q.team, +q.x.toFixed(1), +q.z.toFixed(1), Math.ceil(q.hp), q.rally ? Math.max(0, Math.ceil((q.rally - tickNo) / TICK)) : 0, q.radio ? [+q.radio.x.toFixed(2), +q.radio.z.toFixed(2), +q.radio.yaw.toFixed(2), +q.y.toFixed(2)] : 0]);   // [5] rally point seconds left, [6] a building's respawn point: where its radio stands
     const abFor = t => aboxes.filter(b => b.team === t || [...humans].some(h => h.team === t && h.alive && Math.hypot(h.x - b.x, h.z - b.z) < 80)).map(b => [b.id, b.team, +b.x.toFixed(2), +b.z.toFixed(2), b.uses]);
@@ -1987,7 +2044,7 @@ function broadcastState() {
   const shFor = p => { const cx = Math.floor(p.x / 40), cz = Math.floor(p.z / 40), key = cx * 1000 + cz; let b = shCell.get(key); if (b === undefined) {
       const x0 = cx * 40 + 20, z0 = cz * 40 + 20, idx = []; for (let i = 0; i < shots.length && idx.length < 48; i++) { const q = shots[i]; if (Math.abs(q[0] - x0) < 150 && Math.abs(q[2] - z0) < 150) idx.push(i); }
       if (idx.length) { b = Buffer.allocUnsafe(3 + idx.length * 18); b[0] = 4; b.writeUInt16LE(idx.length, 1); let o = 3;
-        for (const i of idx) { const q = shots[i]; b.writeInt16LE(clamp(Math.round(q[0] * Q), -32767, 32767), o); b.writeInt16LE(clamp(Math.round(q[1] * Q), -32767, 32767), o + 2); b.writeInt16LE(clamp(Math.round(q[2] * Q), -32767, 32767), o + 4);
+        for (const i of idx) { const q = shots[i]; b.writeInt16LE(clamp(Math.round(q[0] * Q()), -32767, 32767), o); b.writeInt16LE(clamp(Math.round(q[1] * Q()), -32767, 32767), o + 2); b.writeInt16LE(clamp(Math.round(q[2] * Q()), -32767, 32767), o + 4);
           b.writeInt16LE(Math.round(q[3] * 10000), o + 6); b.writeInt16LE(Math.round(q[4] * 10000), o + 8); b.writeInt16LE(Math.round(q[5] * 10000), o + 10);
           b[o + 12] = clamp(Math.round(q[6]), 0, 255); b.writeUInt16LE(q[7] & 65535, o + 13); b[o + 15] = q[8] === 'mg' || q[8] === 'hmg' ? 7 : q[8] === 'atr' ? 6 : (W_IDX[q[8]] || 0); b.writeUInt16LE(Math.round(q[9] || 400), o + 16); o += 18; }
       } else b = null; shCell.set(key, b); } return b; };
@@ -2241,14 +2298,38 @@ const server = http.createServer((req, res) => {
     if (!ct || !/^[A-Za-z0-9_]+\.(png|json|mp3)$/.test(nm)) { res.statusCode = 404; return res.end('not found'); }
     return fs.readFile(path.join(__dirname, 'public', 'assets', nm), (err, data) => { if (err) { res.statusCode = 404; return res.end('not found'); } res.setHeader('content-type', ct); res.setHeader('cache-control', 'public, max-age=3600'); res.end(data); });
   }
+  if (u.startsWith('/maps/')) {   // v0.43 imported maps (public/maps): the heightmap, its json and the browser bundle, gzipped when the client takes it
+    const nm = u.slice(6); if (!/^[a-z0-9_]+\.(hm|json|js)$/.test(nm)) { res.statusCode = 404; return res.end('not found'); }
+    return mapFile(req, res, nm);
+  }
   if (u.startsWith('/launcher/') || u === '/download') return launcherFile(req, res, u === '/download' ? null : u.slice(10));
   const f = FILES[u]; if (!f) { res.statusCode = 404; return res.end('not found'); }
   fs.readFile(path.join(__dirname, f[0]), (err, data) => { if (err) { res.statusCode = 500; return res.end('missing ' + f[0]); } res.setHeader('content-type', f[1]); res.setHeader('cache-control', 'no-cache');
-    if (f[0] === 'public/index.html') data = Buffer.from(data.toString('utf8').split('__T128_VERSION__').join(VERSION));   // v0.40: the page shows the version it was served as
+    if (f[0] === 'public/index.html') { let h = data.toString('utf8').split('__T128_VERSION__').join(VERSION);   // v0.40: the page shows the version it was served as
+      if (isWake()) h = h.replace('<script src="shared.js"></script>', '<script>window.T128_MAPSEED=' + T.WAKE_SEED + '</script><script src="maps/wake.js"></script><script src="shared.js"></script>');   // v0.43: the island's heightmap must be in the page before shared.js builds the terrain
+      data = Buffer.from(h); }
     res.end(data); });
 });
 // Windows launcher downloads and self-updates (v0.29.1): put the files electron-builder makes (latest.yml, the Setup .exe and
 // its .blockmap) in public/launcher/. /download sends the newest installer, for a website's download button.
+const MAPZ = new Map();
+const MAPJS = new Map();
+function mapBundle(nm, cb) {   // <name>.js is built from <name>.hm + <name>.json: window.T128_HM (base64 heights) and window.T128_WAKE (the json)
+  const base = nm.slice(0, -3), hit = MAPJS.get(base); if (hit) return cb(null, hit);
+  fs.readFile(path.join(__dirname, 'public', 'maps', base + '.hm'), (e1, hm) => { if (e1) return cb(e1); fs.readFile(path.join(__dirname, 'public', 'maps', base + '.json'), 'utf8', (e2, js) => { if (e2) return cb(e2);
+    let meta; try { meta = JSON.parse(js); } catch (e) { return cb(e); }
+    const b = Buffer.from('window.T128_HM=' + JSON.stringify({ n: meta.N, s: meta.S, b64: hm.toString('base64') }) + ';window.T128_WAKE=' + js + ';'); MAPJS.set(base, b); cb(null, b); }); });
+}
+function mapFile(req, res, nm) {
+  const ct = nm.endsWith('.js') ? 'text/javascript; charset=utf-8' : nm.endsWith('.json') ? 'application/json' : 'application/octet-stream';
+  const read = nm.endsWith('.js') ? mapBundle : (n, cb) => fs.readFile(path.join(__dirname, 'public', 'maps', n), cb);
+  read(nm, (err, data) => {
+    if (err) { res.statusCode = 404; return res.end('not found'); }
+    res.setHeader('content-type', ct); res.setHeader('cache-control', 'public, max-age=3600'); res.setHeader('vary', 'accept-encoding');
+    if (/\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))) { let z = MAPZ.get(nm); if (!z || z.n !== data.length) { z = { n: data.length, b: require('zlib').gzipSync(data, { level: 6 }) }; MAPZ.set(nm, z); } res.setHeader('content-encoding', 'gzip'); return res.end(z.b); }
+    res.end(data);
+  });
+}
 function launcherFile(req, res, nm) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.statusCode = 405; return res.end(); }
   const dir = path.join(__dirname, 'public', 'launcher');
@@ -2289,7 +2370,7 @@ fs.mkdirSync(path.join(__dirname, 'public'), { recursive: true });
 VEHM = require('./vehicles.js')({ aaDps: (team, x, z) => aaFor(1 - team).filter(a => Math.hypot(a.x - x, a.z - z) < AA_R).length * AA_DPS * 1.6, T, ents, humans, DT, TICK, terr: () => terr, tickNo: () => tickNo, damage, explode, send, bcast, tell, teamTell, addXp, supply: () => supply, fireBullet,
   forNear, op: () => op, opTarget, lineZ, spawnLine, wave: () => wave, removeFort, alert, smokeBlocks, sightAt, addCrew, homeZ, faceYaw, later, killFeedRaw });
 T.WX.k = pickWx();
-NAV.rebuild(); fillBots(); op = newOp(0); wave.side = op.att; roundStartExtras();   // bots and flag guards exist before the first tick, so guards start on their flag
+NAV.rebuild(); fillBots(); op = isWake() ? null : newOp(0); wave.side = op ? op.att : 0; if (isWake()) domReset(); roundStartExtras();   // bots and flag guards exist before the first tick, so guards start on their flag
 if (process.env.T128_FAST) { const run = () => { for (let i = 0; i < 20; i++) { try { tick(); } catch (e) { console.error('tick error', e); } } setImmediate(run); }; setImmediate(run); }   // simulation fast-forward (balance tests)
 else setInterval(() => { try { tick(); } catch (e) { console.error('tick error', e); } }, 1000 / TICK);
 server.listen(PORT, () => console.log(`Trench 128 v${VERSION} "${CFG.name}" on http://localhost:${PORT}  (fill ${FILL}/team, ${SLOTS} human slots/team, accounts ${CFG.accounts}${CFG.registry ? ', server list' : ''}${CFG.master ? ', listed at ' + CFG.master : ''}, data ${CFG.data})`));
@@ -2298,4 +2379,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

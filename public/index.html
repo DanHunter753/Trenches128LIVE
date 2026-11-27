@@ -151,7 +151,7 @@ body.menu #scope,body.menu #dn,body.menu #ch,body.menu #hud,body.menu #hb,body.m
 <script>if(!window.THREE)document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>')</script>   <!-- three.js ships with the game (public/vendor); the CDN is only a fallback -->
 <script src="shared.js"></script>
 <script>
-const $=id=>document.getElementById(id),T=T128,{CLS,WPN,UT,RK,REQ}=T,W=T.W,N=T.N,NV=T.NV,ST=T.ST;
+const $=id=>document.getElementById(id),T=T128,{CLS,WPN,UT,RK,REQ}=T,W=T.W,N=T.N,NV=T.NV,ST=T.ST,WAKE=T.MP.kind==='wake',PQ=W>320?50:100;   /* v0.43 Wake Atoll: an 800 m imported island; positions come in 2 cm units there */
 /* ------------------------------------------------------------------ terrain (identical generator to the server) */
 let terr=T.makeTerrain();const hAt=(x,z)=>T.hAt(terr.H,x,z);
 const renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:false});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
@@ -218,7 +218,7 @@ let dirty=true,mmDirty=true;const LODS=[],BAYI=new Map(),bayReg=(key,m,i)=>{let 
 const nrm=new Float32Array(NV*3);tg.setAttribute('normal',new THREE.BufferAttribute(nrm,3));let dR=null;
 let wetOn=false;
 function terrRows(j0,j1){const H=terr.H,D=terr.D,R=N+1,k0=j0*R,k1=j1*R+N;
- for(let k=k0;k<=k1;k++){pos[k*3+1]=H[k];const t=Math.min(1,Math.max(0,(H[k]+2.5)/5)),m=D[k];col[k*3]=(.26+.18*t)*m;col[k*3+1]=(.22+.17*t)*m;col[k*3+2]=(.13+.08*t)*m;
+ for(let k=k0;k<=k1;k++){pos[k*3+1]=H[k];const m=D[k];if(WAKE){const h=H[k];if(h<0){const d=Math.min(1,-h/5);col[k*3]=(.30-.18*d)*m;col[k*3+1]=(.30-.12*d)*m;col[k*3+2]=(.22-.04*d)*m}else{const s=Math.min(1,h/2.2),v=Math.min(1,Math.max(0,(h-2.2)/6));col[k*3]=(.56-.22*s+.02*v)*m;col[k*3+1]=(.50-.16*s+.03*v)*m;col[k*3+2]=(.34-.18*s-.04*v)*m}}else{const t=Math.min(1,Math.max(0,(H[k]+2.5)/5));col[k*3]=(.26+.18*t)*m;col[k*3+1]=(.22+.17*t)*m;col[k*3+2]=(.13+.08*t)*m}   /* v0.43 island: wet sand under the water, pale coral sand on the beach, scrub inland */
   if(wetOn){const i=k%R,wc=T.wetCell(k,H,-W+i*ST,-W+((k/R)|0)*ST);if(wc>=2){col[k*3]=.10*m+.02;col[k*3+1]=.12*m+.02;col[k*3+2]=.13*m+.03}else if(wc===1){col[k*3]*=.68;col[k*3+1]*=.66;col[k*3+2]*=.62}}   /* v0.31: standing water and mud in the rain */
   const i=k%R,j=(k/R)|0,hx=H[k+(i<N?1:0)]-H[k-(i>0?1:0)],hz=H[k+(j<N?R:0)]-H[k-(j>0?R:0)],sx=(i>0&&i<N?2:1)*ST,sz=(j>0&&j<N?2:1)*ST,nx=-hx/sx,nz=-hz/sz,l=1/Math.hypot(nx,1,nz);nrm[k*3]=nx*l;nrm[k*3+1]=l;nrm[k*3+2]=nz*l}
  for(const r of T.ROOMS){const rj0=Math.max(j0,Math.floor((r.z0+W)/ST)),rj1=Math.min(j1,Math.ceil((r.z1+W)/ST));if(rj0>rj1)continue;const i0=Math.max(0,Math.floor((r.x0+W)/ST)),i1=Math.min(N,Math.ceil((r.x1+W)/ST));for(let j=rj0;j<=rj1;j++)for(let i=i0;i<=i1;i++){const k=j*R+i;if(H[k]<r.rb-.3){col[k*3]*=.5;col[k*3+1]*=.5;col[k*3+2]*=.5}}}
@@ -227,6 +227,7 @@ function sync(){terrRows(0,N);dirty=false;dR=null}
 function dirtyRect(x,z,r){const j0=Math.max(0,Math.floor((z-r+W)/ST)-1),j1=Math.min(N,Math.ceil((z+r+W)/ST)+1);if(!dR)dR=[j0,j1];else{dR[0]=Math.min(dR[0],j0);dR[1]=Math.max(dR[1],j1)}}
 function syncDirty(){if(dirty){sync();return}if(dR){terrRows(dR[0],dR[1]);dR=null}}
 sync();scene.add(new THREE.Mesh(tg,new THREE.MeshLambertMaterial({vertexColors:true,map:groundTex})));
+if(WAKE){const sea=new THREE.Mesh(new THREE.PlaneGeometry(2*W+600,2*W+600),new THREE.MeshLambertMaterial({color:0x2a5a78,transparent:true,opacity:.78,depthWrite:false}));sea.rotation.x=-Math.PI/2;sea.position.y=0;sea.renderOrder=1;scene.add(sea);const sb=new THREE.Mesh(new THREE.PlaneGeometry(2*W+600,2*W+600),new THREE.MeshLambertMaterial({color:0x1b3b52}));sb.rotation.x=-Math.PI/2;sb.position.y=-7;scene.add(sb)}   /* v0.43 the sea: a translucent sheet at 0 m over the real seabed, and a dark floor past the map's edge */
 function applyCrater(c,fx){T.dig(terr,c[0],c[1],c[2],c[3]);dirtyRect(c[0],c[1],c[2]*1.45);propsFollow(c[0],c[1],c[2]*1.45);if(fx)boomFx(c[0],c[1])}
 /* ------------------------------------------------------------------ static props (visual only) */
 const dm=new THREE.Object3D(),sbM=new THREE.MeshLambertMaterial({color:0xa89870,map:TXP('tx_burlap',true)}),woodM=new THREE.MeshLambertMaterial({color:0xb0a090,map:TXP('tx_timber',true)}),mgM=new THREE.MeshLambertMaterial({color:0x222222});
@@ -290,7 +291,7 @@ function nearTunnel(){for(let i=0;i<T.TUNNELS.length;i++){const q=T.TUNNELS[i];i
 function phoneVis(l,s,c){const k=l+':'+s;if(c)PCUT.add(k);else PCUT.delete(k);const w=PHM.get(k);if(w)w.visible=!c;mmDirty=true}
 T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k++){const a=k*.4;[.25,.8].forEach(y=>box(1.5,.55,.7,sbM,n.x+Math.sin(a)*2.2,g+y,n.z+dir*Math.cos(a)*2.2,a*dir))}n.gm=box(.25,.25,1.8,mgM,n.x,g+1.1,n.z+dir*.9);box(.8,.8,.8,woodM,n.x,g+.4,n.z)});
 {const wp=new THREE.InstancedMesh(new THREE.CylinderGeometry(.06,.06,1.5,4),woodM,200),wl=[];let wn=0;
- [-1,1].forEach(s=>{const wz=x=>T.trenchC(s*30,x)-s*11;for(let x=-W+4;x<=W-8;x+=4){if(T.GAPS.some(g=>Math.abs(x-g)<5))continue;const z=wz(x),y=hAt(x,z);dm.position.set(x,y+.75,z);dm.updateMatrix();wp.setMatrixAt(wn++,dm.matrix);
+ if(!WAKE)[-1,1].forEach(s=>{const wz=x=>T.trenchC(s*30,x)-s*11;for(let x=-W+4;x<=W-8;x+=4){if(T.GAPS.some(g=>Math.abs(x-g)<5))continue;const z=wz(x),y=hAt(x,z);dm.position.set(x,y+.75,z);dm.updateMatrix();wp.setMatrixAt(wn++,dm.matrix);
   if(!T.GAPS.some(g=>Math.abs(x+4-g)<5))[.4,.8,1.2].forEach(h=>wl.push(x,y+h,z,x+4,hAt(x+4,wz(x+4))+h,wz(x+4)))}});
  wp.count=wn;scene.add(wp);const wg=new THREE.BufferGeometry();wg.setAttribute('position',new THREE.Float32BufferAttribute(wl,3));scene.add(new THREE.LineSegments(wg,new THREE.LineBasicMaterial({color:0x222222})));
  const TL=new THREE.TextureLoader(),artMat=n=>{const t=TL.load('assets/'+n+'.png');t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;return new THREE.SpriteMaterial({map:t,alphaTest:.5})};
@@ -309,7 +310,7 @@ T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k+
  {const gm=new THREE.MeshLambertMaterial({color:0x6a5d48,map:TXP('tx_mud',true)}),strip=(w,d,x,z)=>{const g=new THREE.PlaneGeometry(w,d);const uv=g.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*w/2.4,uv.getY(i)*d/2.4);const m=new THREE.Mesh(g,gm);m.rotation.x=-Math.PI/2;m.position.set(x,EDGE,z);scene.add(m)};
   strip(900,400,0,W+200);strip(900,400,0,-W-200);strip(400,2*W,W+200,0);strip(400,2*W,-W-200,0)}
  {const bm=new THREE.MeshLambertMaterial({color:0xb8aca0,map:TXP('tx_brick',true)});
-  for(let n=0;n<9;n++){const s=n&1?1:-1,along=(T.hash(n,140)-.5)*260,out=W+14+T.hash(n,141)*45,side=n%3!==0,x0=side?along:s*out,z0=side?s*out:along,len=6+T.hash(n,142)*10;
+  if(!WAKE)for(let n=0;n<9;n++){const s=n&1?1:-1,along=(T.hash(n,140)-.5)*260,out=W+14+T.hash(n,141)*45,side=n%3!==0,x0=side?along:s*out,z0=side?s*out:along,len=6+T.hash(n,142)*10;
    for(let k=0;k<len;k+=1.5){const h=1+T.hash(n*13+k,143)*(k%6<3?6:3);const g=new THREE.BoxGeometry(side?1.5:.7,h,side?.7:1.5),uv=g.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*1.5/2,uv.getY(i)*h/2);const m=new THREE.Mesh(g,bm);m.position.set(x0+(side?k:0),EDGE+h/2,z0+(side?0:k));scene.add(m)}}}
  /* puddles: flat decals on trench floors beside the duckboards and in flat hollows of no-man's land */
  {const L=[],flat=(x,z,r)=>{const h=hAt(x,z);return Math.abs(hAt(x+r,z)-h)<.12&&Math.abs(hAt(x-r,z)-h)<.12&&Math.abs(hAt(x,z+r)-h)<.12&&Math.abs(hAt(x,z-r)-h)<.12};
@@ -334,7 +335,7 @@ T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k+
    scatter('rubble',30,90,-16,16,1);scatter('shrub',10,95,-18,18,1.2);scatter('wirecoil',10,97,-10,10,1);
    T.HQS.forEach((q,i)=>{for(let k=0;k<4;k++)mk('barrel',q.x+7+k*1.1,q.z+(k&1)*1.2,1);mk('signpost',q.x-7,q.z+5,1)});
    /* home bases (every soldier respawns here unless a respawn point exists) */
-   for(const t of[0,1]){const z0=t===0?T.HOME_Z:-T.HOME_Z,sg=t===0?1:-1;mk('flag'+t,0,z0-sg*2,1.6);mk('signpost',3,z0-sg*3,1);
+   if(!WAKE)for(const t of[0,1]){const z0=t===0?T.HOME_Z:-T.HOME_Z,sg=t===0?1:-1;mk('flag'+t,0,z0-sg*2,1.6);mk('signpost',3,z0-sg*3,1);
     for(let i=0;i<9;i++){const x=-44+i*11+(T.hash(i,t+60)-.5)*3,z=z0+sg*(3+T.hash(i,t+61)*4);mk('tent',x,z,2.2)}
     for(let i=0;i<6;i++)mk(i&1?'crate':'ammobox',-14+i*5.5,z0-sg*1,i&1?.5:.5);for(let i=0;i<5;i++)mk('barrel',18+i*1.1,z0+sg*(i&1)*1.2,1)}
    /* PSX-pack props: ammo boxes at HQs and behind MG nests, tools by the HQ dugouts */
@@ -353,6 +354,14 @@ T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k+
    for(let n=0;n<12;n++){const [x,z]=far(n*7+3,130);mk('smoke'+(n&1),x,z,3.2+T.hash(n,131)*2,EDGE)}
   }).catch(()=>{})}
 }
+/* v0.43 Wake Atoll scenery from the owner's art: palms where the map has them (one in seven shattered), beach scrub at the map's
+   bushes, and grass tufts scattered inland. Sprites are camera-facing quads in the static batches (ssAdd). */
+if(WAKE){const M=T.MP.meta,pm=n=>{const t=TXP(n);return new THREE.SpriteMaterial({map:t,alphaTest:.5})},palm=[pm('palm0'),pm('palm1')],PL=[];for(let i=0;i<21;i++)PL.push(pm('plant'+i));
+ const BUSH=[3,4,8,13,15],TUFT=[0,1,2,5,6,9,10,11,12,14,16,17,18,19,20],land=(x,z)=>hAt(x,z)>.6,farFlag=(x,z)=>T.OBJ.every(o=>Math.hypot(o.x-x,o.z-z)>5);
+ M.props.forEach((p,i)=>{if(!land(p.x,p.z))return;const h=T.hash(i,801);
+  if(p.k==='palm'){if(h<.14){const hh=2.2+T.hash(i,802)*.6;ssAdd(palm[1],p.x,hAt(p.x,p.z),p.z,hh*1.97,hh,.04,1e9)}else{const hh=5.5+T.hash(i,803)*3;ssAdd(palm[0],p.x,hAt(p.x,p.z),p.z,hh*.71,hh,.03,1e9)}}
+  else if(p.k==='bush'){const k=BUSH[Math.floor(h*BUSH.length)],hh=.9+T.hash(i,804)*.6,im=PL[k].map.image;ssAdd(PL[k],p.x,hAt(p.x,p.z),p.z,hh*1.3,hh,.04,220)}});
+ for(let n=0,put=0;n<6000&&put<900;n++){const x=(T.hash(n,810)-.5)*2*W,z=(T.hash(n,811)-.5)*2*W;if(!land(x,z)||hAt(x,z)<1.2||!farFlag(x,z))continue;const k=TUFT[Math.floor(T.hash(n,812)*TUFT.length)],hh=.45+T.hash(n,813)*.7;ssAdd(PL[k],x,hAt(x,z),z,hh*1.1,hh,.04,120);put++}}
 /* ------------------------------------------------------------------ trench walls, duckboards, dugouts (visual; the shapes are in the terrain and shared.js) */
 {
  const cv=document.createElement('canvas');cv.width=cv.height=128;const g=cv.getContext('2d');g.fillStyle='#4f3d29';g.fillRect(0,0,128,128);
@@ -432,7 +441,7 @@ function stageZ(){if(!opS)return{n:'Home base',z:me.team?-T.HOME_Z:T.HOME_Z};con
 /* v0.31.1 spawn map: when dead, a map of the battlefield. Click your home base, a field post / rally point / building
    respawn point, or a flag your side fully holds (greyed out while it is being taken or enemies are near it). */
 function spawnList(){const st=stageZ();const L=[{id:0,k:'home',n:st.n,x:0,z:st.z,ok:1},{id:-99,k:'air',n:'Airfield',x:T.AIRF[me.team].x,z:T.AIRF[me.team].z,ok:1}];
- T.OBJ.forEach((q,i)=>{if(obj[i].owner===me.team)L.push({id:-(i+1),k:'flag',n:'Flag: '+T.LINES[i],x:q.x,z:q.z,ok:Math.abs(obj[i].p)>=.99&&!flagHot(i)})});
+ T.OBJ.forEach((q,i)=>{if(WAKE&&i>=5)return;if(obj[i].owner===me.team)L.push({id:-(i+1),k:'flag',n:'Flag: '+(WAKE?q.n:T.LINES[i]),x:q.x,z:q.z,ok:Math.abs(obj[i].p)>=.99&&!flagHot(i)})});
  for(const [id,q] of fposts)if(q.team===me.team)L.push({id,k:q.rally?'rally':'post',n:(q.rally?'Rally point ('+q.rally+'s)':q.hp>1e6?'Building respawn point':'Field post')+' · '+nearLine(q.x,q.z),x:q.x,z:q.z,ok:1});return L}
 function flagHot(i){const q=T.OBJ[i];for(const e of ents.values())if(e.team!==me.team&&e.alive&&e.vis!==false&&Math.hypot(e.x-q.x,e.z-T.trenchC(T.FL[i],e.x))<25)return true;return false}
 function pickSpawn(i){const L=spawnList(),it=L[i];if(!it||!it.ok)return;spawnSel=it.id;sendJ({t:'act',a:'spawnAt',id:it.id});spawnDraw()}
@@ -479,7 +488,7 @@ function bmDraw(){const el=$('bm');if(!bmOpen||!deployed||!me.alive||me.officer)
 {const bag=new THREE.BoxGeometry(1.8,.27,.76),mt=new THREE.MeshLambertMaterial({color:0xffffff,map:TXP('tx_burlap',true)}),im=new THREE.InstancedMesh(bag,mt,T.SB.length*3),m4=new THREE.Matrix4(),col=new THREE.Color(),q=new THREE.Quaternion(),e=new THREE.Euler(),v=new THREE.Vector3(),sc=new THREE.Vector3(1,1,1);let i=0;
  for(const b of T.SB){const y0=hAt(b.x,b.z);for(let r=0;r<3;r++){e.set(0,(T.hash(b.x,r+9)-.5)*.14,0);q.setFromEuler(e);v.set(b.x+(T.hash(b.z,r+3)-.5)*.12,y0+.12+r*.26,b.z+(T.hash(b.x,r+5)-.5)*.08);m4.compose(v,q,sc);im.setMatrixAt(i,m4);bayReg(b.t*1000+b.cell,im,i);const sh=.74+.2*T.hash(b.x*3+r,b.z);col.setRGB(.55*sh+.12,.45*sh+.09,.3*sh+.05);im.setColorAt(i,col);i++}}
  im.instanceMatrix.needsUpdate=true;if(im.instanceColor)im.instanceColor.needsUpdate=true;scene.add(im)}
-const flags=T.FL.map((z,i)=>{const g=new THREE.Group(),pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,9,6),new THREE.MeshLambertMaterial({color:0x222222}));pole.position.y=4.5;
+const flags=(WAKE?T.OBJ.slice(0,5):T.FL).map((z,i)=>{const g=new THREE.Group(),pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,9,6),new THREE.MeshLambertMaterial({color:0x222222}));pole.position.y=4.5;
  const f=new THREE.Mesh(new THREE.PlaneGeometry(3,1.8),new THREE.MeshBasicMaterial({color:0x7aa8e0,side:THREE.DoubleSide}));f.position.set(1.6,8,0);g.add(pole,f);{const q=T.OBJ[i];g.position.set(q.x,hAt(q.x,q.z),q.z)}scene.add(g);return f});
 /* ------------------------------------------------------------------ sprites, effects, audio */
 function tex(u,h){const c=document.createElement('canvas');c.width=32;c.height=64;const g=c.getContext('2d'),R=(x,y,w,hh,k)=>{g.fillStyle=k;g.fillRect(x,y,w,hh)};
@@ -548,9 +557,9 @@ function bodyFx(b){const [id,x,y,z,vx,vy,vz,team,look,yaw]=b;const e=ents.get(id
 const nades=[];
 /* ------------------------------------------------------------------ game state */
 const me={id:0,team:0,x:0,y:0,z:0,vy:0,yaw:0,pitch:0,hp:0,maxhp:100,alive:false,ammo:0,rel:false,mg:false,over:false,heat:0,supply:0,cls:'rifleman',w:'bolt',u:'bandage',sq:-1,xp:0,rank:0,eye:1.65,lean:0,prevAmmo:0,prevHp:0};
-const ents=new Map(),obj=T.FL.map((z,i)=>({owner:i<3?0:1,p:i<3?1:-1,lock:0}));
+const ents=new Map(),obj=T.OBJ.map((z,i)=>({owner:i<3?0:1,p:i<3?1:-1,lock:0}));
 let lastTick=0,wave=[0,0],hv=0,roundState='play',pending=[],seq=0,outbox=[],ws=null,ping=0,deployed=false,locked=false,kills=0;
-let dpS=T.DEPOTS.map(()=>[-1,0]),supK=['bomb','barrage','drop','para','smoke','gas','recon','rally','whistle'],supR=[30,13,4,8,12,11,50,3,20],cpS=[0,250,0],cdMax={},ofMouse=null,ringM=null,dpW=null;const gasL=[],reconL=[],swL=[],mkL=[],alertL=[];let supTr=[],tierS=1,groups={},dragS=null,dragged=false,fogC=null,fogM=null,fogT=0;
+let domS=null,dpS=T.DEPOTS.map(()=>[-1,0]),supK=['bomb','barrage','drop','para','smoke','gas','recon','rally','whistle'],supR=[30,13,4,8,12,11,50,3,20],cpS=[0,250,0],cdMax={},ofMouse=null,ringM=null,dpW=null;const gasL=[],reconL=[],swL=[],mkL=[],alertL=[];let supTr=[],tierS=1,groups={},dragS=null,dragged=false,fogC=null,fogM=null,fogT=0;
 let myOrder=null,offOrders=[],sqs=[],supCd=[0,0,0,0,0,0,0,0,0],supCost=[30,15,10,25,8,25,10,20,15],selSq='all',omode='attack',ofx=0,ofz=80,ofh=120,ofyaw=0,ofpit=-Math.PI/2,ofRot=false,orderPing=0,offHtml='';
 const beams=new Map(),crateM=new Map(),fposts=new Map();
 function mkPost(team){const g=new THREE.Group(),sb=new THREE.MeshLambertMaterial({color:0x8a7a52}),cl=new THREE.MeshLambertMaterial({color:team?0x6a665a:0x4a6a9a});
@@ -676,7 +685,7 @@ function onMsg(m){
   case'mask':maskOn=!!m.on;maskAt=performance.now()+(m.d||0)*1000;nz(.5,.15,m.on?600:900,'lowpass',0,1.2);break;
   case'k':kills++;knShow('ELIMINATED '+String(m.n||'enemy').toUpperCase(),'+10');break;
   case'xp':{const lv0=T.levelOf(me.xp||0).lv,lv1=T.levelOf(m.xp).lv;me.xp=m.xp;me.rank=m.rank;recCache(myName(),m.xp);if(m.up)say('PROMOTED to '+RK[m.rank][0]+(m.rank<=3?'. New unlocks in the loadout menu.':'!'));else if(lv1>lv0)say('LEVEL UP: level '+lv1+' (+1 perk point)');break}
-  case'o':m.o.forEach((o,i)=>{obj[i].owner=o[0];obj[i].p=o[1];obj[i].lock=o[2]});if(m.dp)dpS=m.dp;wave=m.w;opS=m.op||null;hv=m.hv;roundState=m.r;syncPosts(m.fp||[]);syncBoxes(m.ab||[]);break;
+  case'o':m.o.forEach((o,i)=>{if(!obj[i])return;obj[i].owner=o[0];obj[i].p=o[1];obj[i].lock=o[2]});domS=m.ds||null;if(m.dp)dpS=m.dp;wave=m.w;opS=m.op||null;hv=m.hv;roundState=m.r;syncPosts(m.fp||[]);syncBoxes(m.ab||[]);break;
   case'cr':applyCrater(m.c,true);firesPlace();break;
   case'bd':for(const b of m.b)bodyFx(b);break;
   case'gr':{const stick=m.tm===1,mt=spMat(stick?'nade':'nade_mills').clone(),mesh=new THREE.Sprite(mt);mesh.scale.set(stick?.26:.3,stick?.62:.36,1);scene.add(mesh);nades.push({mesh,t:0,f:m.f,to:m.to,spin:stick?14:9});break}   /* blue throws Mills bombs, green stick grenades (LP Weapons Pack) */
@@ -703,7 +712,7 @@ function onMsg(m){
 }
 const WKEY=['bolt','carbine','shotgun','smg','lmg','mark','sniper','mg'];
 function onShots(buf){const dv=new DataView(buf),n=dv.getUint16(1,true);for(let i=0,o=3;i<n;i++,o+=18){if(dv.getUint16(o+13,true)===me.id)continue;   /* binary tracers (v0.23) */
- const x=dv.getInt16(o,true)/100,y=dv.getInt16(o+2,true)/100,z=dv.getInt16(o+4,true)/100,dx=dv.getInt16(o+6,true)/1e4,dy=dv.getInt16(o+8,true)/1e4,dz=dv.getInt16(o+10,true)/1e4,w=WKEY[dv.getUint8(o+15)]||'bolt';
+ const x=dv.getInt16(o,true)/PQ,y=dv.getInt16(o+2,true)/PQ,z=dv.getInt16(o+4,true)/PQ,dx=dv.getInt16(o+6,true)/1e4,dy=dv.getInt16(o+8,true)/1e4,dz=dv.getInt16(o+10,true)/1e4,w=WKEY[dv.getUint8(o+15)]||'bolt';
  tracer(x,y,z,dx,dy,dz,dv.getUint8(o+12),false,dv.getUint16(o+16,true));shotSnd(x,z,w)}}
 function onSnap(buf){
  const dv=new DataView(buf),now=performance.now();if(lastSnapAt)netGap=Math.max(netGap,now-lastSnapAt);lastSnapAt=now;const ack=dv.getUint32(5,true),sx=dv.getFloat32(9,true),sy=dv.getFloat32(13,true),sz=dv.getFloat32(17,true),svy=dv.getFloat32(21,true);
@@ -730,7 +739,7 @@ function onSnap(buf){
   const id=dv.getUint16(o,true),m=dv.getUint8(o+2);o+=3;let e=ents.get(id),q=e?e.q:[0,0,0,0,0,0];
   if(m&1){q[0]=dv.getInt16(o,true);q[1]=dv.getInt16(o+2,true);q[2]=dv.getInt16(o+4,true);o+=6}else if(m&2){q[0]+=dv.getInt8(o);q[1]+=dv.getInt8(o+1);q[2]+=dv.getInt8(o+2);o+=3}
   if(m&4)q[3]=dv.getUint8(o++);if(m&8)q[4]=dv.getUint8(o++);if(m&16)q[5]=dv.getUint8(o++);
-  const x=q[0]/100,y=q[1]/100,z=q[2]/100,f=q[4],lk=q[5],yw=q[3]/256*Math.PI*2;
+  const x=q[0]/PQ,y=q[1]/PQ,z=q[2]/PQ,f=q[4],lk=q[5],yw=q[3]/256*Math.PI*2;
   if(!e){const sp=new THREE.Object3D();sp.scale.set(SPW(),1.95,1);e={sp,q,a:{t:now,x,y,z},b:{t:now,x,y,z}};ents.set(id,e)}
   if(m&3){e.a=now-e.b.t>130?{t:now-50,x:e.b.x,y:e.b.y,z:e.b.z}:e.b;e.b={t:now,x,y,z}}   /* resumed after standing still: interpolate over one tick, not the whole pause */
   if(e.gone&&now-e.goneT>1500){e.gone=false;e.sp.visible=true}e.team=f&1;e.cls=lk&7;e.wi=(lk>>3)&7;e.mysq=!!(lk&64);if(e.cls===7){e.elite=e.wi;e.cls=2;e.gl=6+e.elite}else{e.elite=-1;e.gl=Math.min(5,e.wi)}e.fire=!!(f&16);e.aim=!!(f&128);e.yaw=yw;e.bot=!!(f&2);const pr=(f&68)===68;e.para=pr;e.mg=!pr&&!!(f&4);e.down=!pr&&!!(f&64);e.crouch=!!(f&8);e.spotted=!!(f&32);e.seen=now;
@@ -1142,7 +1151,7 @@ function stepSnd(f,s,bits){if(me.sld>0||!me.alive||me.cl||me.y>T.groundAt(terr.H
    later. predTick mirrors the server's own rules (rate of fire, sprint-to-fire delay, semi-automatic trigger); each shot the
    server then confirms is matched against a shown one, and a shown shot that is never confirmed is simply forgotten. */
 const predAt=[];let pCd=0,pSpr=0,pHold=false,netGap=0,netGapAt=0,lastSnapAt=0,pingAt=0,srvMs=0,srvGap=0,nfN=0,nfT=0,nfMax=0,nfFps=0,nfWorst=0,nfLast=0;
-function shotFx(){const W=WPN[me.w]||{},cp=Math.cos(me.pitch),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(me.pitch),dz=-Math.cos(me.yaw)*cp;TUT.shot=1;gunKick=W.flame?.25:1;gFire=0;recoil();if(!(W.flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(W.pel===1&&!W.flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:W.rng,true,me.mg?420:W.vel)}
+function shotFx(){const W=WPN[me.w]||{},zv=me.mg?420:W.vel||400,pz=me.pitch+(zv>=360&&!W.flame?T.GRAV*(W.scope&&!me.mg?150:100)/(2*zv*zv):0),cp=Math.cos(pz),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(pz),dz=-Math.cos(me.yaw)*cp;   /* v0.42 sights zeroed at 100 m, as on the server */TUT.shot=1;gunKick=W.flame?.25:1;gFire=0;recoil();if(!(W.flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(W.pel===1&&!W.flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:W.rng,true,me.mg?420:W.vel)}
 function predTick(dt,bits,f,s){pCd-=dt;pSpr=(bits&1)&&(f||s)&&!me.mg?.18:pSpr-dt;const want=!!(bits&8),W=WPN[me.w],now=performance.now();
  while(predAt.length&&now-predAt[0]>ping*1.5+700)predAt.shift();
  if(want&&W&&!W.flame&&me.alive&&!me.mg&&!myVeh&&!me.elite&&!me.rel&&!me.charging&&!me.cl&&!me.rg&&pSpr<=0&&pCd<=0&&(W.auto||!pHold)&&(me.ammo|0)-predAt.length>0&&!(maskAt>now)){pCd=W.cd*(me.cls==='rifleman'&&me.w==='bolt'?.8:1);predAt.push(now);shotFx()}
@@ -1175,13 +1184,13 @@ let knT=0,knAt=0,knTxt='';function knShow(t,sc){knTxt=t;knAt=performance.now();k
 const FLC=[],FLT=[0,1,2,3].map(f=>{const c=document.createElement('canvas');FLC.push(c);c.width=16;c.height=24;const g=c.getContext('2d');for(let y=0;y<24;y++)for(let x=0;x<16;x++){const cx=Math.abs(x-7.5)/8,h=1-y/24,r=Math.sin(x*1.7+f*2.1+y*.6)*.18+Math.sin(x*.7-f*1.3)*.12,v=(1-h)*(1-cx*1.3)+r;if(v>.25){g.fillStyle=v>.75?'#fff2b0':v>.55?'#ffb030':v>.4?'#e8601a':'#8a2a10';g.fillRect(x,y,1,1)}}return pxTex(c,false)});
 let fires=null;
 function firesInit(){fires=[];let sd=7;const r=()=>(sd=(sd*16807)%2147483647)/2147483647;
- T.BURN.forEach((B,i)=>{const {x,z,k}=B,m=new THREE.Sprite(new THREE.SpriteMaterial({map:FLT[0],transparent:true,depthWrite:false,fog:false}));m.center.set(.5,0);m.scale.set(k,k*1.5,1);scene.add(m);   /* positions shared with the server (T.BURN): they light the ground at night */
+ (WAKE?[]:T.BURN).forEach((B,i)=>{const {x,z,k}=B,m=new THREE.Sprite(new THREE.SpriteMaterial({map:FLT[0],transparent:true,depthWrite:false,fog:false}));m.center.set(.5,0);m.scale.set(k,k*1.5,1);scene.add(m);   /* positions shared with the server (T.BURN): they light the ground at night */
   const f={x,z,m,k,ph:B.ph,sm:[]};if(i%3===0)for(let j=0;j<6;j++){const s=smokeS(j&1);s.material.transparent=true;s.material.alphaTest=0;s.material.color.setRGB(.13,.12,.11);s.center.set(.5,.2);scene.add(s);f.sm.push({s,t:j/6})}fires.push(f)});firesPlace();lightsInit()}
 /* v0.35 night lights (T.LIGHTS, shared with the server): lantern / brazier / pot meshes, flames and halos drawn as GPU point sprites
    (two draw calls, animated in the shader), and pools of light draped on the ground (one additive mesh). At night a soldier
    standing in the light is drawn lit. */
 let LV=null;
-function lightsInit(){const LI=T.LIGHTS,yOf=l=>l.y!=null?l.y:hAt(l.x,l.z)+(l.h||0),parts=new Map(),put=(g,col,x,y,z)=>{g=g.index?g.toNonIndexed():g;g.translate(x,y,z);if(!parts.has(col))parts.set(col,[]);parts.get(col).push(g)};
+function lightsInit(){if(!T.LIGHTS.length){LV={n:0};return}const LI=T.LIGHTS,yOf=l=>l.y!=null?l.y:hAt(l.x,l.z)+(l.h||0),parts=new Map(),put=(g,col,x,y,z)=>{g=g.index?g.toNonIndexed():g;g.translate(x,y,z);if(!parts.has(col))parts.set(col,[]);parts.get(col).push(g)};
  const glassC=0xffc468,FL=[],HL=[],HF=[];
  for(const l of LI){const y=yOf(l),k=l.k;
   if(k==='lantern'||k==='lamp'){const s=k==='lamp'?.7:1;put(new THREE.BoxGeometry(.2*s,.05,.2*s),0x2a2620,l.x,y+.17*s,l.z);put(new THREE.BoxGeometry(.05,.1,.05),0x2a2620,l.x,y+.24*s,l.z);put(new THREE.BoxGeometry(.15*s,.22*s,.15*s),'glass',l.x,y,l.z);put(new THREE.BoxGeometry(.2*s,.04,.2*s),0x2a2620,l.x,y-.13*s,l.z);
@@ -1212,7 +1221,7 @@ function lightsInit(){const LI=T.LIGHTS,yOf=l=>l.y!=null?l.y:hAt(l.x,l.z)+(l.h||
  const pool=new THREE.Mesh(G,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-4,side:THREE.DoubleSide,fog:false}));pool.frustumCulled=false;scene.add(pool);
  LV={lamps,fireH,flames,pool,glass:mats.glass,n:LI.length}}
 const _ls=new THREE.Vector2();
-function lightsTick(){if(!LV)return;const night=wxK==='night',t=performance.now()/1000;renderer.getDrawingBufferSize(_ls);const sc=_ls.y/(2*Math.tan(cam.fov*Math.PI/360));
+function lightsTick(){if(!LV||!LV.n)return;const night=wxK==='night',t=performance.now()/1000;renderer.getDrawingBufferSize(_ls);const sc=_ls.y/(2*Math.tan(cam.fov*Math.PI/360));
  for(const o of[LV.lamps,LV.fireH,LV.flames]){o.material.uniforms.t.value=t;o.material.uniforms.sc.value=sc}
  LV.lamps.visible=night||wxK==='fog';LV.lamps.material.uniforms.gain.value=night?1:.35;LV.fireH.material.uniforms.gain.value=night?1:.3;LV.pool.visible=night;LV.pool.material.opacity=.92+.08*Math.sin(t*9);
  LV.glass.color.setHex(night?0xffd27a:0x9a8458)}
@@ -1714,7 +1723,7 @@ function frame(){
  trTick(dt);
  for(const c of crateM.values()){c.left=Math.max(0,c.left-dt);c.m.position.set(c.x,hAt(c.x,c.z)+.7+c.left/2.2*30,c.z)}orderPing=Math.max(0,orderPing-dt);
  syncDirty();
- flags.forEach((f,i)=>{f.material.color.set(obj[i].owner===0?0x7aa8e0:0x62d66a);f.position.y=3+(obj[i].p+1)*2.5});
+ flags.forEach((f,i)=>{f.material.color.set(obj[i].owner===0?0x7aa8e0:obj[i].owner===1?0x62d66a:0xd8d2c0);f.position.y=WAKE?3+Math.abs(obj[i].p)*5:3+(obj[i].p+1)*2.5});   /* a neutral flag on Wake is white and half-mast */
  // camera
  if(!deployed)me.yaw+=dt*.08;
  scene.fog.density=((me.officer&&deployed)||mortarSight()||fgunObs()?.0025:fgunScope()?.006:.011)*S.fog*(myVeh&&myVeh.k==='plane'?.35:myVeh&&vView?.8:1)*wxFogK(now)/(1+((WPN[me.w]&&WPN[me.w].scope||1)-1)*adsT*.55);   /* a scope cuts through the haze */
@@ -1751,7 +1760,7 @@ function frame(){
   let h=RK[me.rank][0]+' · '+me.xp+' XP · '+(me.team?'GREEN':'BLUE')+' · '+(me.officer?'OFFICER':me.sq>=0?T.SQUADS[me.sq]+(me.lead?' (SQUAD LEADER)':''):'no squad')+'\n';
   if(me.officer)h+='COMMAND POINTS '+cpS[0]+'/'+cpS[1]+' (+'+cpS[2]+'/min) · tier '+tierS+'   SUPPLY '+me.supply+'\n';else h+='HP '+Math.ceil(me.hp)+'   '+(me.mg?'MG '+me.ammo+' rds   HEAT '+'█'.repeat(Math.round(me.heat*10))+'░'.repeat(10-Math.round(me.heat*10))+(me.over?' OVERHEATED':'')+(me.rel?' (new belt)':''):'AMMO '+me.ammo+'/'+w.mag+(me.rel?' (reloading)':''))+'   SUPPLY '+me.supply+'   KILLS '+kills+'\n';
   h+=(me.elite?'ELITE '+T.ELITE[me.elite].n:CLS[me.cls].n)+(me.officer?'':' · '+w.n)+'   ping '+ping+' ms · '+hv+' players\n';
-  obj.forEach((o,i)=>{h+='<span style="color:var(--'+(o.owner===0?'bl':'rd')+')">'+T.LINES[i]+'  '+(o.lock>0?'reinforcing '+o.lock+'s':bar(o))+'</span>\n'});
+  obj.forEach((o,i)=>{if(WAKE&&i>=5)return;h+='<span style="color:var(--'+(o.owner===0?'bl':o.owner===1?'rd':'fg')+')">'+(WAKE?T.OBJ[i].id+' · '+T.OBJ[i].n:T.LINES[i])+'  '+(o.lock>0?'reinforcing '+o.lock+'s':bar(o))+'</span>\n'});
   h+='SIDE OBJECTIVES: '+T.DEPOTS.map((d,i)=>'<span style="color:'+(dpS[i][0]<0?'#aaa':dpS[i][0]===me.team?'var(--'+(me.team?'rd':'bl')+')':'#e05040')+'">'+d.n+(dpS[i][0]<0?'':dpS[i][0]===me.team?' (ours)':' (enemy)')+'</span>').join(' · ')+'\n';
   if(opS){const [att,sec,nsec,tk,tkMax,bat,nbat]=opS;h+='OPERATION: '+(att===me.team?'you attack':'you defend')+' · sector '+Math.min(sec+1,nsec)+'/'+nsec+' · '+(att===me.team?'tickets ':'enemy tickets ')+tk+'/'+tkMax+' · battalion '+Math.min(bat+1,nbat)+'/'+nbat+'\n'}
   h+='WEATHER: '+T.WXS[wxK].n+(wxK==='night'?' · lamps, fires and flares light the field':wxK==='fog'?' · short sight lines':wxK==='rain'?' · mud slows you':'')+'\n';
@@ -1767,7 +1776,7 @@ function frame(){
    if(show&&myVeh){const vh=vehHud();hb.querySelector('.am').innerHTML=vst.rl>0?vst.rl.toFixed(1)+'<small>s reload</small>':'READY';hb.querySelector('.ul i').style.width=vst.hp+'%';hb.querySelector('.sp').textContent='ARMOUR '+vst.hp+'%  ·  SUPPLY '+me.supply;hb.querySelector('.it').textContent=vh?vh.keys:''}
    else if(show){if(me._wi!==me.w){me._wi=me.w;wIcon()}hb.querySelector('.am').innerHTML=me.mg?me.ammo+'<small>rds</small>':me.ammo+'<small>/ '+w.mag+(me.rel?' · reloading':'')+'</small>';hb.querySelector('.ul i').style.width=Math.max(0,Math.min(100,me.hp/(me.maxhp||100)*100))+'%';hb.querySelector('.sp').textContent='SUPPLY '+me.supply+'  ·  HP '+Math.ceil(me.hp);hb.querySelector('.it').textContent='['+kn('grenade')+'] GRENADES '+(me.gr|0)+'   ['+kn('heal')+'] '+(me.u==='gasnade'?'GAS GRENADES':me.u==='smokenade'?'SMOKE GRENADES':me.u==='flare'?'FLARES':'BANDAGES')+' '+(me.bd|0)+(maskOn?'   ['+kn('mask')+'] MASK ON':'')+(me.cls==='assault'&&!me.elite&&!me.officer?'   ['+kn('ability')+'] '+(me.mph?'MORPHINE '+Math.max(0,Math.ceil((mphEnd-performance.now())/1000))+'s':'MORPHINE '+(me.mphN|0)):'')+(me.cls==='gunner'&&!me.elite&&!me.officer?'   ['+kn('ability')+'] AMMO BOX':'')+(me.cls==='rifleman'&&!me.elite&&!me.officer?'   ['+kn('ability')+'] RIFLE GRENADE'+(me.rg?' (FITTED)':''):'')}
    {const hi=$('hint');const vHint=show?(rgHint()||medHint()||ekHint()||vehNearHint()||aboxHint()):null;const wkOn=performance.now()-((me.wk&&me.wk.at)||0)<600;if(tnNear&&show&&!medNear){hi.style.display='block';const P=Math.round(TNP[tnNear.i]*100);hi.textContent=wkOn?me.wk.n+(me.wk.p?' · '+Math.round(me.wk.p*100)+'%':''):tnNear.dig?'Hold ['+kn('use')+'] to dig the mine gallery under the enemy trench ('+P+'%)'+(me.cls==='sapper'?'':' (sappers dig 3x faster)'):P?'Enemy digging below ('+P+'%)! Hold ['+kn('use')+'] to countermine':'Listening post: hold ['+kn('use')+'] to listen for enemy mining'}else if(phNear&&show&&!medNear){hi.style.display='block';hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':'Hold ['+kn('use')+(phNear.own?'] to splice the telephone line':'] to cut the enemy telephone line')+(me.cls==='sapper'?'':' (sappers are faster)')}else if(repNear&&show&&!medNear){hi.style.display='block';hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':'Hold ['+kn('use')+'] to repair the '+repNear.n+(me.cls==='sapper'?'':' (sappers repair faster)')}else if(fortNear&&show&&!medNear){hi.style.display='block';const F=T.FORT[fortNear.k];hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':fortNear.team===me.team?'Hold ['+kn('use')+'] to build the '+F.n.toLowerCase()+' ('+Math.round(fortNear.done*100)+'%)':'Hold ['+kn('use')+'] to tear down the enemy '+F.n.toLowerCase()}else if(medNear&&show){hi.style.display='block';hi.textContent=performance.now()-(me.rvAt||0)<700?'Reviving '+Math.round(me.rvp*100)+'%':'Hold ['+kn('use')+'] to revive'}else if(vHint){hi.style.display='block';hi.textContent=vHint}else if(clAvail&&show&&!me.cl){hi.style.display='block';hi.textContent='Hold ['+kn('jump')+'] to climb'}else hi.style.display='none'}
-   if(!opHud())$('stat').textContent=(wave[0]===me.team?'YOUR PUSH ':'ENEMY PUSH ')+Math.max(0,45-wave[1])+'s'+(myOrder&&!me.officer?'\n'+myOrder.ty.toUpperCase()+' '+myOrder.n+' · '+Math.round(Math.hypot(myOrder.x-me.x,myOrder.z-me.z))+' m':'')}}
+   if(!opHud())$('stat').textContent=WAKE&&domS?'HOLD THE ATOLL · '+(me.team===0?'YOU ':'ENEMY ')+domS[0]+' – '+domS[1]+(me.team===0?' ENEMY':' YOU')+' · FIRST TO '+domS[2]+'\n'+T.OBJ.slice(0,5).map((q,i)=>q.id+(obj[i].owner===me.team?'●':obj[i].owner<0?'○':'✕')).join('  ')+(myOrder&&!me.officer?'\n'+myOrder.ty.toUpperCase()+' '+myOrder.n+' · '+Math.round(Math.hypot(myOrder.x-me.x,myOrder.z-me.z))+' m':''):(wave[0]===me.team?'YOUR PUSH ':'ENEMY PUSH ')+Math.max(0,45-wave[1])+'s'+(myOrder&&!me.officer?'\n'+myOrder.ty.toUpperCase()+' '+myOrder.n+' · '+Math.round(Math.hypot(myOrder.x-me.x,myOrder.z-me.z))+' m':'')}}
  msgT-=dt;if(msgT<=0)$('msg').textContent='';
 }
 connectScreen();frame();
