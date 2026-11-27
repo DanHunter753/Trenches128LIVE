@@ -21,6 +21,11 @@ function client(name) { return new Promise(res => { const ws = new WebSocket('ws
   R.server = +(me.x - x0).toFixed(2); R.predicted = +(sim.x - x0).toFixed(2); ck('burstFullyApplied', Math.abs(me.x - sim.x) < .05 && Math.abs(R.predicted) > .6);   // (a slow machine gunner covers ~0.9 m)
   // a speed hack: 3 s of 50 ms frames in one go
   place(); await sleep(400); const x1 = me.x; for (let m = 0; m < 3; m++) { const c = []; for (let i = 0; i < 20; i++) c.push([++seq, 50, 1, 0, 1, Math.PI / 2, 0]); A.ws.send(JSON.stringify({ t: 'in', c, rt: X.tickNo() })); }
-  await sleep(120); R.hackMoved = +Math.abs(me.x - x1).toFixed(2); ck('speedHackCapped', Math.abs(me.x - x1) < 7 * 1 * (.6 + .2) + .5);   // sprint 7 m/s x (bank + a few ticks)
+  await sleep(120); R.hackMoved = +Math.abs(me.x - x1).toFixed(2); ck('speedHackCapped', Math.abs(me.x - x1) < 7 * 1 * (1 + .25) + .5);   // sprint 7 m/s x (the 1 s bank + a few ticks)
+  // v0.38: a 60 Hz client rounds each 16.7 ms frame up to 17 ms (2% fast) and the server's timer runs a little slow. With the
+  // bank empty, 4 s of that must still be applied in full (it used to lose ~4%, pulling the player back several times a second).
+  place(); await sleep(300); me.tBank = 0; const sim2 = { x: me.x, y: me.y, z: me.z, vy: 0, w: me.w, cls: me.cls }, x2 = me.x, t0 = Date.now(); let sent = 0;
+  while (Date.now() - t0 < 4000) { const due = Math.floor((Date.now() - t0) / (1000 / 60)), c = []; while (sent < due && c.length < 20) { sent++; c.push([++seq, 17, 1, 0, 1, Math.PI / 2, 0]); T.step(sim2, { dt: .017, f: 1, s: 0, bits: 1, yaw: Math.PI / 2 }, X.terr().H, T.spOf(me)); } if (c.length) A.ws.send(JSON.stringify({ t: 'in', c, rt: X.tickNo() })); await sleep(30); }
+  await sleep(300); R.drift = [+(me.x - x2).toFixed(2), +(sim2.x - x2).toFixed(2)]; ck('clockDriftNotPunished', Math.abs(me.x - sim2.x) < .12 && Math.abs(sim2.x - x2) > 15);
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);
 })().catch(e => { console.log('TEST ERROR', e); process.exit(1); });

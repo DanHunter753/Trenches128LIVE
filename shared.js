@@ -244,7 +244,7 @@ function wall(out, along, c, a0, a1, th, slits, top, mat, sw) {
   if (top > SL0) { let a = a0; const w = (sw || .8) / 2; for (const sc of slits.slice().sort((p, q) => p - q)) { B(a, sc - w, SL0, Math.min(SL1, top)); a = sc + w; } B(a, a1, SL0, Math.min(SL1, top)); }
 }
 function fortParts(k) {
-  const o = { boxes: [], nest: null, sp: null, wire: null };
+  const o = { boxes: [], nest: null, sp: null, wire: null, radio: null };   // radio: where the respawn point's field telephone stands (a back corner, out of the way)
   if (k === 'bags') o.boxes.push([0, 0, 1.0, .38, 0, .95, 'bag']);
   else if (k === 'cover') o.boxes.push([0, 0, .85, .22, 0, 1.25, 'wood']);
   else if (k === 'wire') o.wire = [0, 0, 2.6, .7];
@@ -252,19 +252,19 @@ function fortParts(k) {
     const b = o.boxes, t = .7; wall(b, 'x', 3, -3.5, 3.5, t, [-2.2, 0, 2.2], 2.05, 'bag', .9);
     wall(b, 'z', -3.5, -2.65, 2.65, t, [.6], 2.05, 'bag'); wall(b, 'z', 3.5, -2.65, 2.65, t, [.6], 2.05, 'bag');
     wall(b, 'x', -3, -3.5, -1, t, [], 1.35, 'bag'); wall(b, 'x', -3, 1, 3.5, t, [], 1.35, 'bag');
-    o.nest = [0, 2.0]; o.sp = [0, -1.2];
+    o.nest = [0, 2.0]; o.sp = [0, -1.2]; o.radio = [-2.55, -2.05];
   } else if (k === 'blockhouse') {   // log walls, roof, four front loopholes, side loopholes, MG at the right front corner
     const b = o.boxes, t = .45, top = 2.6; wall(b, 'x', 3, -4, 4, t, [-2.6, -.9, .9, 2.6], top, 'wood', .9);
     wall(b, 'z', -4, -2.8, 2.8, t, [0], top, 'wood'); wall(b, 'z', 4, -2.8, 2.8, t, [0], top, 'wood');
-    wall(b, 'x', -3, -4, -.7, t, [], top, 'wood'); wall(b, 'x', -3, .7, 4, t, [], top, 'wood');
+    wall(b, 'x', -3, -4, -.95, t, [], top, 'wood'); wall(b, 'x', -3, .95, 4, t, [], top, 'wood');   // v0.38: a 1.9 m doorway (was 1.4: easy to get stuck on)
     b.push([0, 0, 4.3, 3.3, top, top + .3, 'wood']);
-    o.nest = [2.6, 2.0]; o.sp = [-1.5, -1.2];
+    o.nest = [2.6, 2.0]; o.sp = [-1.5, -1.0]; o.radio = [-3.25, -2.25];
   } else if (k === 'pillbox') {   // thick concrete, three front embrasures (MG in the centre), side slits, heavy roof
     const b = o.boxes, t = .8, top = 2.5; wall(b, 'x', 3, -3, 3, t, [-1.8, 0, 1.8], top, 'stone', .9);
     wall(b, 'z', -3, -2.6, 2.6, t, [.4], top, 'stone'); wall(b, 'z', 3, -2.6, 2.6, t, [.4], top, 'stone');
-    wall(b, 'x', -3, -3, -.65, t, [], top, 'stone'); wall(b, 'x', -3, .65, 3, t, [], top, 'stone');
+    wall(b, 'x', -3, -3, -.9, t, [], top, 'stone'); wall(b, 'x', -3, .9, 3, t, [], top, 'stone');   // v0.38: 1.8 m doorway (was 1.3)
     b.push([0, 0, 3.4, 3.4, top, top + .5, 'stone']);
-    o.nest = [0, 1.8]; o.sp = [0, -1.3];
+    o.nest = [0, 1.8]; o.sp = [0, -1.1]; o.radio = [-2.05, -2.0];
   }
   return o;
 }
@@ -278,7 +278,8 @@ function fortWorld(f) {
   const nest = P.nest && (() => { const [x, z] = toW(f, P.nest[0], P.nest[1]); return { x, z, yaw: f.yaw }; })();
   const sp = P.sp && (() => { const [x, z] = toW(f, P.sp[0], P.sp[1]); return { x, z }; })();
   const wire = P.wire && (() => { const [cx, cz] = toW(f, P.wire[0], P.wire[1]); return { cx, cz, c, s, hx: P.wire[2], hz: P.wire[3], f }; })();
-  return { P, boxes, nest, sp, wire };
+  const radio = P.radio && (() => { const [x, z] = toW(f, P.radio[0], P.radio[1]); return { x, z, yaw: f.yaw }; })();
+  return { P, boxes, nest, sp, wire, radio };
 }
 function fortUnindex(f) {
   if (f.wb) for (const b of f.wb) for (const k of b.cells) { const a = FGRID.get(k); if (a) { const i = a.indexOf(b); if (i >= 0) a.splice(i, 1); if (!a.length) FGRID.delete(k); } }
@@ -706,7 +707,7 @@ const CLS = {
   rifleman: { n: 'Rifleman', d: 'The only class with the bolt-action rifle. Works the bolt and aims faster, shrugs off suppression, and charges with the bayonet for longer. [N] fits a rifle grenade to the muzzle: lob it 30–110 m onto a machine-gun nest or a knot of men.', hp: 100, sp: 1, w: ['bolt', 'carbine'] },
   assault: { n: 'Assault', d: 'Trench clearer. Extra health, faster on his feet, reloads 30% quicker, slides (crouch while sprinting; stand, jump or pull back to cancel). [N] morphine (2 per life): 10 s faster, takes 40% less damage, +15 HP.', hp: 125, sp: 1.1, w: ['shotgun', 'smg'] },
   gunner: { n: 'Machine Gunner', d: 'Holds the line. Slow, with deep magazines; crouch to brace the gun (tighter, steadier fire). [N] drops an ammo box (3 supply): teammates who walk over it get a full magazine, grenades and utility back.', hp: 100, sp: .85, w: ['lmg'] },
-  medic: { n: 'Medic', d: 'Bandages heal 70 instead of 40.', hp: 100, sp: 1, w: ['carbine', 'smg'] },
+  medic: { n: 'Medic', d: 'Sees the health of hurt teammates within 45 m. [H] bandages the hurt man in front of him (70 HP), or himself. Hold [E] to revive the downed, then earns XP for each kill the revived man makes.', hp: 100, sp: 1, w: ['carbine', 'smg'] },
   sapper: { n: 'Sapper', d: 'Digs bigger holes. Grenades cost 1 supply. [B] builds a field post your team respawns at.', hp: 100, sp: 1, w: ['shotgun', 'carbine'] },
   recon: { n: 'Recon', d: 'Sniper and spotter. Scoped rifles; headshots with a scope kill outright. [T] spots every enemy in your sights for the whole team (and the officer).', hp: 90, sp: 1.02, w: ['sniper', 'mark', 'carbine'] },
   officer: { n: 'Officer', d: 'Command view: order squads, call in bombers, barrages and supply drops. Max 2 per team.', hp: 100, sp: 1, w: ['carbine'] },

@@ -30,6 +30,7 @@ body.tab #kf,body.tab #chat{opacity:0}
 #cross.plus::after{top:0;bottom:0;left:calc(50% - var(--cs)/4);width:calc(var(--cs)/2)}
 #cross.none{display:none}
 #gear{position:fixed;top:8px;right:10px;z-index:9;width:34px;height:34px;padding:0;font-size:18px;opacity:.75}
+#net{position:fixed;left:8px;bottom:5px;z-index:9;font-size:11px;letter-spacing:.04em;text-shadow:0 1px 2px #000;pointer-events:none;opacity:.85}body.menu #net{display:none}body.off #net{bottom:auto;top:3px;left:auto;right:64px}
 #fps{position:fixed;top:48px;right:12px;z-index:9;font-size:12px;text-shadow:0 1px 2px #000;pointer-events:none;display:none}
 #set{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(14,12,8,.94)}
 #setb{width:min(660px,94vw);max-height:90vh;overflow:auto;background:#1b170f;border:1px solid #5a4e34;padding:16px 22px}
@@ -115,13 +116,23 @@ button:hover:not(:disabled),button.on{border-color:var(--ac);color:var(--ac)}
 #off div{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center}#off button{padding:5px 10px}#off button:disabled{opacity:.4;cursor:not-allowed}
 body.off #hb,body.off #gun,body.off #cross{display:none}
 body.menu #off{display:none!important}
+/* v0.38 the officer's panel on phones: it covered the whole screen. Now a strip along the bottom whose rows scroll sideways,
+   with the long status lines and the help folded away, and a button to tuck it out of the way. */
+#off .ctl .tb{display:none}body.touch #off .ctl .tb{display:inline-block}
+body.touch #off{left:0;right:0;bottom:0;transform:none;max-width:none;padding:3px 6px 4px;gap:3px;align-items:stretch;background:rgba(14,12,8,.9);border-width:1px 0 0}
+body.touch #off>div{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:4px}body.touch #off>div::-webkit-scrollbar{display:none}
+body.touch #off>div>*{flex:0 0 auto}body.touch #off .cpb{font-size:10px;white-space:nowrap;overflow:hidden;display:block}body.touch #off .cpb i{height:4px;margin-top:2px}
+body.touch #off .tier,body.touch #off .dps,body.touch #off>.hp{display:none}body.touch.offhelp:not(.offmin) #off>.hp{display:block;font-size:10px;white-space:normal}
+body.touch #off .card{width:100px;font-size:10px;padding:2px 5px;line-height:1.15}body.touch #off .card br,body.touch #off .card .q{display:none}body.touch #off .card b{display:block;white-space:nowrap;overflow:hidden}body.touch #off .card i{height:3px}body.touch #off button{padding:5px 8px;font-size:11px}
+body.touch #off .ab{display:flex}body.touch #off .ab button{min-width:66px;font-size:10px;padding:3px 4px 2px 8px}body.touch #off .ab button kbd{display:none}
+body.touch.offmin #off>div:not(.ctl){display:none}body.touch.offmin #off .ctl>:not(.tb){display:none}body.touch.offmin #off{left:auto;border-width:1px 0 0 1px;background:rgba(14,12,8,.6)}
 body.menu #scope,body.menu #dn,body.menu #ch,body.menu #hud,body.menu #hb,body.menu #tabh,body.menu #stat,body.menu #hint,body.menu #banner,body.menu #oob,body.menu #opbar,body.menu #bm,body.menu #gun,body.menu #cross,body.menu #msg,body.menu #hurt,body.menu #mm{display:none}
 </style></head><body class="menu">
 <canvas id="c"></canvas><canvas id="gun" width="360" height="240"></canvas><canvas id="item" width="360" height="240"></canvas><canvas id="mm" width="170" height="170"></canvas><div id="tc"><div id="tcs"><i></i></div></div>
 <div id="tcd"><button id="tcdm">CALL<br>MEDIC</button><button id="tcdr">HOLD TO<br>RESPAWN</button></div><div id="wp" style="display:none"><i></i><b></b></div><canvas id="phud"></canvas><div id="rot"><b>📱</b>Turn your phone sideways to play.<br><small>Trench 128 plays in landscape.</small><button id="rotb">Rotate to landscape</button></div><div id="tut"><button id="tutx">Skip tutorial</button><div id="tutt"></div><i><b id="tutp"></b></i></div><div id="bm"></div><div id="banner"></div><div id="oob"></div><div id="opbar"><i></i></div><div id="spk"></div><div id="hurt"></div><div id="supv"></div><div id="chgv"></div><canvas id="mud" width="180" height="120"></canvas><canvas id="fx" width="360" height="240"></canvas><canvas id="vv" width="360" height="240"></canvas><div id="cross"></div><div id="hm"><i></i><i></i><i></i><i></i></div><div id="chg"><b></b></div><div id="kn"></div><div id="chat"><div id="chatl"></div><input id="chati" maxlength="120" autocomplete="off" spellcheck="false"></div><div id="kf"></div><div id="sb"></div><div id="wheel"></div><div id="maskv"></div><div id="dpb"><span></span><i><b></b></i></div><div id="gasv"></div><div id="swt"></div><div id="brt"><span></span><i><b></b></i></div><div id="alf"></div><div id="selbox"></div><div id="hud"></div><div id="hb"><canvas id="wi" width="75" height="31"></canvas><div class="am"></div><div class="ul"><i></i></div><div class="sp"></div><div class="it"></div></div><div id="tabh">Hold TAB for controls</div><div id="stat"></div><div id="hint"></div><div id="scope"></div><div id="dn"></div><canvas id="ch" width="160" height="64"></canvas><div id="msg"></div>
 <div id="off"></div>
 <div id="ov"><div class="box" id="ovb"></div></div>
-<button id="gear" title="Settings">⚙</button><div id="fps"></div><div id="set"><div id="setb"></div></div>
+<button id="gear" title="Settings">⚙</button><div id="fps"></div><div id="net"></div><div id="set"><div id="setb"></div></div>
 <script src="vendor/three.min.js"></script>
 <script>if(!window.THREE)document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>')</script>   <!-- three.js ships with the game (public/vendor); the CDN is only a fallback -->
 <script src="shared.js"></script>
@@ -168,7 +179,10 @@ function applyS(){cam.fov=S.fov;cam.updateProjectionMatrix();sizeR();
 applyS();
 const hemi=new THREE.HemisphereLight(0xc4c4bc,0x403a30,.95);scene.add(hemi);const sun=new THREE.DirectionalLight(0xe8e4d8,.5);sun.position.set(50,80,30);scene.add(sun);
 const pxTex=(cv,rep)=>{const t=new THREE.CanvasTexture(cv);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;if(rep){t.wrapS=t.wrapT=THREE.RepeatWrapping}return t};
-const TXL=new THREE.TextureLoader(),TXP=(n,rep)=>{const t=TXL.load('assets/'+n+'.png');t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;if(rep){t.wrapS=t.wrapT=THREE.RepeatWrapping}return t};
+/* v0.38: every picture retries when its download fails (phones, slow or patchy connections); before, one failed download
+   left that art missing for the whole session (soldiers.png is 2.3 MB: without it every soldier was invisible) */
+function imgRetry(im,src,hi){let n=0;if(hi)try{im.fetchPriority='high'}catch(e){}im.onerror=()=>{if(n++<10)setTimeout(()=>{im.src=src+'?r='+n},Math.min(6000,700*n))};im.src=src;return im}
+const TXL=new THREE.TextureLoader(),TXP=(n,rep)=>{const u='assets/'+n+'.png';let t=null;const ld=k=>TXL.load(u+(k?'?r='+k:''),tx=>{if(k&&t&&tx&&tx.image){t.image=tx.image;t.needsUpdate=true}},undefined,()=>{if(k<10)setTimeout(()=>ld(k+1),Math.min(6000,700*(k+1)))});t=ld(0);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;if(rep){t.wrapS=t.wrapT=THREE.RepeatWrapping}return t};
 let groundTex=null;try{const cv=document.createElement('canvas');cv.width=cv.height=64;const g=cv.getContext('2d'),R=(a,b)=>{const v=Math.sin(a*12.9898+b*78.233)*43758.5453;return v-Math.floor(v)};for(let y=0;y<64;y++)for(let x=0;x<64;x++){const r=R(x,y),c=R(x>>2,y>>2);let v=.82+.1*c-.05;if(r<.12)v-=.2;else if(r>.93)v+=.14;if(R(x*.5+7,y*.5)>.985)v-=.28;const k=Math.round(Math.max(0,Math.min(1,v))*255);g.fillStyle='rgb('+k+','+Math.round(k*.97)+','+Math.round(k*.9)+')';g.fillRect(x,y,1,1)}groundTex=pxTex(cv,true);const gt=TXP('tx_mud',true);if(gt&&gt.image!==undefined)groundTex=gt}catch(e){}
 const tg=new THREE.BufferGeometry(),pos=new Float32Array(NV*3),uvs=new Float32Array(NV*2),col=new Float32Array(NV*3),idx=new Uint32Array(N*N*6);
 for(let j=0,k=0;j<=N;j++)for(let i=0;i<=N;i++,k++){pos[k*3]=-W+i*ST;pos[k*3+2]=-W+j*ST;uvs[k*2]=i*ST/2.4;uvs[k*2+1]=j*ST/2.4}
@@ -459,12 +473,12 @@ function tex(u,h){const c=document.createElement('canvas');c.width=32;c.height=6
  const t=pxTex(c,false);t.magFilter=t.minFilter=THREE.NearestFilter;return t}
 const TX=[tex('#3b5b8c','#7aa0c8'),tex('#a85a48','#6a665a')];
 const ART={mat:null};
-(function(){const im=new Image();im.onload=()=>{const FH=150,FW=im.naturalWidth>=2560?160:Math.round(im.naturalWidth/16),NCOL=Math.round(im.naturalWidth/FW),M=[],RN=Math.round(im.naturalHeight/FH);ART.fw=FW;ART.cols=NCOL;ART.armed=FW>=150;   /* v0.29: 160 px cells, the rifle is part of the body art */for(let r=0;r<RN;r++){M[r]=[];for(let v=0;v<NCOL;v++){const c=document.createElement('canvas');c.width=FW;c.height=FH;c.getContext('2d').drawImage(im,v*FW,r*FH,FW,FH,0,0,FW,FH);M[r][v]=new THREE.SpriteMaterial({map:pxTex(c,false),alphaTest:.5})}}ART.mat=M};im.src='assets/soldiers.png'})();
+(function(){const im=new Image();im.onload=()=>{const FH=150,FW=im.naturalWidth>=2560?160:Math.round(im.naturalWidth/16),NCOL=Math.round(im.naturalWidth/FW),M=[],RN=Math.round(im.naturalHeight/FH);ART.fw=FW;ART.cols=NCOL;ART.armed=FW>=150;   /* v0.29: 160 px cells, the rifle is part of the body art */for(let r=0;r<RN;r++){M[r]=[];for(let v=0;v<NCOL;v++){const c=document.createElement('canvas');c.width=FW;c.height=FH;c.getContext('2d').drawImage(im,v*FW,r*FH,FW,FH,0,0,FW,FH);M[r][v]=new THREE.SpriteMaterial({map:pxTex(c,false),alphaTest:.5})}}ART.mat=M};imgRetry(im,'assets/soldiers.png',1)})();
 /* weapon layer drawn over each soldier: rows = weapon, cols = (hold|aim)*4 + view; 160 px wide frames centred on the 96 px body */
-(function(){const im=new Image();im.onload=()=>{const FW=160,FH=150,M=[],RN=Math.round(im.naturalHeight/FH);for(let r=0;r<RN;r++){M[r]=[];for(let v=0;v<8;v++){const c=document.createElement('canvas');c.width=FW;c.height=FH;c.getContext('2d').drawImage(im,v*FW,r*FH,FW,FH,0,0,FW,FH);M[r][v]=new THREE.SpriteMaterial({map:pxTex(c,false),alphaTest:.5})}}ART.gun=M};im.src='assets/soldier_guns.png'})();
+(function(){const im=new Image();im.onload=()=>{const FW=160,FH=150,M=[],RN=Math.round(im.naturalHeight/FH);for(let r=0;r<RN;r++){M[r]=[];for(let v=0;v<8;v++){const c=document.createElement('canvas');c.width=FW;c.height=FH;c.getContext('2d').drawImage(im,v*FW,r*FH,FW,FH,0,0,FW,FH);M[r][v]=new THREE.SpriteMaterial({map:pxTex(c,false),alphaTest:.5})}}ART.gun=M};imgRetry(im,'assets/soldier_guns.png')})();
 const SPW=()=>1.3*(ART.fw||96)/96;
 /* v0.29 fallen soldiers (owner's art): 2 rows (team) x 3 poses of 220x110; a body that has come to rest switches to one of them */
-(function(){const im=new Image();im.onload=()=>{const W=220,H=110,M=[];for(let t=0;t<2;t++){M[t]=[];for(let i=0;i<3;i++){const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d').drawImage(im,i*W,t*H,W,H,0,0,W,H);M[t][i]=new THREE.SpriteMaterial({map:pxTex(c,false),alphaTest:.5})}}ART.dead=M};im.src='assets/soldiers_dead.png'})();   /* soldier quad width: same pixel density whatever the atlas cell width */
+(function(){const im=new Image();im.onload=()=>{const W=220,H=110,M=[];for(let t=0;t<2;t++){M[t]=[];for(let i=0;i<3;i++){const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d').drawImage(im,i*W,t*H,W,H,0,0,W,H);M[t][i]=new THREE.SpriteMaterial({map:pxTex(c,false),alphaTest:.5})}}ART.dead=M};imgRetry(im,'assets/soldiers_dead.png')})();   /* soldier quad width: same pixel density whatever the atlas cell width */
 function pickView(e,cx,cz){const dx=e.b.x-cx,dz=e.b.z-cz,l=Math.hypot(dx,dz)||1,ux=dx/l,uz=dz/l,fx=-Math.sin(e.yaw||0),fz=-Math.cos(e.yaw||0),c=fx*ux+fz*uz,s=-fx*uz+fz*ux;return Math.abs(c)>Math.abs(s)?(c<0?0:2):(s>0?1:3)}
 /* sampled gun audio (Snake's Authentic Gun Sounds): lazy-loaded once the AudioContext exists; snd() noise is the fallback */
 const SFX={},SFXN=['s_rifle','s_carbine','s_smg','s_mg','s_shotgun','s_bolt','s_pump','s_shell','s_rl_rifle','s_rl_carbine','s_rl_smg','s_rl_lmg'];let sfxGo=false;
@@ -541,6 +555,17 @@ function rgFrame(dt){for(let i=rgL.length-1;i>=0;i--){const g=rgL[i];g.t+=dt;con
  const ey=me.y+me.eye,P=T.rgPath(terr.H,me.x,ey,me.z,me.yaw,me.pitch);rgVis.ring.position.set(P.x,P.y+.15,P.z);rgVis.d=Math.hypot(P.x-me.x,P.z-me.z);
  for(let i=0;i<16;i++){const t=P.t*(i+1)/17;rgVis.ap[i*3]=me.x+P.vx*t;rgVis.ap[i*3+1]=ey+P.vy*t-.5*T.RG.g*t*t;rgVis.ap[i*3+2]=me.z+P.vz*t}rgVis.ag.attributes.position.needsUpdate=true}
 const rgHint=()=>{if(!me.rg||!me.alive||!rgVis)return null;const ready=performance.now()>=rgReady;return 'RIFLE GRENADE · '+Math.round(rgVis.d)+' m · '+(ready?'LMB launch':'fitting…')+' · raise the muzzle for range · ['+kn('ability')+']/['+kn('reload')+'] take it off'};
+/* v0.38 medics: a health bar over every hurt teammate within 45 m (seen through cover: a medic knows where he is needed),
+   and the bandage goes to the hurt man in front of you before yourself */
+const medHp=new Map(),medS=[];let medHpAt=0,medMate=null,medBarM=null,medN=0;
+function medBar(v){if(!medBarM)medBarM=[];const i=Math.max(0,Math.min(10,Math.round(v/10)));if(!medBarM[i]){const c=document.createElement('canvas');c.width=44;c.height=8;const g=c.getContext('2d');g.fillStyle='rgba(10,8,6,.85)';g.fillRect(0,0,44,8);g.fillStyle=i<=3?'#e04030':i<=6?'#e0b040':'#6ac060';g.fillRect(2,2,Math.max(2,4*i),4);g.fillStyle='#fff';g.fillRect(21,0,2,2);
+  medBarM[i]=new THREE.SpriteMaterial({map:pxTex(c,false),depthTest:false,transparent:true,fog:false})}return medBarM[i]}
+function medTick(){let n=0;medMate=null;const on=deployed&&me.alive&&me.cls==='medic'&&!me.officer&&performance.now()-medHpAt<1600;
+ if(on){const fx=-Math.sin(me.yaw),fz=-Math.cos(me.yaw);let bs=101;for(const[id,v]of medHp){const e=ents.get(id);if(!e||e.down||e.gone||e.sp.visible===false)continue;const P=e.sp.position,B=e.b,dx=B.x-me.x,dz=B.z-me.z,d=Math.hypot(dx,dz);
+   let m=medS[n];if(!m){m=new THREE.Sprite(medBar(v));m.renderOrder=6;scene.add(m);medS.push(m)}const mt=medBar(v);if(m.material!==mt)m.material=mt;const k=.55+d*.012;m.visible=true;m.scale.set(k,k*.18,1);m.position.set(P.x,P.y+2.2+k*.12,P.z);n++;
+   if(d<2.8&&Math.abs(B.y-me.y)<1.8&&(d<.7||(dx*fx+dz*fz)/d>.35)&&v<bs){bs=v;medMate={id,v}}}}
+ for(let i=n;i<medS.length;i++)medS[i].visible=false;medN=n}
+const medHint=()=>medMate&&(me.bd|0)>0&&!me.mg?'['+kn('heal')+'] bandage this teammate ('+medMate.v+'% health)':null;
 const aboxM=new Map();let mphEnd=0;
 function mkAbox(team){const g=new THREE.Group(),wd=new THREE.MeshLambertMaterial({color:0x6e5434}),bd=new THREE.MeshLambertMaterial({color:team?0x8a9a5a:0x6a8ac8}),dk=new THREE.MeshLambertMaterial({color:0x2c2620});
  const b=(w,h,d,m,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);g.add(o);return o};b(.66,.34,.42,wd,0,.17,0);b(.7,.05,.46,dk,0,.36,0);g.userData.band=b(.67,.08,.43,bd,0,.22,0);b(.08,.06,.1,dk,-.36,.3,0);b(.08,.06,.1,dk,.36,.3,0);
@@ -558,7 +583,14 @@ function syncBoxes(list){const keep=new Set();for(const[id,team,x,z,uses]of list
  for(const[id,q]of aboxM)if(!keep.has(id)){scene.remove(q.g);aboxM.delete(id)}}
 const aboxHint=()=>{if(!me.alive||me.officer||myVeh)return null;const q=aboxNear();return q?'Ammo box: walk over it to restock magazine, grenades and '+(me.u==='bandage'?'bandages':'utility')+(me.cls==='assault'?' (and a morphine)':''):null};
 const aboxNear=()=>{for(const q of aboxM.values())if(q.team===me.team&&Math.hypot(q.x-me.x,q.z-me.z)<4)return q;return null};
-function syncPosts(list){const keep=new Set();for(const[id,team,x,z,hp,rally]of list){keep.add(id);let q=fposts.get(id);if(!q){q={g:mkPost(team),team,x,z,hp};q.g.position.set(x,hAt(x,z),z);scene.add(q.g);fposts.set(id,q)}q.hp=hp;q.rally=rally||0;q.g.scale.y=.55+.45*Math.min(1,hp/300)}
+function mkRadio(team){const g=new THREE.Group(),L=c=>new THREE.MeshLambertMaterial({color:c}),wd=L(0x6e5434),dk=L(0x2b2a22),ol=L(0x4a5236),br=L(0xb09a5a),
+ b=(w,h,d,m,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);g.add(o);return o};
+ b(.62,.42,.42,wd,0,.21,0);b(.66,.04,.46,dk,0,.44,0);                                  /* an ammunition crate for a table */
+ b(.44,.28,.24,ol,-.04,.6,0);b(.4,.2,.02,dk,-.04,.6,.125);b(.05,.05,.03,br,-.16,.64,.14);b(.05,.05,.03,br,-.04,.64,.14);b(.1,.03,.03,br,.08,.56,.14);   /* the set: case, panel, two dials, the key */
+ b(.2,.05,.07,dk,.22,.49,.08).rotation.y=.5;                                           /* the handset, off its cradle */
+ const an=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,1.15,5),dk);an.position.set(-.22,1.3,-.08);g.add(an);
+ const f=new THREE.Mesh(new THREE.PlaneGeometry(.24,.15),new THREE.MeshBasicMaterial({color:team?0x62d66a:0x7aa8e0,side:THREE.DoubleSide}));f.position.set(-.09,1.78,-.08);g.add(f);return g}
+function syncPosts(list){const keep=new Set();for(const[id,team,x,z,hp,rally,rad]of list){keep.add(id);let q=fposts.get(id);if(!q){q={g:rad?mkRadio(team):mkPost(team),team,x,z,hp,rad:!!rad};if(rad){q.px=rad[0];q.pz=rad[1];q.g.position.set(rad[0],Math.max(rad[3],hAt(rad[0],rad[1])),rad[1]);q.g.rotation.y=rad[2]+.6}else q.g.position.set(x,hAt(x,z),z);scene.add(q.g);fposts.set(id,q)}q.hp=hp;q.rally=rally||0;if(!q.rad)q.g.scale.y=.55+.45*Math.min(1,hp/300)}
  for(const[id,q]of fposts)if(!keep.has(id)){scene.remove(q.g);fposts.delete(id)}}
 const sqLabel=k=>k>=100?['Assault 1','Assault 2','Garrison'][k-100]:T.SQUADS[k],sqCol=k=>[0x4cc3ff,0xffd24c,0x7dff7d,0xff9bff,0xffa05c,0xb59bff][k%6];
 const K={};let fireHeld=false,fireLatch=false,hurtV=0,hmV=0,msgT=0,gunKick=0,bob=0,hudT=0,mmT=0,prof=null;
@@ -574,7 +606,7 @@ function connect(name,host){
  ws.onclose=()=>{if(deployed||prof){location.reload()}};
  const dropAll=()=>{for(const e of ents.values()){scene.remove(e.sp);if(e.eb)scene.remove(e.eb);if(e.ft)scene.remove(e.ft);if(e.gs)scene.remove(e.gs);if(e.mk)scene.remove(e.mk);if(e.ch)scene.remove(e.ch)}ents.clear()};
  ws.onmessage=ev=>{if(ev.data instanceof ArrayBuffer)return new Uint8Array(ev.data,0,1)[0]===4?onShots(ev.data):onSnap(ev.data);const m=JSON.parse(ev.data);if(m.t==='snapReset'||m.t==='w')dropAll();onMsg(m)};
- setInterval(()=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:'ping',c:performance.now()}))},2000);
+ setInterval(()=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:'ping',c:performance.now(),p:ping}))},2000);
 }
 const sendJ=o=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o))};
 function onMsg(m){
@@ -583,7 +615,7 @@ function onMsg(m){
   case'prof':if(m.map!=null&&m.map!==T.MP.seed){mapReload(m.map,null,RJ&&RJ.dep);break}prof=m;me.id=m.id;me.team=m.team;me.xp=m.xp;recCache(m.name,m.xp);if(xpStart==null)xpStart=m.xp;me.rank=m.rank;try{const l=JSON.parse(localStorage.getItem('t128mp')||'{}');Object.assign(L,l)}catch(e){}if(RJ&&m.back!=null&&m.back>=0)L.sq=m.back;fixL();loadoutScreen();if(RJ&&RJ.dep){RJ=null;setTimeout(()=>{if($('go'))$('go').click()},80)}RJ=null;break;
   case'w':applyWx(m.wx||'overcast');for(const i of(m.nd||[]))nestDeadVis(i,1);for(const k of[...PCUT])phoneVis(...k.split(':').map(Number),0);for(const k of(m.ph||[]))phoneVis(...k.split(':').map(Number),1);(m.tn||[]).forEach((p,i)=>TNP[i]=p);(m.aa||[]).forEach((d,i)=>aaVis(i,d));for(const c of m.craters){T.applyEv(terr,c);if(c[0]==='b')bayVis(c[1]*1000+c[2],true)}sync();propsFollow(0,0,1e9);fortsReset(m.forts||[]);me.cls=m.cls;me.w=m.w;drawGun();me.u=m.u;me.sq=m.sq;me.maxhp=CLS[m.cls].hp;deployed=true;document.body.classList.remove('menu');
    $('ov').style.display='none';say(m.cls==='officer'?'Officer on station.':'Deployed. Click the screen to capture the mouse.');if(m.cls!=='officer'){try{lockMouse()}catch(e){}}for(const c of(m.crates||[]))addCrate(c);setOfficer(m.cls==='officer');break;
-  case'sp':maskOn=false;me.elite=null;supV=0;recPend=0;meleeT=9;me.chg=T.chgMax({cls:m.cls});me.charging=false;me.rg=0;ddL.length=0;me.x=m.x;me.y=m.y;me.z=m.z;me.vy=0;me.alive=true;me.hp=m.hp;me.cls=m.cls;me.w=m.w;drawGun();me.u=m.u;me.sq=m.sq;me.maxhp=CLS[m.cls].hp;if(me.mg)mgView(false);me.mg=false;me.cl=null;me.clWait=0;pending=[];if(!m.rv){me.yaw=me.team?Math.PI:0;me.pitch=0}me.down=false;me.gaveUp=false;me.ammo=me.prevAmmo=WPN[m.w].mag;me.prevHp=m.hp;me.eye=1.65;$('gun').style.display='';setOfficer(m.cls==='officer');myOrder=null;syncBeams();say(m.rv?'Revived — stay low':m.cls==='officer'?'Officer on station. Pick a squad and an order, then click the map.':'Spawned');break;
+  case'sp':maskOn=false;me.elite=null;supV=0;recPend=0;meleeT=9;me.chg=T.chgMax({cls:m.cls});me.charging=false;me.rg=0;ddL.length=0;me.x=m.x;me.y=m.y;me.z=m.z;me.vy=0;me.alive=true;me.hp=m.hp;me.cls=m.cls;me.w=m.w;drawGun();me.u=m.u;me.sq=m.sq;me.maxhp=CLS[m.cls].hp;if(me.mg)mgView(false);me.mg=false;me.cl=null;me.clWait=0;pending=[];if(!m.rv){me.yaw=me.team?Math.PI:0;me.pitch=0}me.down=false;me.gaveUp=false;me.ammo=me.prevAmmo=WPN[m.w].mag;me.prevHp=m.hp;me.eye=1.65;$('gun').style.display='';$('gun').style.visibility='';predAt.length=0;gunWake();setTimeout(gunWake,600);setTimeout(gunWake,2000);setOfficer(m.cls==='officer');myOrder=null;syncBeams();say(m.rv?'Revived — stay low':m.cls==='officer'?'Officer on station. Pick a squad and an order, then click the map.':'Spawned');break;
   case'dead':endPlace();setTimeout(()=>{if(document.pointerLockElement)document.exitPointerLock();spawnDraw()},400);me.alive=false;me.down=false;me.gaveUp=false;say(m.by==='your own choice'?'Respawning…':m.by==='bleeding out'?'You bled out. Respawning…':'Killed by '+m.by+'. Respawning…');break;
   case'down':me.alive=false;me.down=true;me.bleedT=m.bleed;me.giveT=0;me.gaveUp=false;me.rvp=0;me.rvAt=0;say('Knocked down by '+m.by);break;
   case'fo':fortsReset(m.f);break;
@@ -601,10 +633,12 @@ function onMsg(m){
   case'rvp':me.rvp=m.p;me.rvAt=performance.now();me.rvBy=m.by||'';break;
   case'msg':say(m.m);break;   case'chat':chatAdd(m);break;
   case'hm':if(m.v===2){tone(2600,2300,.03,.05,'triangle');break}hmV=1;{const h=$('hm');h.className=(m.k?'k ':'')+(m.h?'h':'');}hitSnd(m);if(m.k&&m.h&&performance.now()-knAt<300)knShow(knTxt+'  ·  HEADSHOT','+10');else if(m.k&&m.m&&performance.now()-knAt<300)knShow(knTxt+'  ·  BAYONET','+10');break;
-  case'mph':{const on=m.s>0;if(on&&!me.mph){tone(180,900,.35,.05,'sine');say('Morphine: faster and harder to drop for '+m.s+'s'+(m.n?' ('+m.n+' left)':''))}me.mph=on;mphEnd=performance.now()+m.s*1000;me.mphN=m.n;break}
+  case'mph':{const on=m.s>0;if(on&&!me.mph){itemPlay([4,5,4,5,5],.17);nz(.12,.12,2400,'highpass',0,3);tone(180,900,.35,.05,'sine');say('Morphine: faster and harder to drop for '+m.s+'s'+(m.n?' ('+m.n+' left)':''))}me.mph=on;mphEnd=performance.now()+m.s*1000;me.mphN=m.n;break}
   case'rg':{me.rg=m.s;rgReady=performance.now()+(m.f||0)*1000;if(m.s){play('s_bolt',.4,{at:.1,rate:.7});say('Fitting a rifle grenade… then LMB to launch · ['+kn('ability')+'] or ['+kn('reload')+'] to take it off')}break}
   case'rgf':{const mesh=new THREE.Sprite(spMat('nade_mills').clone());mesh.scale.set(.22,.3,1);scene.add(mesh);rgL.push({mesh,t:0,f:m.f,v:m.v,T:m.T});if(m.id===me.id){gunKick=1.4;gFire=0;recoil()}
    {const d=Math.hypot(m.f[0]-me.x,m.f[2]-me.z),v=Math.max(.05,1-d/160);tone(140,60,.18,.12*v,'triangle');tone(900,300,.12,.04*v,'sawtooth')}break}
+  case'mh':medHp.clear();for(const[id,v]of m.l||[])medHp.set(id,v);medHpAt=performance.now();break;
+  case'mhd':{medHp.delete(m.id);say('Bandaged '+m.n+' (+'+m.hp+' HP) · +'+m.xp+' XP');break}
   case'abd':{const g=hAt(m.x,m.z);puff(m.x,g,m.z);break}
   case'dd':ddL.push({x:m.x,z:m.z,t:1.6});if(ddL.length>6)ddL.shift();break;
   case'sup':supV=Math.max(supV,m.v||0);crackSnd(m.x,m.z);shake=Math.max(shake,.1);break;
@@ -646,7 +680,7 @@ function onMsg(m){
   case'wh':whistleSnd();$('banner').innerHTML='OVER THE TOP!<small>All squads attack '+String(m.n).replace(/[<>&]/g,'')+'</small>';$('banner').style.opacity=1;bannerT=performance.now()+4000;break;
   case'dr':addCrate(m);break;
   case'drx':{const c=crateM.get(m.id);if(c){scene.remove(c.m);crateM.delete(m.id)}break}
-  case'pong':ping=Math.round(performance.now()-m.c);break;
+  case'pong':ping=Math.round(performance.now()-m.c);pingAt=performance.now();break;
   case'opn':opBanner(m);break;
   case'oob':oobUntil=m.s?performance.now()+m.s*1000:0;break;
   case'end':roundState='ended';overlay('<h1>'+(m.win===0?'BLUE':'GREEN')+' WINS THE TERRITORY</h1>'+(opS?(opS[0]===me.team?(m.win===me.team?'Your attack broke through every line.':'Your attack ran out of men.'):(m.win===me.team?'Your line held. The enemy is spent.':'The enemy broke through your last line.')):(m.win===me.team?'Your side broke the line.':'Your side was overrun.'))+'<br>Next round the sides swap: attackers defend.'+'<br>New round starting shortly…'+aarHtml(m),'');document.exitPointerLock();break;
@@ -658,13 +692,13 @@ function onShots(buf){const dv=new DataView(buf),n=dv.getUint16(1,true);for(let 
  const x=dv.getInt16(o,true)/100,y=dv.getInt16(o+2,true)/100,z=dv.getInt16(o+4,true)/100,dx=dv.getInt16(o+6,true)/1e4,dy=dv.getInt16(o+8,true)/1e4,dz=dv.getInt16(o+10,true)/1e4,w=WKEY[dv.getUint8(o+15)]||'bolt';
  tracer(x,y,z,dx,dy,dz,dv.getUint8(o+12),false,dv.getUint16(o+16,true));shotSnd(x,z,w)}}
 function onSnap(buf){
- const dv=new DataView(buf),now=performance.now(),ack=dv.getUint32(5,true),sx=dv.getFloat32(9,true),sy=dv.getFloat32(13,true),sz=dv.getFloat32(17,true),svy=dv.getFloat32(21,true);
+ const dv=new DataView(buf),now=performance.now();if(lastSnapAt)netGap=Math.max(netGap,now-lastSnapAt);lastSnapAt=now;const ack=dv.getUint32(5,true),sx=dv.getFloat32(9,true),sy=dv.getFloat32(13,true),sz=dv.getFloat32(17,true),svy=dv.getFloat32(21,true);
  const hp=dv.getUint8(25),fl=dv.getUint8(26),ammo=dv.getUint16(27,true),sup=dv.getUint16(29,true),heat=dv.getUint8(31),n=dv.getUint16(32,true);
  me.lead=!!(fl&16);if(!!(fl&32)!==!!me.officer)setOfficer(!!(fl&32));const wasAlive=me.alive;me.hp=hp;me.supply=sup;{const r=!!(fl&4);if(r&&!me.rel&&wasAlive)reloadSnd(me.w,!!(fl&2));me.rel=r}me.over=!!(fl&8);me.down=!!(fl&128);if(!(fl&1)&&me.mph){me.mph=false}if((fl&1)&&!wasAlive){me.sld=0;me.sldCd=0;me.pb=0;me.mph=false;me.mphN=me.cls==='assault'?2:0}{const rs=dv.getUint16(34,true);me.gr=rs&255;me.bd=rs>>8}me.heat=heat/100;
  const mounted=!!(fl&2);if(mounted!==me.mg){me.mg=mounted;me.prevAmmo=ammo;$('gun').style.display=!me.alive?'none':'';gIdx=-1;mgView(mounted);if(mounted){let nb=null,bd=4;for(const n of T.NEST)if(n.team===me.team){const d=Math.hypot(n.x-me.x,n.z-me.z);if(d<bd){bd=d;nb=n}}me.mgBase=nb&&nb.yaw!=null?nb.yaw:(me.team?Math.PI:0);me.yaw=me.mgBase;me.pitch=0}}
  if(fl&1){
   me.alive=true;
-  if(ammo<me.prevAmmo&&!mounted===!me.mg){TUT.shot=1;const cp=Math.cos(me.pitch),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(me.pitch),dz=-Math.cos(me.yaw)*cp;gunKick=WPN[me.w]&&WPN[me.w].flame?.25:1;gFire=0;recoil();if(!(WPN[me.w]&&WPN[me.w].flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(WPN[me.w].pel===1&&!WPN[me.w].flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:WPN[me.w].rng,true,me.mg?420:WPN[me.w].vel)}
+  if(ammo<me.prevAmmo&&!mounted===!me.mg){let k=Math.min(4,me.prevAmmo-ammo),shown=false;while(k-->0){if(!me.mg&&predAt.length)predAt.shift();else if(!shown){shown=true;shotFx()}}}else if(ammo>me.prevAmmo)predAt.length=0;
   me.prevAmmo=ammo;me.ammo=ammo;
   const sc=!!(fl&64);let skip=false;
   if(me.cl){skip=true;if(sc)me.clSeen=1;else if(!me.clSeen&&me.cl.t>.8){me.cl=null;skip=false}}
@@ -701,13 +735,15 @@ function renderOff(){if(!me.officer)return;const cp=cpS[0],held=dpS.filter(d=>d[
   return `<button class="card${isSel(k)?' on':''}${brk?' brk':''}" data-sq="${k}" style="--c:#${sqCol(k).toString(16).padStart(6,'0')}"><b>${nm}</b>${fire?' ⚔':''}${brk?' BROKEN':''}<br>${ai?al+'/'+tot+' men':n+' players'+(ld?' · '+ld:'')}<i title="health"><b style="width:${hp}%;background:#c04040"></b></i><i title="morale"><b style="width:${mo}%;background:${mc_(mo)}"></b></i><span class="q">${o?o[1]+' '+(o[5]?'✓':'')+q:'no orders'}</span></button>`}).join('');
  const HK=['1','2','3','4','5','6','7','8','9','0','-','=','T','J'],ab=supK.map((k,i)=>{const a=ABL[k]||[k,'#aaa',''],cd=supCd[i]||0,lock=(supTr[i]||1)>tierS,poor=cp<supCost[i],sw=cd>0?Math.round(100*cd/(cdMax[k]||cd)):0;
   return `<button data-m="${k}" class="${omode===k?'on':''}${poor?' poor':''}${lock?' lock':''}" style="--c:${a[1]};${sw?`background:linear-gradient(to top,#000a ${sw}%,transparent ${sw}%)`:''}" ${cd>0||poor||lock?'disabled':''} title="${a[2]}"><kbd>${HK[i]||''}</kbd>${a[0]}<br><small>${lock?'🔒 tier '+supTr[i]:supCost[i]+' CP'+(cd>0?' · '+cd+'s':'')}</small></button>`}).join('');
+ const ctlB=`<button class="tb" data-help="1">?</button><button class="tb" data-min="1">${document.body.classList.contains('offmin')?'▲ Show':'▼ Hide'}</button><button data-menu="1">Menu</button>`;
  const html=`<div class="cpb"><b>COMMAND POINTS ${cp} / ${cpS[1]}</b> · +${cpS[2]}/min · flank depots held ${held}/${dpS.length} · <span style="color:${phonesUp()?(phonesUp()<T.PHONES.length/2?'#e9a23b':'inherit'):'#e33'}">telephone ${phonesUp()}/${T.PHONES.length/2}${phonesUp()?'':' (no artillery)'}</span>${T.TUNNELS.map((q,i)=>q.team===me.team&&TNP[i]?' · mine '+Math.round(TNP[i]*100)+'%':'').join('')}${T.TUNNELS.some((q,i)=>q.team!==me.team&&TNP[i])?' · <span style="color:#e33">enemy mining heard</span>':''}<i><b style="width:${Math.min(100,100*cp/cpS[1])}%"></b></i></div>
 <div class="tier">REQUISITION TIER ${tierS}/3${tierS<3?' · next: '+(tierS===1?'hold 2 depots or take an enemy line':'hold all 4 depots or take two enemy lines'):''} · spotter marks ${mkL.filter(q=>q.until>performance.now()).length}</div><div class="dps">${T.DEPOTS.map((d,i)=>`<span style="--c:${dpS[i][0]<0?'#999':dpS[i][0]===me.team?'#4cff9a':'#ff5040'}">${d.n}</span>`).join('')}</div>
 <div class="cards"><button data-sq="all" class="${selSq==='all'?'on':''}">All</button>${rows}</div>
-<div><b>ORDER</b>${[['attack','R'],['defend','F'],['move','G']].map(([m,k])=>`<button data-m="${m}" class="${omode===m?'on':''}">${m[0].toUpperCase()+m.slice(1)} [${k}]</button>`).join('')}<button data-clear="1">Cancel order [C]</button></div>
+<div class="${S.touch?'ctl':''}"><b>ORDER</b>${[['attack','R'],['defend','F'],['move','G']].map(([m,k])=>`<button data-m="${m}" class="${omode===m?'on':''}">${m[0].toUpperCase()+m.slice(1)}${S.touch?'':' ['+k+']'}</button>`).join('')}<button data-clear="1">Cancel${S.touch?'':' order [C]'}</button>${S.touch?ctlB:''}</div>
 <div class="ab">${ab}</div>
-<div><small>WASD pan · RMB drag rotate · wheel zoom · drag a box or click cards to select squads (Shift adds) · F1-F4 groups (Shift+F to save) · R/F/G orders, Shift+click queues · 1-0,- call-ins · Space: last alert · click the minimap to look there</small><button data-menu="1">Menu</button></div>`;
- if(html!==offHtml){offHtml=html;$('off').innerHTML=html}}
+${S.touch?'<div class="hp"><small>Drag: move the map · pinch: zoom · twist two fingers: turn · two fingers up/down: tilt · tap squad cards to pick who the order is for, tap an order or call-in, then tap the ground · tap the minimap to look there</small></div>':'<div class="ctl"><small>WASD pan · RMB drag rotate · wheel zoom · drag a box or click cards to select squads (Shift adds) · F1-F4 groups (Shift+F to save) · R/F/G orders, Shift+click queues · 1-0,- call-ins · Space: last alert · click the minimap to look there</small>'+ctlB+'</div>'}`;
+ if(html!==offHtml&&!offHeld){const el=$('off'),sl=[...el.children].map(c=>c.scrollLeft);offHtml=html;el.innerHTML=html;sl.forEach((v,i)=>{if(v&&el.children[i])el.children[i].scrollLeft=v})}}   /* v0.38: not redrawn under a finger (the tap was lost), and the rows keep their sideways scroll */
+let offHeld=false;$('off').addEventListener('touchstart',()=>{offHeld=true},{passive:true});for(const ev of['touchend','touchcancel'])$('off').addEventListener(ev,()=>{setTimeout(()=>{offHeld=false},350)},{passive:true});
 function offKey(e){const c=e.code;
  if(/^F[1-4]$/.test(c)){e.preventDefault();const g=c;if(e.shiftKey){groups[g]=targets();say('Group '+g+' saved ('+groups[g].length+' squads)')}else if(groups[g]){selSq=new Set(groups[g]);const r=sqs.find(q=>q[0]===groups[g][0]);if(r&&r[10]!=null&&e.timeStamp-(groups['_'+g]||0)<400){ofx=r[10];ofz=r[11]}groups['_'+g]=e.timeStamp}renderOff();return}
  if(c==='Space'){e.preventDefault();const a=alertL.find(q=>q.x!=null);if(a){ofx=a.x;ofz=a.z}return}
@@ -718,7 +754,7 @@ const targets=()=>selSq==='all'?sqs.map(r=>r[0]):[...selSq].filter(k=>sqs.some(r
 function selOnly(k,add){if(k==='all'){selSq='all';return}if(!add||selSq==='all')selSq=new Set([k]);else if(selSq.has(k))selSq.delete(k);else selSq.add(k);if(selSq.size===0)selSq='all'}
 $('off').ondblclick=e=>{const b=e.target.closest('[data-sq]');if(!b||b.dataset.sq==='all')return;const r=sqs.find(q=>q[0]==b.dataset.sq);if(r&&r[10]!=null){ofx=r[10];ofz=r[11]}};
 $('off').onclick=e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.dataset.sq!==undefined)selOnly(b.dataset.sq==='all'?'all':+b.dataset.sq,e.shiftKey);if(b.dataset.m)omode=b.dataset.m;
- if(b.dataset.clear)targets().forEach(k=>sendJ({t:'cmd',k:'order',sq:k,ty:'clear'}));if(b.dataset.menu)pauseScreen();renderOff()};
+ if(b.dataset.clear)targets().forEach(k=>sendJ({t:'cmd',k:'order',sq:k,ty:'clear'}));if(b.dataset.menu)pauseScreen();if(b.dataset.min)document.body.classList.toggle('offmin');if(b.dataset.help)document.body.classList.toggle('offhelp');renderOff()};
 function toGround(cx,cy){const t=Math.tan(75/2*Math.PI/180),nx=cx/innerWidth*2-1,ny=1-cy/innerHeight*2,a=innerWidth/innerHeight,sy=Math.sin(ofyaw),cy_=Math.cos(ofyaw),sp=Math.sin(ofpit),cp=Math.cos(ofpit);
  const f=[-sy*cp,sp,-cy_*cp],r=[cy_,0,-sy],u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]];
  const d=[0,1,2].map(i=>f[i]+nx*t*a*r[i]+ny*t*u[i]),g0=Math.max(0,hAt(ofx,ofz)),o=[ofx+sy*cp*ofh,g0-sp*ofh,ofz+cy_*cp*ofh];
@@ -727,6 +763,16 @@ function toGround(cx,cy){const t=Math.tan(75/2*Math.PI/180),nx=cx/innerWidth*2-1
 $('c').addEventListener('click',e=>{if(!me.officer||!deployed||!me.alive)return;const[x,z]=toGround(e.clientX,e.clientY);
  if(dragged){dragged=false;return}if(supK.includes(omode)){sendJ({t:'cmd',k:'sup',s:omode,x,z,yaw:+ofyaw.toFixed(3),sqs:omode==='creep'?targets():undefined});omode='attack';renderOff()}else if(e.shiftKey&&omode!=='clear')targets().forEach(k=>sendJ({t:'cmd',k:'order',sq:k,ty:omode,x,z,q:1}));else targets().forEach(k=>sendJ({t:'cmd',k:'order',sq:k,ty:omode,x,z}))});
 addEventListener('wheel',e=>{if(me.officer&&deployed)ofh=Math.max(40,Math.min(170,ofh+e.deltaY*.1))},{passive:true});
+/* v0.38 the officer's view on phones and tablets (there was no way to move it without a keyboard): drag with one finger to
+   slide the map, pinch to zoom, twist two fingers to turn, slide two fingers up or down to tilt. A tap still gives the order. */
+let OT=null;const otOn=e=>me.officer&&deployed&&e.target&&e.target.id==='c',ot2=t=>({d:Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY)||1,a:Math.atan2(t[1].clientY-t[0].clientY,t[1].clientX-t[0].clientX),cy:(t[0].clientY+t[1].clientY)/2});
+function otStart(t){if(t.length>=2){const q=ot2(t);OT={k:2,d:q.d,a:q.a,cy:q.cy,h:ofh,yaw:ofyaw,pit:ofpit,mv:99}}else if(t.length===1)OT={k:1,x:t[0].clientX,y:t[0].clientY,mv:OT?99:0};else OT=null}
+addEventListener('touchstart',e=>{if(!otOn(e)){if(!e.touches.length)OT=null;return}otStart(e.touches)},{passive:true});
+addEventListener('touchmove',e=>{if(!OT||!me.officer||!deployed)return;const t=e.touches;if(e.cancelable)e.preventDefault();
+ if(t.length>=2){if(OT.k!==2)otStart(t);const q=ot2(t);ofh=Math.max(40,Math.min(170,OT.h*OT.d/q.d));let da=q.a-OT.a;da=Math.atan2(Math.sin(da),Math.cos(da));ofyaw=OT.yaw+da;ofpit=Math.max(-Math.PI/2,Math.min(-.5,OT.pit+(q.cy-OT.cy)*.004))}
+ else if(t.length===1&&OT.k===1){const x=t[0].clientX,y=t[0].clientY;OT.mv+=Math.abs(x-OT.x)+Math.abs(y-OT.y);if(OT.mv>10){const a=toGround(OT.x,OT.y),b=toGround(x,y);ofx=Math.max(-W+10,Math.min(W-10,ofx+a[0]-b[0]));ofz=Math.max(-W+5,Math.min(W-5,ofz+a[1]-b[1]))}OT.x=x;OT.y=y}},{passive:false});
+function otEnd(e){if(!OT)return;if(OT.mv>10&&e.cancelable)e.preventDefault();   /* a drag is not a tap: no order is given where the finger lifts */otStart(e.touches)}
+addEventListener('touchend',otEnd,{passive:false});addEventListener('touchcancel',()=>{OT=null});
 function syncBeams(){const want=new Map();if(me.officer)offOrders.forEach(o=>want.set(o[0],o));else if(myOrder&&!myOrder.done&&me.sq>=0)want.set(me.sq,[me.sq,myOrder.ty,myOrder.x,myOrder.z]);
  for(const[k,b]of beams)if(!want.has(k)){scene.remove(b);beams.delete(k)}
  for(const[k,o]of want){let b=beams.get(k);if(!b){b=mkBeam(sqCol(k));scene.add(b);beams.set(k,b)}b.position.set(o[2],hAt(o[2],o[3]),o[3])}}
@@ -774,7 +820,7 @@ addEventListener('keydown',e=>{if(deployed&&!me.alive&&!me.down&&!me.officer&&/^
   if(deployed&&me.officer){if($('ov').style.display==='none')pauseScreen();else $('ov').style.display='none'}
   else if(deployed&&$('ov').style.display!=='none'&&$('rs'))$('rs').click();return}
  K[e.code]=1;if(deployed&&me.officer&&!e.repeat){offKey(e);return}if(!deployed||!lockedNow())return;const A=a=>e.code===S.binds[a];
- if(A('reload'))sendJ({t:'act',a:'reload'});if(A('grenade')){sendJ({t:'act',a:'grenade'});if((me.gr|0)>0&&!me.mg)itemPlay([6,6,7],.17)}if(A('heal')){sendJ({t:'act',a:'heal'});if(me.u==='bandage'&&(me.bd|0)>0&&me.hp<(me.maxhp||100)&&!me.mg)itemPlay([0,1,2,3],.42)}if(A('dig'))sendJ({t:'act',a:'dig'});if(A('mg'))sendJ({t:'act',a:'mg'});if(A('ability')&&!e.repeat)sendJ({t:'act',a:'ability'});if(A('fob')){if(ghostK){endPlace()}else{bmOpen=!bmOpen;bmDraw()}}else if(bmOpen&&/^(Digit|Numpad)[1-8]$/.test(e.code)){const i=+e.code.slice(-1)-1,it=bmItems()[i];if(it&&it.ok){if(T.FORT[it.k])startPlace(it.k);else sendJ(it.k==='fob'?{t:'act',a:'fob'}:{t:'act',a:'fspawn'})}bmOpen=false;bmDraw()}else if(!me.alive&&deployed&&/^(Digit|Numpad)[0-9]$/.test(e.code)){pickSpawn(+e.code.slice(-1))}if(A('postToggle'))sendJ({t:'act',a:'postToggle'});if(A('mark')&&!e.repeat&&me.alive&&!me.officer)sendJ({t:'act',a:'mark'});if(A('ping')&&!e.repeat&&me.alive&&!me.officer){wheelOn=true;wheelV=[0,0];wheelDraw()}else if(A('ping')&&!e.repeat&&me.down){sendJ({t:'act',a:'ping',k:'medic'});say('You shout for a medic!')}if(A('mask')&&!e.repeat&&me.alive&&!me.officer)sendJ({t:'act',a:'mask'});if(A('crouch')&&!e.repeat&&myVeh&&(myVeh.k==='tank'||myVeh.k==='plane')){vView^=1;vvKey='-'}if(A('melee')&&!e.repeat&&me.alive&&!me.mg&&!me.cl&&!me.officer){meleeT=0;sendJ({t:'act',a:'melee'});swishSnd()}
+ if(A('reload'))sendJ({t:'act',a:'reload'});if(A('grenade')){sendJ({t:'act',a:'grenade'});if((me.gr|0)>0&&!me.mg)itemPlay([6,6,7],.17)}if(A('heal')){sendJ({t:'act',a:'heal'});if(me.u==='bandage'&&(me.bd|0)>0&&(me.hp<(me.maxhp||100)||medMate)&&!me.mg)itemPlay([0,1,2,3],medMate?.3:.42)}if(A('dig'))sendJ({t:'act',a:'dig'});if(A('mg'))sendJ({t:'act',a:'mg'});if(A('ability')&&!e.repeat)sendJ({t:'act',a:'ability'});if(A('fob')){if(ghostK){endPlace()}else{bmOpen=!bmOpen;bmDraw()}}else if(bmOpen&&/^(Digit|Numpad)[1-8]$/.test(e.code)){const i=+e.code.slice(-1)-1,it=bmItems()[i];if(it&&it.ok){if(T.FORT[it.k])startPlace(it.k);else sendJ(it.k==='fob'?{t:'act',a:'fob'}:{t:'act',a:'fspawn'})}bmOpen=false;bmDraw()}else if(!me.alive&&deployed&&/^(Digit|Numpad)[0-9]$/.test(e.code)){pickSpawn(+e.code.slice(-1))}if(A('postToggle'))sendJ({t:'act',a:'postToggle'});if(A('mark')&&!e.repeat&&me.alive&&!me.officer)sendJ({t:'act',a:'mark'});if(A('ping')&&!e.repeat&&me.alive&&!me.officer){wheelOn=true;wheelV=[0,0];wheelDraw()}else if(A('ping')&&!e.repeat&&me.down){sendJ({t:'act',a:'ping',k:'medic'});say('You shout for a medic!')}if(A('mask')&&!e.repeat&&me.alive&&!me.officer)sendJ({t:'act',a:'mask'});if(A('crouch')&&!e.repeat&&myVeh&&(myVeh.k==='tank'||myVeh.k==='plane')){vView^=1;vvKey='-'}if(A('melee')&&!e.repeat&&me.alive&&!me.mg&&!me.cl&&!me.officer){meleeT=0;sendJ({t:'act',a:'melee'});swishSnd()}
  if(!e.repeat){if(A('crouch')&&S.togCrouch)tCrouch=!tCrouch;if(A('sprint')&&S.togSprint)tSprint=!tSprint}});
 addEventListener('keyup',e=>K[e.code]=0);
 addEventListener('mousemove',e=>{if(me.officer&&deployed)ofMouse=[e.clientX,e.clientY];if(ofRot&&me.officer&&deployed){ofyaw-=e.movementX*.006;ofpit=Math.max(-Math.PI/2,Math.min(-.5,ofpit-e.movementY*.005));return}if(!lockedNow())return;if(wheelOn){wheelV[0]+=e.movementX;wheelV[1]+=e.movementY;const l=Math.hypot(wheelV[0],wheelV[1]);if(l>120){wheelV[0]*=120/l;wheelV[1]*=120/l}wheelDraw();return}const k=.0022*S.sens/(1+((ZOOM[me.w]||1.3)-1)*adsT);me.yaw-=e.movementX*k;me.pitch=Math.max(-1.45,Math.min(1.45,me.pitch-e.movementY*k*(S.invY?-1:1)))});
@@ -870,6 +916,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Operations.</b> One side attacks, the other defends, and the sides swap each round. Attackers take the enemy's three trench lines one at a time; every respawn costs a ticket, and a fresh battalion (with a barrage) arrives when one runs dry. Three battalions lost and the attack has failed.<br>
  <b>Squads.</b> Join a squad; your leader gets the officer's orders. Follow them for bonus XP. Medics revive, sappers build cover, buildings and respawn points.<br>
  <b>Side objectives.</b> Four supply depots on the flanks give your officer command points. Bots go for them too.<br>
+ <b>Medics.</b> A health bar hangs over every hurt teammate within 45 m, even through cover. Stand by a hurt man, face him and press H: the bandage goes to him (70 HP) before yourself. Hold E on a downed man to revive him; you then earn a little XP for every kill he makes until he dies again.<br>
  <b>Riflemen.</b> Only riflemen carry the bolt-action rifle; they work the bolt and aim faster, keep their nerve under suppression and charge with the bayonet for longer. N fits a rifle grenade (it uses one of your grenades): the dotted arc and ring show where it will land, 30–110 m out depending on how high you raise the muzzle. Fire to launch, N or R to take it off. It wrecks a machine-gun nest.<br>
  <b>Machine gunners.</b> Crouch to brace the gun for tight, steady bursts. N drops an ammo box (3 supply, two at a time): anyone on your side who walks over it gets a full magazine, grenades and utility back.<br>
  <b>Assault.</b> Faster, tougher, quicker to reload. Crouch while sprinting to slide in under fire; stand up, jump or pull back to cancel it. N injects morphine (two per life, another from an ammo box): for 10 s you run faster and shrug off 40% of the damage.<br>
@@ -888,7 +935,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wrecked guns.</b> Shells knock out MG nests, field guns and AA guns; hold E beside one to repair it (sappers are fastest).<br>
  <b>Phones.</b> Touch controls turn on by themselves; play in landscape. The ✎ button lets you move the buttons where you like.<br>
  <b>Your career.</b> Every game earns XP toward 100 levels and the ranks up to General. Your service record is on this screen.
- </div></details><div class="ver">v0.37</div>`,'');
+ </div></details><div class="ver">v0.38</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -961,23 +1008,28 @@ $('setb').addEventListener('input',e=>{const t=e.target;if(t.dataset.k){S[t.data
 $('setb').addEventListener('change',e=>{const t=e.target;if(t.dataset.c){S[t.dataset.c]=t.checked}else if(t.dataset.s){S[t.dataset.s]=t.value}else if(t.dataset.k&&(t.dataset.k==='master'||t.dataset.k==='sfx')){snd(.4)}else return;saveS();applyS()});
 /* ------------------------------------------------------------------ loop */
 const gc=$('gun').getContext('2d'),GR=(x,y,w,h,c)=>{gc.fillStyle=c;gc.fillRect(x,y,w,h)};
-const WIMG={},GF={w:360,h:240,cols:6,rl:[5,20],fire:[1,2,3,4],ads:21,afire:[22,23,24,25],sprint:26,melee:[27,28,29,30,31]};['bolt','carbine','shotgun','smg','lmg','mark','flame','atr','hmg'].forEach(k=>{const i=new Image();i.onload=()=>{i.adsDy=adsDrop(i);gIdx=-1;drawGun();if(k===me.w)wIcon()};i.src='assets/gun_'+k+'.png';WIMG[k]=i});
+const WIMG={},GF={w:360,h:240,cols:6,rl:[5,20],fire:[1,2,3,4],ads:21,afire:[22,23,24,25],sprint:26,melee:[27,28,29,30,31]};['bolt','carbine','shotgun','smg','lmg','mark','flame','atr','hmg'].forEach(k=>{const i=new Image();i.onload=()=>{i.adsDy=adsDrop(i);gIdx=-1;drawGun();if(k===me.w)wIcon()};imgRetry(i,'assets/gun_'+k+'.png',1);WIMG[k]=i});
 /* v0.29: aiming down sights must leave the aim point (screen centre) clear. Measure where the top of the front sight sits in the
    aiming frame and draw the aiming frames lowered so the sight tip ends just below the centre dot (trench gun, AT rifle, Lewis...). */
 function adsDrop(im){try{const c=document.createElement('canvas');c.width=GF.w;c.height=GF.h;const g=c.getContext('2d');g.drawImage(im,(GF.ads%GF.cols)*GF.w,Math.floor(GF.ads/GF.cols)*GF.h,GF.w,GF.h,0,0,GF.w,GF.h);
  const d=g.getImageData(GF.w/2-10,0,20,GF.h).data;for(let y=0;y<GF.h;y++)for(let x=0;x<20;x++)if(d[(y*20+x)*4+3]>40)return Math.max(0,Math.ceil(GF.h/2+2-y));return 0}catch(e){return 0}}WIMG.sniper=WIMG.mark;
 const CROSS=(()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(2,2,28,28);g.fillStyle='#d22';g.fillRect(12,5,8,22);g.fillRect(5,12,22,8);return pxTex(c,false)})();
-const CHI=new Image();CHI.src='assets/climb_hands.png';const ZOOM={bolt:1.45,carbine:1.4,shotgun:1.15,smg:1.3,lmg:1.35,mark:3.5,sniper:6,flame:1.1,atr:2.2,hmg:1.3};   /* slight zoom when aiming down the sights (the scope does real magnification) */let adsHeld=false,adsNow=false,adsT=0,medNear=null,revT=0,clAvail=false,clWas=false;let gFire=9,gRel=-1,gIdx=-1;
+const CHI=new Image();imgRetry(CHI,'assets/climb_hands.png');const ZOOM={bolt:1.45,carbine:1.4,shotgun:1.15,smg:1.3,lmg:1.35,mark:3.5,sniper:6,flame:1.1,atr:2.2,hmg:1.3};   /* slight zoom when aiming down the sights (the scope does real magnification) */let adsHeld=false,adsNow=false,adsT=0,medNear=null,revT=0,clAvail=false,clWas=false;let gFire=9,gRel=-1,gIdx=-1;
 function gunFrame(){if(me.mg)return gFire<.2?GF.afire[Math.min(3,Math.floor(gFire/.05))]:GF.ads;if(me.rel&&gRel<0)gRel=0;if(!me.rel)gRel=-1;let f=0;if(meleeT<.42){const k=[.06,.12,.22,.32,.42].findIndex(v=>meleeT<v);return GF.melee[k<0?4:k]}if(me.charging)return GF.melee[0];if(sprB>.5&&gRel<0)return GF.sprint;if(adsT>.5&&gRel<0)return gFire<.2?GF.afire[Math.min(3,Math.floor(gFire/.05))]:GF.ads;if(gRel>=0){const rl=(WPN[me.w]||{rl:2}).rl||2;f=GF.rl[0]+Math.min(15,Math.floor(gRel/rl*16))}else if(gFire<.2)f=GF.fire[Math.min(3,Math.floor(gFire/.05))];return f}
 /* v0.29 hands-and-item animations (owner's art): bandaging (H), the syringe while reviving (E), the grenade throw (G).
    Frames: 0 pouch, 1 kit, 2 bandaging, 3 bandaged, 4-5 syringe, 6 grenade, 7 after the throw. Shown in place of the gun. */
-const ITEMI=new Image();ITEMI.src='assets/fpv_items.png';let itemSeq=null,itemF=-1,reviving=0;
+const ITEMI=new Image();imgRetry(ITEMI,'assets/fpv_items.png');let itemSeq=null,itemF=-1,reviving=0,itemHid=false,gunRe=0;
 function itemPlay(fr,d){itemSeq={fr,d,t0:performance.now()}}
+/* v0.38 phones: after a spawn, a rotation or going full screen some phones never painted the gun's layer until something else
+   (the bandage animation) made it repaint. Do that on purpose: redraw the picture and blink the layer for two frames. */
+function gunWake(){const g=$('gun');gIdx=-1;try{drawGun()}catch(e){}if(itemHid)return;g.style.opacity='0';requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!itemHid)g.style.opacity=''}))}
+for(const ev of['resize','orientationchange'])addEventListener(ev,()=>setTimeout(gunWake,250));document.addEventListener('fullscreenchange',()=>setTimeout(gunWake,250));document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(gunWake,100)});
 function itemTick(){const now=performance.now();let f=-1;
  if(me.alive&&now-reviving<260)f=4+(Math.floor(now/320)&1);
  else if(itemSeq){const i=Math.floor((now-itemSeq.t0)/1000/itemSeq.d);if(i<itemSeq.fr.length&&me.alive)f=itemSeq.fr[i];else itemSeq=null}
- const c=$('item'),g=$('gun');if(f<0){if(itemF>=0){itemF=-1;c.style.display='none';g.style.opacity=''}return}
- if(f!==itemF&&ITEMI.complete&&ITEMI.naturalWidth){itemF=f;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.clearRect(0,0,360,240);x.drawImage(ITEMI,(f%4)*360,Math.floor(f/4)*240,360,240,0,0,360,240)}
+ const c=$('item'),g=$('gun');if(now-gunRe>2000){gunRe=now;gIdx=-1}   /* the gun picture is redrawn every 2 s: phones can throw a canvas away (rotation, full screen, memory) */
+ if(f<0||!(ITEMI.complete&&ITEMI.naturalWidth)){if(itemF>=0||itemHid){itemF=-1;itemHid=false;c.style.display='none';g.style.opacity=''}return}   /* v0.38: the gun is only hidden while the hands are really drawn, and always comes back */
+ itemHid=true;if(f!==itemF){itemF=f;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.clearRect(0,0,360,240);x.drawImage(ITEMI,(f%4)*360,Math.floor(f/4)*240,360,240,0,0,360,240)}
  c.style.display='block';g.style.opacity='0';c.style.transform=g.style.transform}
 /* v0.29.1: on a mounted MG the player sees the Lewis gun's aiming picture (and its firing frames); the nest's own gun block is hidden */
 const gk=()=>me.mg?'lmg':me.w;let mgHid=[];
@@ -994,6 +1046,17 @@ function crackSnd(x,z){const p=relPan(x,z)*.7;nz(.028,.55,2600,'highpass',p,6);n
 function swishSnd(){nz(.16,.22,1300,'bandpass',0,1.2)}
 function stepSnd(f,s,bits){if(me.sld>0||!me.alive||me.cl||me.y>T.groundAt(terr.H,me.x,me.z,me.y)+.15)return;const ph=Math.floor(bob/Math.PI);if(ph===stepPh)return;stepPh=ph;
  const run=me.charging?1.3:bits&1?1:0,v=bits&2?.06:.11+.11*run;nz(.08,v,520+260*run,'lowpass',ph&1?-.2:.2,2.5);if(Math.random()<.4)nz(.16,v*.55,260,'lowpass',0,1.4)}   /* boots in mud, sometimes a squelch */
+/* v0.38: your own shot (kick, sound, tracer) is shown the instant you fire, not when the server's answer comes back a ping
+   later. predTick mirrors the server's own rules (rate of fire, sprint-to-fire delay, semi-automatic trigger); each shot the
+   server then confirms is matched against a shown one, and a shown shot that is never confirmed is simply forgotten. */
+const predAt=[];let pCd=0,pSpr=0,pHold=false,netGap=0,netGapAt=0,lastSnapAt=0,pingAt=0;
+function shotFx(){const W=WPN[me.w]||{},cp=Math.cos(me.pitch),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(me.pitch),dz=-Math.cos(me.yaw)*cp;TUT.shot=1;gunKick=W.flame?.25:1;gFire=0;recoil();if(!(W.flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(W.pel===1&&!W.flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:W.rng,true,me.mg?420:W.vel)}
+function predTick(dt,bits,f,s){pCd-=dt;pSpr=(bits&1)&&(f||s)&&!me.mg?.18:pSpr-dt;const want=!!(bits&8),W=WPN[me.w],now=performance.now();
+ while(predAt.length&&now-predAt[0]>ping*1.5+700)predAt.shift();
+ if(want&&W&&!W.flame&&me.alive&&!me.mg&&!myVeh&&!me.elite&&!me.rel&&!me.charging&&!me.cl&&!me.rg&&pSpr<=0&&pCd<=0&&(W.auto||!pHold)&&(me.ammo|0)-predAt.length>0&&!(maskAt>now)){pCd=W.cd*(me.cls==='rifleman'&&me.w==='bolt'?.8:1);predAt.push(now);shotFx()}
+ pHold=want}
+function netTick(now){const el=$('net');if(!deployed){if(el.textContent)el.textContent='';return}if(now-netGapAt>2500){netGap=0;netGapAt=now}
+ const lost=lastSnapAt&&now-lastSnapAt>1500,rough=netGap>260,c=lost||ping>=180?'#e04030':ping>=90||rough?'#e0b040':'#8fbf6a',t=lost?'NO SIGNAL':'PING '+ping+' ms'+(rough?' · unsteady':'');if(el.textContent!==t)el.textContent=t;if(el.style.color!==c)el.style.color=c}
 function recoil(){const w=me.mg?{rcl:.012}:WPN[me.w]||{},k=(w.rcl||.02)*(adsNow?.75:1)*(.85+Math.random()*.3);me.pitch=Math.min(1.45,me.pitch+k);me.yaw+=(Math.random()-.5)*k*.6;recPend+=k*.6;punch+=k*1.1}   /* muzzle climbs; about 60% settles back on its own */
 function feelTick(dt){
  if(recPend>0){const r=Math.min(recPend,recPend*dt*7+dt*.01);me.pitch-=r;recPend-=r}
@@ -1122,7 +1185,7 @@ const sptTex=col=>{const c=document.createElement('canvas');c.width=c.height=12;
 const SPT=sptTex('#ff3424'),SPTB=sptTex('#4a9cff'),SPTG=sptTex('#3ee05a'),sptS=[],sptM=[SPT,SPTB,SPTG].map((t,i)=>new THREE.SpriteMaterial({map:t,transparent:true,depthTest:i!==1,fog:false}));sptM[0].depthTest=false;sptM[2].depthTest=false;   /* v0.34.1: blue team markers hide behind cover like the men under them; red (spotted) and green (your squad) show through */
 function spotTick(){let n=0;if(deployed)for(const e of ents.values()){if(n>=90)break;if(e.down||e.gone||!e.sp||e.id===me.id)continue;
   const P=e.sp.position,d=Math.hypot(cam.position.x-P.x,cam.position.z-P.z)||1;let c;
-  if(e.team!==me.team){if(!e.spotted)continue;c=0}else{if(e.mg&&e.bot&&d>60)continue;c=e.mysq?2:1;if(c===1&&(d>Math.min(150,sdFar)||e.row==null||e.sp.visible===false))continue}   /* only over a man who is actually drawn (fog hides bodies beyond sdFar) */
+  if(e.team!==me.team){if(!e.spotted)continue;c=0}else{if(e.mg&&e.bot&&d>60)continue;c=e.mysq?2:1;if(c===1&&(d>Math.min(150,sdFar)||(e.row==null&&artReady())||e.sp.visible===false))continue}   /* only over a man who is actually drawn (fog hides bodies beyond sdFar) */
   let m=sptS[n];if(!m){m=new THREE.Sprite(sptM[c]);scene.add(m);sptS.push(m)}if(m.material!==sptM[c])m.material=sptM[c];
   const k=(c?.85:1)*(.2+d*.0055)/(1+((ZOOM[gk()]||1.3)-1)*adsT*.8);m.visible=true;m.scale.set(k,k,1);m.position.set(P.x,P.y+1.3+k*.7,P.z);n++}   /* v0.29: about half the old size, just above the helmet */
  for(let i=n;i<sptS.length;i++)sptS[i].visible=false}
@@ -1132,7 +1195,7 @@ const WN={flame:'Flamethrower',fire:'Fire',atr:'Tankgewehr',hmg:'MG 08/15',tank:
 function kfAdd(m){kfL.unshift({m,at:performance.now()});if(kfL.length>6)kfL.pop();kfDraw()}
 function kfDraw(){$('kf').innerHTML=kfL.map(({m})=>`<div class="${m.ai===me.id||m.vi===me.id?'me':''}">${m.a?`<span style="color:${TC(m.at)}">${esc(m.a)}</span>`:''}<span class="w">[${WN[m.w]||esc(m.w)}${m.h?' ✛':''}]</span><span style="color:${TC(m.vt)}">${esc(m.v)}</span></div>`).join('')}
 let sbT=0;function sbDraw(S2){const rk=i=>i<0?'AI':RK[i]?RK[i][0].slice(0,4):'';
- $('sb').innerHTML=S2.map((t,i)=>`<div class="tm"><h3 style="color:${TC(i)}">${i?'GREEN':'BLUE'} · ${t.n} players + ${t.ai} AI · ${t.k} kills / ${t.d} deaths</h3><table><tr><th>name</th><th>squad</th><th>K</th><th>D</th><th>A</th><th>score</th></tr>${t.l.map(r=>`<tr class="${r[9]?'me':''}${r[8]?' bot':''}${r[10]?'':' dead'}"><td>${esc(rk(r[1])+' '+r[0])}</td><td>${esc(r[2])}</td><td class="n">${r[4]}</td><td class="n">${r[5]}</td><td class="n">${r[6]}</td><td class="n">${r[7]}</td></tr>`).join('')}</table></div>`).join('');$('sb').classList.add('on')}
+ $('sb').innerHTML=S2.map((t,i)=>`<div class="tm"><h3 style="color:${TC(i)}">${i?'GREEN':'BLUE'} · ${t.n} players + ${t.ai} AI · ${t.k} kills / ${t.d} deaths</h3><table><tr><th>name</th><th>squad</th><th>K</th><th>D</th><th>A</th><th>score</th><th>ping</th></tr>${t.l.map(r=>`<tr class="${r[9]?'me':''}${r[8]?' bot':''}${r[10]?'':' dead'}"><td>${esc(rk(r[1])+' '+r[0])}</td><td>${esc(r[2])}</td><td class="n">${r[4]}</td><td class="n">${r[5]}</td><td class="n">${r[6]}</td><td class="n">${r[7]}</td><td class="n" style="color:${r[11]>=180?'#e04030':r[11]>=90?'#e0b040':'#8fbf6a'}">${r[11]>=0?r[11]:''}</td></tr>`).join('')}</table></div>`).join('');$('sb').classList.add('on')}
 function aarHtml(m){const r=m.rep;if(!r)return'';const c=(x,col)=>x?`<div style="--c:${TC(x[2])}"><b>${esc(x[0])}</b>${esc(x[1])}<br><small>${esc(x[3])}</small></div>`:'';
  let h='<div class="aar"><h3>AFTER-ACTION REPORT</h3><div class="cards">'+c(r.mvp)+r.cards.map(x=>c(x)).join('')+(r.squad?`<div style="--c:${TC(r.squad[1])}"><b>Best squad</b>${esc(r.squad[0])}<br><small>${r.squad[2]} points</small></div>`:'')+'</div>';
  for(const o of r.officers)h+=`<div style="color:${TC(o[1])}">Officer ${esc(o[0])}: ${o[2]} call-ins, ${o[3]} kills by support, ${o[4]} orders completed</div>`;
@@ -1182,7 +1245,7 @@ function glintTick(now){let n=0;if(deployed&&!me.officer)for(const e of ents.val
   let g=glints[n];if(!g){g=new THREE.Sprite(new THREE.SpriteMaterial({map:GLT,transparent:true,depthWrite:false,fog:false,blending:THREE.AdditiveBlending}));scene.add(g);glints.push(g)}
   const k=(.3+l*.012)*(.75+.45*Math.abs(Math.sin(now/110+e.id)));g.scale.set(k,k,1);g.position.set(P.x+dx/l*.5,P.y+.62,P.z+dz/l*.5);g.visible=true;n++}
  for(let i=n;i<glints.length;i++)glints[i].visible=false}
-const ICON={};['bolt','carbine','shotgun','smg','lmg','mark','flame','atr','hmg'].forEach(k=>{const i=new Image();i.onload=()=>{if(k===me.w)wIcon()};i.src='assets/w_'+k+'.png';ICON[k]=i});ICON.sniper=ICON.mark;
+const ICON={};['bolt','carbine','shotgun','smg','lmg','mark','flame','atr','hmg'].forEach(k=>{const i=new Image();i.onload=()=>{if(k===me.w)wIcon()};imgRetry(i,'assets/w_'+k+'.png');ICON[k]=i});ICON.sniper=ICON.mark;
 function wIcon(){const im=ICON[me.w],c=$('wi');if(!im||!im.naturalWidth)return;const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);g.imageSmoothingEnabled=false;const sc=Math.min(c.width/im.naturalWidth,c.height/im.naturalHeight),w=im.naturalWidth*sc,h=im.naturalHeight*sc;g.drawImage(im,0,c.height-h,w,h);g.globalCompositeOperation='source-in';g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.globalCompositeOperation='source-over'}
 const mm=$('mm');mm.addEventListener('click',e=>{if(!me.officer||!deployed)return;const b=mm.getBoundingClientRect();let u=(e.clientX-b.left)/b.width,v=(e.clientY-b.top)/b.height;if(me.team===1){u=1-u;v=1-v}ofx=u*2*W-W;ofz=v*2*W-W});
 const mc=mm.getContext('2d'),mt=document.createElement('canvas');mt.width=mt.height=161;
@@ -1345,8 +1408,16 @@ function staticDraw(far){const cx=cam.position.x,cz=cam.position.z,o=me.officer&
    const y=it[i+1]-it[i+4]*it[i+5],hw=it[i+3]/2,h=it[i+4],j=m*12;P[j]=x-R[0]*hw;P[j+1]=y-R[1]*hw;P[j+2]=z-R[2]*hw;P[j+3]=x+R[0]*hw;P[j+4]=y+R[1]*hw;P[j+5]=z+R[2]*hw;P[j+6]=P[j+3]+U[0]*h;P[j+7]=P[j+4]+U[1]*h;P[j+8]=P[j+5]+U[2]*h;P[j+9]=P[j]+U[0]*h;P[j+10]=P[j+1]+U[1]*h;P[j+11]=P[j+2]+U[2]*h;
    for(let v=0;v<4;v++){C[j+v*3]=k;C[j+v*3+1]=k;C[j+v*3+2]=kb}m++}
   q.geo.setDrawRange(0,m*6);q.geo.attributes.position.needsUpdate=true;q.geo.attributes.color.needsUpdate=true;drawn+=m}return drawn}
+/* v0.38: until the soldier art has arrived, every soldier is drawn as a plain uniformed figure (he was invisible, with only his marker showing) */
+let FBQ=null;function fbDraw(on){if(!on){if(FBQ){for(const q of FBQ)q.geo.setDrawRange(0,0);FBQ.on=0;FBQ.n=0}return}
+ if(!FBQ)FBQ=[QBatch(TX[0],330),QBatch(TX[1],330)];FBQ.on=1;const n=[0,0],R=CR,U=CU,cx=cam.position.x,cz=cam.position.z;
+ for(const e of ents.values()){if(e.sp.visible===false)continue;const P=e.sp.position;if(!me.officer&&Math.hypot(P.x-cx,P.z-cz)>sdFar)continue;const ti=e.team?1:0,q=FBQ[ti];if(n[ti]>=q.max)continue;
+  const j=n[ti]++*12,hw=e.down?.8:.42,h=e.down?.7:e.crouch?1.35:1.85,x=P.x,y=P.y,z=P.z,A=q.pos,C=q.col;A[j]=x-R[0]*hw;A[j+1]=y-R[1]*hw;A[j+2]=z-R[2]*hw;A[j+3]=x+R[0]*hw;A[j+4]=y+R[1]*hw;A[j+5]=z+R[2]*hw;A[j+6]=A[j+3]+U[0]*h;A[j+7]=A[j+4]+U[1]*h;A[j+8]=A[j+5]+U[2]*h;A[j+9]=A[j]+U[0]*h;A[j+10]=A[j+1]+U[1]*h;A[j+11]=A[j+2]+U[2]*h;
+  for(let v=0;v<12;v++)C[j+v]=sprK}
+ FBQ.n=n[0]+n[1];FBQ.forEach((q,i)=>{q.geo.setDrawRange(0,n[i]*6);q.geo.attributes.position.needsUpdate=true;q.geo.attributes.color.needsUpdate=true})}
+const artReady=()=>!!(ART.mat&&BODY.tex.image&&BODY.tex.image.width);
 let ssN=0,sdFar=150;function soldiersDraw(){const m=cam.matrixWorld.elements;CR[0]=m[0];CR[1]=m[1];CR[2]=m[2];CU[0]=m[4];CU[1]=m[5];CU[2]=m[6];
- const far=Math.min(400,1.98/Math.max(.002,scene.fog.density||.011)),cx=cam.position.x,cz=cam.position.z;lodN=0;sdFar=far;
+ const far=Math.min(400,1.98/Math.max(.002,scene.fog.density||.011)),cx=cam.position.x,cz=cam.position.z;lodN=0;sdFar=far;{const ok=artReady();if(!ok||(FBQ&&FBQ.on))fbDraw(!ok)}
  for(const e of ents.values()){const P=e.sp.position;if(e.sp.visible===false||e.row==null)continue;const dx=P.x-cx,dz=P.z-cz,d=Math.hypot(dx,dz);if(d>far&&!me.officer)continue;lodN++;
   const S=e.sp.scale;let kL=sprK;if(wxK==='night'){const l=T.litAt(P.x,P.z);if(l>0)kL=Math.max(kL,sprK+(.95-sprK)*l)}BODY.add(P.x,P.y,P.z,S.x,S.y,e.row,e.col,kL*(e.spotted&&e.team!==me.team?1.08:1),CR,CU);
   if(!ART.armed&&!e.down&&S.y>1.5&&d<120){const l=d||1,k=e.vw===2?-.06:.06;GUNB.add(P.x+dx/l*-k,P.y,P.z+dz/l*-k,1.3*160/96,1.95,e.gl||0,(e.aim?4:0)+(e.vw||0),kL,CR,CU)}}
@@ -1478,7 +1549,7 @@ function v26Tick(now,dt){vhTick(now,dt);artTick(dt);lodTick(dt);chatTick();fires
   if(e.elite===0){if(!e.ft){e.ft=new THREE.Sprite(new THREE.SpriteMaterial({map:FUELT,alphaTest:.5}));e.ft.center.set(.5,0);e.ft.scale.set(.62,.78,1);scene.add(e.ft)}const P=e.sp.position,show=e.sp.visible!==false&&!e.down&&(e.vw===2||e.vw===1||e.vw===3);e.ft.visible=show;   /* the fuel tanks on his back show from behind and the sides */
    if(show){const dx=cam.position.x-P.x,dz=cam.position.z-P.z,l=Math.hypot(dx,dz)||1,yw=e.yaw||0,k=e.vw===2?.08:-.02;e.ft.position.set(P.x+dx/l*k+Math.sin(yw)*.12,P.y+.85,P.z+dz/l*k+Math.cos(yw)*.12)}}else if(e.ft){scene.remove(e.ft);e.ft=null}}}
 
-let last=performance.now(),lastSend=0;
+let last=performance.now(),lastSend=0,dtAcc=0;
 function nestNear(){let b=null,bd=3.6;for(const n of T.NEST)if(n.team===me.team&&!n.dead){const d=Math.hypot(me.x-n.x,me.z-n.z);if(d<bd){bd=d;b=n}}return b}
 /* v0.31 beginner tutorial: on a first deploy a coach card walks through the basics, each step ticked off by doing it.
    Skippable; Settings > Controls brings it back. Officers (they play from the map) and spectators never see it. */
@@ -1501,7 +1572,7 @@ function tutTick(dt){const el=$('tut');if(!S.tut||!deployed||!me.alive||me.offic
 function tutEnd(){S.tut=false;saveS();TUT.i=-1;$('tut').style.display='none'}
 $('tutx').onclick=e=>{e.stopPropagation();tutEnd()};
 function frame(){
- requestAnimationFrame(frame);const now=performance.now(),dtms=Math.max(1,Math.min(50,Math.round(now-last)));last=now;const dt=dtms/1000;tutTick(dt);planesFrame(dt);wrecksFrame(dt);mphFrame();rgFrame(dt);
+ requestAnimationFrame(frame);const now=performance.now();dtAcc=Math.min(200,dtAcc+now-last);last=now;const dtms=Math.max(1,Math.min(50,Math.round(dtAcc)));dtAcc=dtAcc>50.5?0:dtAcc-dtms;const dt=dtms/1000;   /* v0.38: the rounding remainder is carried, so the time sent to the server adds up to real time exactly */tutTick(dt);planesFrame(dt);wrecksFrame(dt);mphFrame();rgFrame(dt);netTick(now);medTick();
  if(deployed&&me.officer){const sp=(dn('sprint')?90:45)*dt,mr=(dn('right')?1:0)-(dn('left')?1:0),mf=(dn('fwd')?1:0)-(dn('back')?1:0),sy=Math.sin(ofyaw),cy_=Math.cos(ofyaw);ofx=Math.max(-W+10,Math.min(W-10,ofx+(mr*cy_-mf*sy)*sp));ofz=Math.max(-W+5,Math.min(W-5,ofz+(-mr*sy-mf*cy_)*sp));ofyaw+=((dn('leanL')?1:0)-(dn('use')?1:0))*1.6*dt}
  else if(deployed){
   const lk=lockedNow(),f=lk?(dn('fwd')?1:0)-(dn('back')?1:0):0,s=lk?(dn('right')?1:0)-(dn('left')?1:0):0;
@@ -1509,7 +1580,7 @@ function frame(){
   const adsOn=adsHeld&&lk&&me.alive&&!me.mg&&!me.rel&&!me.cl&&!me.officer&&!maskOn&&!myVeh;if(!adsOn&&!S.togAds&&!myVeh)adsHeld=adsHeld&&lk;if(!lk||!me.alive||me.rel||me.cl||me.mg)adsHeld=false;adsNow=adsOn;
   const spr=(S.togSprint?tSprint:dn('sprint'))&&!adsOn,crc=S.togCrouch?tCrouch:dn('crouch');
   const canCl=lk&&me.alive&&!me.mg&&!me.cl&&dn('fwd')&&me.y<=T.groundAt(terr.H,me.x,me.z,me.y)+.1&&T.climbTarget(terr.H,me.x,me.y,me.z,me.yaw);clAvail=!!canCl;
-  const bits=lk?((spr?1:0)|(crc?2:0)|(dn('jump')?4:0)|((fireHeld||fireLatch)?8:0)|(canCl&&dn('jump')?16:0)|(adsOn?32:0)|(spr&&dn('melee')&&!me.mg?64:0)|(myVeh&&myVeh.k==='plane'&&adsHeld?32:0)):0;fireLatch=false;sprNow=!!(bits&1)&&(f!==0||s!==0)&&!me.mg;
+  const bits=lk?((spr?1:0)|(crc?2:0)|(dn('jump')?4:0)|((fireHeld||fireLatch)?8:0)|(canCl&&dn('jump')?16:0)|(adsOn?32:0)|(spr&&dn('melee')&&!me.mg?64:0)|(myVeh&&myVeh.k==='plane'&&adsHeld?32:0)):0;fireLatch=false;sprNow=!!(bits&1)&&(f!==0||s!==0)&&!me.mg;predTick(dt,bits,f,s);
   if(me.alive){
    if(me.mg){const mb=me.mgBase!=null?me.mgBase:(me.team?Math.PI:0);me.yaw=mb+Math.max(-1.25,Math.min(1.25,Math.atan2(Math.sin(me.yaw-mb),Math.cos(me.yaw-mb))));me.pitch=Math.max(-.35,Math.min(.45,me.pitch));me.eye=1.35}
    if(myVeh)vehClamp();
@@ -1592,7 +1663,7 @@ function frame(){
   {const hb=$('hb'),show=me.alive&&!me.officer;hb.style.display=show?'':'none';$('tabh').style.display=show||me.officer?'':'none';
    if(show&&myVeh){const vh=vehHud();hb.querySelector('.am').innerHTML=vst.rl>0?vst.rl.toFixed(1)+'<small>s reload</small>':'READY';hb.querySelector('.ul i').style.width=vst.hp+'%';hb.querySelector('.sp').textContent='ARMOUR '+vst.hp+'%  ·  SUPPLY '+me.supply;hb.querySelector('.it').textContent=vh?vh.keys:''}
    else if(show){if(me._wi!==me.w){me._wi=me.w;wIcon()}hb.querySelector('.am').innerHTML=me.mg?me.ammo+'<small>rds</small>':me.ammo+'<small>/ '+w.mag+(me.rel?' · reloading':'')+'</small>';hb.querySelector('.ul i').style.width=Math.max(0,Math.min(100,me.hp/(me.maxhp||100)*100))+'%';hb.querySelector('.sp').textContent='SUPPLY '+me.supply+'  ·  HP '+Math.ceil(me.hp);hb.querySelector('.it').textContent='['+kn('grenade')+'] GRENADES '+(me.gr|0)+'   ['+kn('heal')+'] '+(me.u==='gasnade'?'GAS GRENADES':me.u==='smokenade'?'SMOKE GRENADES':me.u==='flare'?'FLARES':'BANDAGES')+' '+(me.bd|0)+(maskOn?'   ['+kn('mask')+'] MASK ON':'')+(me.cls==='assault'&&!me.elite&&!me.officer?'   ['+kn('ability')+'] '+(me.mph?'MORPHINE '+Math.max(0,Math.ceil((mphEnd-performance.now())/1000))+'s':'MORPHINE '+(me.mphN|0)):'')+(me.cls==='gunner'&&!me.elite&&!me.officer?'   ['+kn('ability')+'] AMMO BOX':'')+(me.cls==='rifleman'&&!me.elite&&!me.officer?'   ['+kn('ability')+'] RIFLE GRENADE'+(me.rg?' (FITTED)':''):'')}
-   {const hi=$('hint');const vHint=show?(rgHint()||ekHint()||vehNearHint()||aboxHint()):null;const wkOn=performance.now()-((me.wk&&me.wk.at)||0)<600;if(tnNear&&show&&!medNear){hi.style.display='block';const P=Math.round(TNP[tnNear.i]*100);hi.textContent=wkOn?me.wk.n+(me.wk.p?' · '+Math.round(me.wk.p*100)+'%':''):tnNear.dig?'Hold ['+kn('use')+'] to dig the mine gallery under the enemy trench ('+P+'%)'+(me.cls==='sapper'?'':' (sappers dig 3x faster)'):P?'Enemy digging below ('+P+'%)! Hold ['+kn('use')+'] to countermine':'Listening post: hold ['+kn('use')+'] to listen for enemy mining'}else if(phNear&&show&&!medNear){hi.style.display='block';hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':'Hold ['+kn('use')+(phNear.own?'] to splice the telephone line':'] to cut the enemy telephone line')+(me.cls==='sapper'?'':' (sappers are faster)')}else if(repNear&&show&&!medNear){hi.style.display='block';hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':'Hold ['+kn('use')+'] to repair the '+repNear.n+(me.cls==='sapper'?'':' (sappers repair faster)')}else if(fortNear&&show&&!medNear){hi.style.display='block';const F=T.FORT[fortNear.k];hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':fortNear.team===me.team?'Hold ['+kn('use')+'] to build the '+F.n.toLowerCase()+' ('+Math.round(fortNear.done*100)+'%)':'Hold ['+kn('use')+'] to tear down the enemy '+F.n.toLowerCase()}else if(medNear&&show){hi.style.display='block';hi.textContent=performance.now()-(me.rvAt||0)<700?'Reviving '+Math.round(me.rvp*100)+'%':'Hold ['+kn('use')+'] to revive'}else if(vHint){hi.style.display='block';hi.textContent=vHint}else if(clAvail&&show&&!me.cl){hi.style.display='block';hi.textContent='Hold ['+kn('jump')+'] to climb'}else hi.style.display='none'}
+   {const hi=$('hint');const vHint=show?(rgHint()||medHint()||ekHint()||vehNearHint()||aboxHint()):null;const wkOn=performance.now()-((me.wk&&me.wk.at)||0)<600;if(tnNear&&show&&!medNear){hi.style.display='block';const P=Math.round(TNP[tnNear.i]*100);hi.textContent=wkOn?me.wk.n+(me.wk.p?' · '+Math.round(me.wk.p*100)+'%':''):tnNear.dig?'Hold ['+kn('use')+'] to dig the mine gallery under the enemy trench ('+P+'%)'+(me.cls==='sapper'?'':' (sappers dig 3x faster)'):P?'Enemy digging below ('+P+'%)! Hold ['+kn('use')+'] to countermine':'Listening post: hold ['+kn('use')+'] to listen for enemy mining'}else if(phNear&&show&&!medNear){hi.style.display='block';hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':'Hold ['+kn('use')+(phNear.own?'] to splice the telephone line':'] to cut the enemy telephone line')+(me.cls==='sapper'?'':' (sappers are faster)')}else if(repNear&&show&&!medNear){hi.style.display='block';hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':'Hold ['+kn('use')+'] to repair the '+repNear.n+(me.cls==='sapper'?'':' (sappers repair faster)')}else if(fortNear&&show&&!medNear){hi.style.display='block';const F=T.FORT[fortNear.k];hi.textContent=wkOn?me.wk.n+' · '+Math.round(me.wk.p*100)+'%':fortNear.team===me.team?'Hold ['+kn('use')+'] to build the '+F.n.toLowerCase()+' ('+Math.round(fortNear.done*100)+'%)':'Hold ['+kn('use')+'] to tear down the enemy '+F.n.toLowerCase()}else if(medNear&&show){hi.style.display='block';hi.textContent=performance.now()-(me.rvAt||0)<700?'Reviving '+Math.round(me.rvp*100)+'%':'Hold ['+kn('use')+'] to revive'}else if(vHint){hi.style.display='block';hi.textContent=vHint}else if(clAvail&&show&&!me.cl){hi.style.display='block';hi.textContent='Hold ['+kn('jump')+'] to climb'}else hi.style.display='none'}
    if(!opHud())$('stat').textContent=(wave[0]===me.team?'YOUR PUSH ':'ENEMY PUSH ')+Math.max(0,45-wave[1])+'s'+(myOrder&&!me.officer?'\n'+myOrder.ty.toUpperCase()+' '+myOrder.n+' · '+Math.round(Math.hypot(myOrder.x-me.x,myOrder.z-me.z))+' m':'')}}
  msgT-=dt;if(msgT<=0)$('msg').textContent='';
 }
