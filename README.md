@@ -73,6 +73,13 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+
+## v0.40 — Last stand, mouse binds, version check
+
+- **Last stand.** When you are knocked down you draw a revolver: 6 rounds, about one shot a second, and a slow 4 s reload ([R]). The move keys crawl at roughly 0.6 m/s.
+- **Finishing off.** Downed soldiers can now be hit by enemy bullets, bayonets and blasts. They have 60 health while down (a rifle needs two hits); the finisher gets +3 XP. Teammates cannot hurt them.
+- **Mouse buttons can be bound.** Any action in Settings can take a mouse button (left, middle, right, Mouse 4, Mouse 5), and Fire and Aim are now rebindable too.
+- **Version on the first screen.** The login page shows the page version and checks it against the server, with a warning if the two differ (old page cached, or server not yet updated).
 ## v0.39.1 - rifle animation, and a readout that says where lag comes from
 - **Rifle in the hands** (also the carbine and anti-tank rifle, which share its art):
   - The hip view is 1.3x larger and set lower, so the forearm leaves the screen at the bottom like the trench gun's instead of

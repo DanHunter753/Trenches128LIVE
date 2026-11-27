@@ -10,7 +10,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Server tests: each starts its own server in-process on its own port.
 const UNIT = ['snapdec', 'trench', 'climb', 'dugouts', 'destruct', 'net', 'round', 'limits', 'posts', 'forts', 'revive', 'officer', 'ops', 'gunplay',
-  'ai', 'command', 'rts', 'recon', 'comms', 'vehicles', 'bots27', 'live', 'tanktrench', 'v29', 'fuzz', 'launcherfiles', 'maps', 'wrecks', 'mud', 'phones', 'tunnels', 'planes', 'spawnmap', 'structs', 'movebank', 'flying', 'spacing', 'botjobs', 'lights', 'classes', 'v38'];
+  'ai', 'command', 'rts', 'recon', 'comms', 'vehicles', 'bots27', 'live', 'tanktrench', 'v29', 'fuzz', 'launcherfiles', 'maps', 'wrecks', 'mud', 'phones', 'tunnels', 'planes', 'spawnmap', 'structs', 'movebank', 'flying', 'spacing', 'botjobs', 'lights', 'classes', 'v38', 'laststand'];
 // Browser tests: run against a fresh T128_TEST server on :8099 with a seeded xp.json (ranks the tests need).
 const SEED = { offtester: 800, officerbrowser: 800, leaderbrowser: 150, settester: 900, camtester: 800, cmdbrowser: 800, reconbrowser: 150, rtsbrowser: 800, gunnerbrowser: 150 };
 const BROWSER = [['browser'], ['browser_ads'], ['browser_audio'], ['browser_climb'], ['browser_command'], ['browser_comms'], ['browser_forts'], ['browser_gunplay'],
@@ -18,7 +18,7 @@ const BROWSER = [['browser'], ['browser_ads'], ['browser_audio'], ['browser_clim
   ['browser_settings'], ['browser_v16'], ['browser_v26', { env: { T128_WX: 'night' } }],
   ['browser_v27', { args: ['--registry', '--public', 'http://localhost:8099', '--name', 'BTest'] }],
   ['browser_v29'],
-  ['browser_tutorial'], ['browser_plane'], ['browser_tclayout'], ['browser_touchdown'], ['browser_marks'], ['browser_orders'], ['browser_record'], ['browser_respawn'], ['browser_classes'], ['browser_v38'], ['browser_customize'], ['browser_netfeel', { env: { T128_LAG: '90,70', T128_WX: 'overcast' }, args: ['--fill', '0'] }], ['browser_maps', { targs: ['--own-server'] }],
+  ['browser_tutorial'], ['browser_plane'], ['browser_tclayout'], ['browser_touchdown'], ['browser_marks'], ['browser_orders'], ['browser_record'], ['browser_respawn'], ['browser_classes'], ['browser_v38'], ['browser_customize'], ['browser_laststand', { args: ['--fill', '0'] }], ['browser_netfeel', { env: { T128_LAG: '90,70', T128_WX: 'overcast' }, args: ['--fill', '0'] }], ['browser_maps', { targs: ['--own-server'] }],
   ['browser_touch'],
   ['browser_soak', { env: { T128_WX: 'night' }, args: ['--fill', '40'], targs: ['http://localhost:8099', '90'] }]];
 
