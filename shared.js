@@ -349,6 +349,9 @@ function buildLights() {
     else if ((S.k === 'farm' || S.k === 'barn') && hv < .55) L(S.x + Math.cos(hv * 40) * 1.5, S.z + Math.sin(hv * 40) * 1.5, 'fire', 14, { h: 0 });
     else if (S.k === 'chapel' && hv < .6) L(S.x, S.z, 'lamp', 6, { h: .9 }); });   // candles left burning in the chapel ruins
   for (const b of BURN) L(b.x, b.z, 'burn', 6 + b.k * 4, { h: 0 });
+  gridLights();
+}
+function gridLights() {
   LGRID = new Map(); LIGHTS.forEach((l, i) => { for (let gx = Math.floor((l.x - l.r) / 16); gx <= Math.floor((l.x + l.r) / 16); gx++) for (let gz = Math.floor((l.z - l.r) / 16); gz <= Math.floor((l.z + l.r) / 16); gz++) { const k = gx * 1000 + gz; if (!LGRID.has(k)) LGRID.set(k, []); LGRID.get(k).push(l); } });
 }
 /** How well lit the ground is at (x, z) by the lamps and fires: 0 (dark) .. 1 (in the pool of light). */
@@ -450,7 +453,7 @@ function fortSeg(x0, y0, z0, x1, y1, z1) {   // segments up to one grid cell (6 
       for (const b of a) { const t = segBox(b, x0, y0, z0, x1, y1, z1); if (t >= 0 && (best < 0 || t < best)) best = t; } } }
   return best;
 }
-function wireK(x, z) { let k = wireK0(x, z); for (const w of FWIRE) if (inBox(w, x, z, 0)) { k = Math.min(k, .3); break; } return k; }
+function wireK(x, z) { let k = MP.kind === 'wake' ? 1 : wireK0(x, z); for (const w of WWIRE) if (inBox(w, x, z, 0)) { k = .4; break; } for (const w of FWIRE) if (inBox(w, x, z, 0)) { k = Math.min(k, .3); break; } return k; }
 function los(H, x1, y1, z1, x2, y2, z2) {
   const n = Math.max(10, Math.min(120, Math.ceil(Math.hypot(x2 - x1, z2 - z1) / 1.0)));
   let px = x1, py = y1, pz = z1;
@@ -680,6 +683,84 @@ function loadWake() {
   const g = root.T128_HM, meta = root.T128_WAKE; if (!g || !meta) return null;   // browser: public/maps/wake.js set these before shared.js ran
   const bin = atob(g.b64), n = (meta.N + 1) * (meta.N + 1), h = new Float32Array(n); for (let i = 0; i < n; i++) { let v = bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8); if (v & 32768) v -= 65536; h[i] = v / 100; } return { meta, h };
 }
+// ---- v0.45 Wake restyle: everything the imported map lists, rebuilt in the game's WW1 look. Trenches are carved into the
+// heightmap (a spoil bank thrown up on the outer side), buildings and gun pits are solid STRUCT boxes (walking, bullets, sight
+// and the bots' nav all respect them), beach obstacles become barbed-wire belts (WWIRE, slows like the trench maps' wire),
+// the AA stands become working AA guns, and lanterns go up at huts, bunkers, towers and flags. Same result on server and client.
+const WWIRE = [], WTR = [], TRM = new Map();   // TRM: heightmap vertex -> 1 trench, 2 spoil bank (for the ground colour)
+function carveTrench(pts, D) {   // pts: polyline [[x, z], ...]; D: depth. Flat floor 1.2 m wide, walls out to 1.1 m, a 0.35 m spoil bank behind
+  let L = 0; const seg = []; for (let i = 0; i + 1 < pts.length; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], l = Math.hypot(bx - ax, bz - az); seg.push([ax, az, bx, bz, l, L]); L += l; }
+  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const [x, z] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  const PR = HM.slice(0);
+  for (let j = Math.max(0, Math.floor((z0 - 4 + W) / ST)); j <= Math.min(N, Math.ceil((z1 + 4 + W) / ST)); j++) for (let i = Math.max(0, Math.floor((x0 - 4 + W) / ST)); i <= Math.min(N, Math.ceil((x1 + 4 + W) / ST)); i++) {
+    const x = -W + i * ST, z = -W + j * ST; let bd = 1e9, ba = 0;
+    for (const [ax, az, bx, bz, l, s0] of seg) { const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / (l * l || 1))), d = Math.hypot(x - ax - (bx - ax) * t, z - az - (bz - az) * t); if (d < bd) { bd = d; ba = s0 + t * l; } }
+    const k = j * (N + 1) + i, h0 = PR[k]; if (h0 < 1.3) continue;   // never dig down to the sea
+    const ramp = Math.min(1, ba / 3, (L - ba) / 3);   // the ends slope up so men (and bots) can walk out
+    if (bd < 1.1) { const w = bd < .6 ? 1 : 1 - (bd - .6) / .5; HM[k] = Math.min(HM[k], h0 - D * Math.max(0, ramp) * w); TRM.set(k, 1); }
+    else if (bd < 3.2 && ramp > .3) { HM[k] = Math.max(HM[k], h0 + .35 * Math.exp(-((bd - 2) * (bd - 2)) / .5) * ramp); if (bd < 2.8 && !TRM.has(k)) TRM.set(k, 2); }
+  }
+  WTR.push({ pts, D });
+}
+function buildWake(m) {
+  WWIRE.length = 0; WTR.length = 0; TRM.clear();
+  const H = (i, k) => hash(i * 1.37 + 11, k);
+  // trenches: three short arcs round each flag (inside the capture circle), plus the map's own trench pieces
+  m.flags.forEach((f, fi) => { const a0 = H(fi, 1) * 6.283; for (let k = 0; k < 3; k++) { const c = a0 + k * 2.094, r = 9 + H(fi, k + 2) * 1.5, pts = [];
+    for (let s = -5; s <= 5; s++) { const a = c + s * .11; pts.push([f.x + Math.cos(a) * r, f.z + Math.sin(a) * r]); }
+    if (pts.every(([x, z]) => hmSample(x, z) > 1.5)) carveTrench(pts, 1.15); } });
+  m.props.filter(p => p.k === 'trench').forEach(p => { const c = Math.cos(p.r || 0), s = Math.sin(p.r || 0); carveTrench([[p.x - s * 4.5, p.z - c * 4.5], [p.x + s * 4.5, p.z + c * 4.5]], 1.15); });
+  // structures
+  const gmin = (x, z, yaw, hx, hz) => { const c = Math.cos(yaw), s = Math.sin(yaw); let mn = 1e9; for (const [a, b] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz], [0, 0]]) mn = Math.min(mn, hmSample(x + a * c + b * s, z - a * s + b * c)); return mn; };
+  const put = (k, x, z, yaw, fn, opt) => { const S = { k, x, z, yaw, parts: [] }, c = Math.cos(yaw), s = Math.sin(yaw), g0 = opt && opt.g != null ? opt.g : gmin(x, z, yaw, 3, 3) - .15;
+    const P = (lx, lz, hx, hz, h0, h1, mat, ry, nb, abs) => { const wx = x + lx * c + lz * s, wz = z - lx * s + lz * c, g = abs ? 0 : (opt && opt.flat ? g0 : gmin(wx, wz, yaw + (ry || 0), hx, hz) - .2); S.parts.push(addSBox(wx, wz, yaw + (ry || 0), hx, hz, g + h0, g + h1, mat, nb)); };
+    fn(P, S); STRUCT.push(S); return S; };
+  const ring = (P, R, n, h, mat, gapA, gapW, thick) => { for (let i = 0; i < n; i++) { const a = (i + .5) / n * 6.283; let d = Math.abs(((a - gapA) % 6.283 + 9.425) % 6.283 - 3.1416); if (d < gapW) continue;
+    P(Math.sin(a) * R, Math.cos(a) * R, Math.PI * R / n * 1.05, thick || .35, 0, h, mat, a); } };
+  const land = p => hmSample(p.x, p.z) > .4;
+  m.props.forEach((p, i) => { const y = p.r || 0, h = H(i, 9);
+    if (p.k === 'hut' && land(p)) put('hut', p.x, p.z, y, P => { const w = 5.2, d = 4.2, ruin = h < .3, wh = ruin ? 0 : 2.5;
+      const wall = (lx, lz, len, ry, door, win) => { const n = Math.round(len / 1.3), sl = len / n; for (let q = 0; q < n; q++) { const al = -len / 2 + sl * (q + .5), px = lx + (ry ? 0 : al), pz = lz + (ry ? al : 0), hx = ry ? .12 : sl / 2, hz = ry ? sl / 2 : .12;
+        if (door && q === Math.floor(n / 2)) { P(px, pz, hx, hz, 2.05, 2.5, 'plank', 0, true); continue; }
+        if (ruin) { if (H(i, q + lx * 3 + lz * 7) < .35) continue; P(px, pz, hx, hz, 0, .6 + 1.7 * H(i, q + 40 + lz), 'wood'); continue; }
+        if (win && (q === 1 || q === n - 2)) { P(px, pz, hx, hz, 0, .95, 'plank'); P(px, pz, hx, hz, 1.75, wh, 'plank'); continue; }
+        P(px, pz, hx, hz, 0, wh, 'plank'); } };
+      wall(0, -d / 2, w, 0, true, true); wall(0, d / 2, w, 0, false, true); wall(-w / 2, 0, d, 1, false, false); wall(w / 2, 0, d, 1, false, true);
+      if (!ruin) P(0, 0, w / 2 + .45, d / 2 + .45, wh, wh + .14, 'tin', 0, true); }, { flat: true });
+    else if (p.k === 'bunker' && land(p)) put('bunker', p.x, p.z, y, P => { const w = 5.4, hw = w / 2;   // a concrete pillbox: firing slit at the front (-z), door at the back
+      for (const sx of [-1, 1]) P(sx * (hw - .2), 0, .2, hw, 0, 2.1, 'concrete');
+      P(0, -(hw - .2), hw, .2, 0, 1.3, 'concrete'); P(0, -(hw - .2), hw, .2, 1.7, 2.1, 'concrete');
+      P(-1.6, hw - .2, 1.1, .2, 0, 2.1, 'concrete'); P(1.6, hw - .2, 1.1, .2, 0, 2.1, 'concrete'); P(0, hw - .2, .5, .2, 1.95, 2.1, 'concrete', 0, true);
+      P(0, 0, hw + .2, hw + .2, 2.1, 2.45, 'concrete', 0, true); }, { flat: true });
+    else if (p.k === 'tower' && land(p)) put('tower', p.x, p.z, y, P => { for (const sx of [-1, 1]) for (const sz of [-1, 1]) P(sx * 1.4, sz * 1.4, .12, .12, 0, 7.4, 'post');
+      P(0, 0, 1.7, 1.7, 5.5, 5.7, 'plank', 0, true); for (const sz of [-1, 1]) P(0, sz * 1.6, 1.7, .06, 5.7, 6.6, 'plank', 0, true); P(0, 0, 1.9, 1.9, 7.4, 7.55, 'tin', 0, true); }, { flat: true });
+    else if (p.k === 'gun' && land(p)) put('cring', p.x, p.z, y, P => ring(P, 4.2, 12, 1, 'concrete', 0, .6), { flat: true });   // the gun (an emplacement in EMPL) sits in a concrete ring, open at the back
+    else if (p.k === 'bagring' && land(p)) put('bagring', p.x, p.z, y, P => ring(P, 2.4, 9, 1, 'bag', 0, .5, .4), { flat: true });
+    else if (p.k === 'bags' && land(p)) put('bags', p.x, p.z, y, P => P(0, 0, 1.8, .4, 0, 1, 'bag'));
+    else if (p.k === 'tank' && land(p)) put('tank', p.x, p.z, y, P => { P(0, 0, 1.75, 3.9, 0, 2.1, 'metal'); P(0, -.3, 1.1, 1.3, 2.1, 2.7, 'metal', h - .5); });
+    else if ((p.k === 'plane' || p.k === 'planewreck') && land(p)) put('plane', p.x, p.z, y, P => { P(0, 0, .55, 3, 0, 1.1, 'wood'); P(0, -1, 4, .7, 0, .35, 'wood', 0, true); });
+    else if (p.k === 'wreck' && land(p)) put('lorry', p.x, p.z, y, P => { P(0, -1.9, 1.05, .85, 0, 2.3, 'metal'); P(0, 1, 1.05, 1.9, 0, 1.3, 'wood'); });
+    else if (p.k === 'radar' && land(p)) put('mast', p.x, p.z, y, P => { P(0, 0, .18, .18, 0, 16, 'post'); P(3.5, 0, 1.6, 1.3, 0, 2.3, 'plank'); P(3.5, 0, 1.9, 1.6, 2.3, 2.42, 'tin', 0, true); });
+    else if (p.k === 'pier' && land(p)) put('shed', p.x, p.z, y, P => { const w = 9, d = 6; for (const sz of [-1, 1]) for (let q = -3; q <= 3; q++) if (!(sz < 0 && Math.abs(q) < 1)) P(q * 1.29, sz * d / 2, .645, .12, 0, 3, 'plank');
+      for (const sx of [-1, 1]) P(sx * w / 2, 0, .12, d / 2, 0, 3, 'plank'); P(0, -d / 2, .645, .12, 2.3, 3, 'plank', 0, true); P(0, 0, w / 2 + .5, d / 2 + .5, 3, 3.15, 'tin', 0, true); }, { flat: true });   // the dock store
+    else if (p.k === 'bridge') { let by = y, bs = -1e9; for (let q = 0; q < 36; q++) { const a = q / 36 * Math.PI, c = Math.cos(a), sn = Math.sin(a); const v = Math.min(hmSample(p.x + sn * 30, p.z + c * 30), hmSample(p.x - sn * 30, p.z - c * 30)); if (v > bs) { bs = v; by = a; } }   // (the file's angle doesn't match the channel: span the shortest way between the two shores)
+      const hd = Math.min(hmSample(p.x + Math.sin(by) * 17, p.z + Math.cos(by) * 17), hmSample(p.x - Math.sin(by) * 17, p.z - Math.cos(by) * 17)) - .15;
+      put('bridge', p.x, p.z, by, P => { const L = 34; for (let q = -L / 2; q <= L / 2; q += 3.2) { if (H(i, q) < .2) continue; for (const sx of [-1, 1]) P(sx * 1.6, q, .13, .13, -3, H(i, q + 9) < .5 ? hd : hd * .35, 'post', 0, false, true);
+        if (Math.abs(q) > L / 2 - 7 || H(i, q + 20) < .25) P(0, q, 1.8, 1.6, hd, hd + .18, 'plank', (H(i, q + 3) - .5) * .4, true, true); } }); }   // shelled: the deck is gone in the middle; men use the ford beside it
+    if ((p.k === 'obstacle' || p.k === 'wire') && land(p)) { const yaw = p.k === 'wire' ? y : H(i, 3) * 6.283, len = p.k === 'wire' ? 9 : 4.5;
+      WWIRE.push({ cx: p.x, cz: p.z, c: Math.cos(yaw), s: Math.sin(yaw), hx: len / 2, hz: .9, yaw }); }
+  });
+  // AA guns (working: they shoot at enemy planes) where the map has its flak stands
+  AA.length = 0; m.props.filter(p => p.k === 'aa' && land(p)).forEach(p => AA.push({ team: p.team == null ? 1 : p.team, x: p.x, z: p.z }));
+  // lanterns: hut doors, bunker backs, tower tops, every flag
+  LIGHTS.length = 0; const Lt = (x, z, k, r, o) => LIGHTS.push(Object.assign({ x: +x.toFixed(2), z: +z.toFixed(2), k, r }, o || {}));
+  STRUCT.forEach((S, i) => { const c = Math.cos(S.yaw), s = Math.sin(S.yaw), at = (lx, lz) => [S.x + lx * c + lz * s, S.z - lx * s + lz * c];
+    if (S.k === 'hut' && H(i, 21) < .5) { const [x, z] = at(.9, -2.5); Lt(x, z, 'lantern', 8, { h: 2.2, hang: 1 }); }
+    else if (S.k === 'bunker') { const [x, z] = at(0, 3.2); Lt(x, z, 'lantern', 7, { h: 1.9, hang: 1 }); }
+    else if (S.k === 'tower') Lt(S.x, S.z, 'lamp', 12, { h: 6 }); });
+  for (const f of m.flags) Lt(f.x + .3, f.z, 'lantern', 12, { h: 2.6, hang: 1 });
+  gridLights();
+}
 function applyWake() {
   const d = loadWake(); if (!d) return false; const m = d.meta;
   setWorld(m.S, m.N); HM = d.h; MP.kind = 'wake'; MP.meta = m; MP.seed = WAKE_SEED; Object.assign(MP, { ph1: 0, ph2: 0, a1: 1, a2: 1, gx: 0, gz: 0, hs: 0 });
@@ -693,6 +774,7 @@ function applyWake() {
   fill(DEPOTS, []);
   ROOMS.length = 0; SB.length = 0; SBG.clear(); SGRID.clear(); SBOX.length = 0; PHONES.length = 0; TUNNELS.length = 0; AA.length = 0; STRUCT.length = 0; LIGHTS.length = 0; LGRID = new Map(); BAYS.clear();
   AIRF[0] = { x: -300, z: -300, yaw: 0 }; AIRF[1] = { x: 262, z: 258, yaw: -Math.PI / 2 };   // v0.43: the garrison's strip; the landing force has no airfield yet
+  buildWake(m);
   FLOOR = null; PRISTINE = null; return true;
 }
 /** Build the map for `seed` (0 = classic). Returns the seed actually used (a failing layout moves on to the next seed). */
@@ -789,7 +871,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { setWorld, WAKE_SEED, isSea, SEA_WADE, hmSample: (x, z) => HM ? hmSample(x, z) : 0, crawl, CRAWL, RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { WWIRE, WTR, TRM, carveTrench, setWorld, WAKE_SEED, isSea, SEA_WADE, hmSample: (x, z) => HM ? hmSample(x, z) : 0, crawl, CRAWL, RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 for (const [k, g] of [['S', () => S], ['N', () => N], ['ST', () => ST], ['W', () => W], ['NV', () => NV]]) Object.defineProperty(API, k, { get: g, enumerable: true });   // world size can change with the map
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;

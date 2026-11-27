@@ -29,7 +29,7 @@ const CFG = {
   // Default random when run as a server; classic for tests (T128_TEST, or loaded in-process).
   // v0.30.1: where /download sends players when this server holds no installer of its own (public/launcher/latest.yml)
   launcherUrl: (v => /^https:\/\/[^\s"'<>]+$/.test(v) ? v : '')(String(sarg('launcher-url', process.env.T128_LAUNCHER_URL || ''))),
-  maps: (v => v === 'random' || v === 'classic' || v === 'wake' || /^\d{1,10}$/.test(v) ? v : 'random')(String(sarg('maps', process.env.T128_MAPS || (require.main === module && !process.env.T128_TEST ? 'random' : 'classic')))),
+  maps: (v => v === 'random' || v === 'classic' || v === 'wake' || v === 'rotate' || /^\d{1,10}$/.test(v) ? v : 'random')(String(sarg('maps', process.env.T128_MAPS || (require.main === module && !process.env.T128_TEST ? 'random' : 'classic')))),
 };
 fs.mkdirSync(CFG.data, { recursive: true });
 const ACC = CFG.accounts === 'off' ? null : require('./accounts.js')(CFG.data);
@@ -38,7 +38,8 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = Math.random;
 
 // ------------------------------------------------------------------ world state
-const mapPick = () => CFG.maps === 'random' ? T.newSeed() : CFG.maps === 'classic' ? 0 : CFG.maps === 'wake' ? T.WAKE_SEED : +CFG.maps;
+let rotN = 0;   // v0.45 'rotate': two random trench maps, then Wake Atoll, and round again
+const mapPick = () => CFG.maps === 'rotate' ? (rotN++ % 3 === 2 ? T.WAKE_SEED : T.newSeed()) : CFG.maps === 'random' ? T.newSeed() : CFG.maps === 'classic' ? 0 : CFG.maps === 'wake' ? T.WAKE_SEED : +CFG.maps;
 const isWake = () => T.MP.kind === 'wake';   // v0.43 Wake Atoll: an imported island played as Domination (no lines, no Operations)
 let mapSeed = T.setMap(mapPick()), nextMap = null;   // v0.30: this round's layout; the next one is generated in a worker during the end screen
 let terr = T.makeTerrain(), craters = [];
@@ -79,7 +80,8 @@ const SUP = { barrage: { cost: 15, cd: 30, r: 13, tier: 1 }, drop: { cost: 10, c
   heavy: { cost: 45, cd: 150, r: 30, tier: 3 }, star: { cost: 8, cd: 25, r: 30, tier: 1 }, tank: { cost: 50, cd: 150, r: 8, tier: 2 }, strafe: { cost: 20, cd: 60, r: 6, tier: 2 } };
 const SUPK = Object.keys(SUP), supZero = () => Object.fromEntries(SUPK.map(k => [k, 0]));
 // side objectives: depots on the flanks. CP: +1 per 4 s base, +3 per 4 s per depot held; captures pay +10
-const DP = T.DEPOTS.map(d => ({ ...d, owner: -1, p: 0 })), CP_MAX = 250, CP_START = 30, RAID_MAX = 8;
+const DP = [0, 1, 2, 3].map(i => ({ ...(T.DEPOTS[i] || { n: '', x: 1e5, z: 1e5 }), owner: -1, p: 0 })),   // (always four: a server that starts on Wake Atoll, which has none, still has them for the trench maps)
+  CP_MAX = 250, CP_START = 30, RAID_MAX = 8;
 let cmdPts = [CP_START, CP_START], dT = 0;
 const smokes = [], gases = [], recons = [], marks = [];
 let markId = 1; const alertAt = new Map();
@@ -1664,8 +1666,8 @@ function switchMap() {
   const t0 = Date.now(); mapSeed = T.setMap(job.seed);
   if (!(job.H && job.used === mapSeed && T.adoptTerrain(job.H, job.F))) console.log('[map] worker not ready: generating here');
   terr = T.makeTerrain();
-  OB.forEach((o, i) => { o.x = T.OBJ[i].x; o.z = T.OBJ[i].z; o.n = T.OBJ[i].n || T.LINES[i]; });
-  DP.forEach((d, i) => Object.assign(d, { n: T.DEPOTS[i].n, x: T.DEPOTS[i].x, z: T.DEPOTS[i].z }));
+  OB.forEach((o, i) => { o.x = T.OBJ[i].x; o.z = T.OBJ[i].z; o.n = T.OBJ[i].n || T.LINES[i]; o.t = T.FL[i]; });
+  DP.forEach((d, i) => { const q = T.DEPOTS[i]; Object.assign(d, q ? { n: q.n, x: q.x, z: q.z } : { n: '', x: 1e5, z: 1e5 }); });   // (Wake Atoll has no depots: parked off the map)
   console.log('[map] round map ' + mapSeed + ' (' + (Date.now() - t0) + ' ms)'); return true;
 }
 function resetRound() {

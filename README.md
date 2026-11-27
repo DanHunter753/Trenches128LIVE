@@ -74,6 +74,18 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.45 — Wake Atoll stage 3: the island rebuilt in WW1 style, new bolt-rifle aim view
+
+- **Fighting trenches at every flag.** Three short plank-revetted trenches with duckboards ring each flag inside the capture circle, about 1.2 m deep with a spoil bank thrown up behind. Climb out over the side or walk out of the sloped ends; the map's own trench pieces near Wilkes Landing are dug too.
+- **Buildings and works from the original map, all solid** (they stop men, bullets and sight; bots path round them): 20 plank huts with tin roofs, doors and windows (a third of them shelled to ruins), 4 concrete pillboxes with a front firing slit and a back door, 4 timber watch towers, a dock store, a wireless mast where the radar stood, concrete rings round the 5 coastal guns, 11 sandbag rings and 32 sandbag walls, and wrecked tanks, lorries and biplanes.
+- **Bridges:** the two wooden bridges are shelled: pilings and broken deck at the banks. The fords beside them are still how you cross.
+- **Beach obstacles are barbed-wire belts** (posts and coils) that slow you down like the wire on the trench maps.
+- **The airstrip and sand roads** are laid on the ground, and the scrub inland is patchy now.
+- **AA guns:** the garrison's five flak stands are working AA guns.
+- **Night:** lanterns at hut doors, pillbox doors, every flag, and lamps on the watch towers.
+- **Map rotation:** `--maps rotate` (or `T128_MAPS=rotate`) plays two random trench maps, then Wake Atoll, and round again; pages follow the server onto each map by themselves. The default is still random trench maps. (Switching fixed: a server that started on Wake had no supply depots for the trench maps, and leaving Wake crashed on the missing depots.)
+- **Bolt-action aim view** redrawn from the supplied art: gloved hands, bolt handle on the right, a fresh smoke puff after the shot. The other bolt frames are unchanged.
+
 ## v0.44 — Wake Atoll stage 2: Domination HUD, flag respawns, smarter bots
 
 - **Domination HUD.** At the top of the screen: a race bar (your points grow from the left, the enemy's from the right; first to the middle at 100 wins) and five flag badges A–E in the holder's colour, with a ring showing how far each flag has been pushed and a pulse while it is changing hands. Standing in a flag shows what is happening there: CAPTURING C 29%, NEUTRALISING, LOSING, CONTESTED or HOLDING, and how many of each side are inside it.
@@ -409,7 +421,7 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - **Players:** the page is built for one map, so at the round change it saves the player's seat, reloads onto the new
   map (a second or two, everything cached) and rejoins by itself: same name, side and squad (a single-use rejoin ticket
   from the server), same loadout, deployed again. A page never reloads in a loop (at most 4 map reloads a minute).
-- **Settings:** `--maps random` (default), `--maps classic`, or `--maps <number>` for one fixed map. `/health` shows the
+- **Settings:** `--maps random` (default), `--maps classic`, `--maps wake` (Wake Atoll only), `--maps rotate` (two trench maps, then Wake Atoll), or `--maps <number>` for one fixed map. `/health` shows the
   current map number. Tests run on the classic map.
 - **Fairness check:** `node tools/mapcheck.js 60` builds 60 maps and walks the bots' pathfinding from both home lines to
   every objective, depot, nest and gun, and compares the two sides' attack distances: 60 of 60 passed, sides within 5%.

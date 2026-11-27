@@ -218,7 +218,7 @@ let dirty=true,mmDirty=true;const LODS=[],BAYI=new Map(),bayReg=(key,m,i)=>{let 
 const nrm=new Float32Array(NV*3);tg.setAttribute('normal',new THREE.BufferAttribute(nrm,3));let dR=null;
 let wetOn=false;
 function terrRows(j0,j1){const H=terr.H,D=terr.D,R=N+1,k0=j0*R,k1=j1*R+N;
- for(let k=k0;k<=k1;k++){pos[k*3+1]=H[k];const m=D[k];if(WAKE){const h=H[k];if(h<0){const d=Math.min(1,-h/5);col[k*3]=(.30-.18*d)*m;col[k*3+1]=(.30-.12*d)*m;col[k*3+2]=(.22-.04*d)*m}else{const s=Math.min(1,h/2.2),v=Math.min(1,Math.max(0,(h-2.2)/6));col[k*3]=(.56-.22*s+.02*v)*m;col[k*3+1]=(.50-.16*s+.03*v)*m;col[k*3+2]=(.34-.18*s-.04*v)*m}}else{const t=Math.min(1,Math.max(0,(H[k]+2.5)/5));col[k*3]=(.26+.18*t)*m;col[k*3+1]=(.22+.17*t)*m;col[k*3+2]=(.13+.08*t)*m}   /* v0.43 island: wet sand under the water, pale coral sand on the beach, scrub inland */
+ for(let k=k0;k<=k1;k++){pos[k*3+1]=H[k];const m=D[k];if(WAKE){const h=H[k];if(h<0){const d=Math.min(1,-h/5);col[k*3]=(.30-.18*d)*m;col[k*3+1]=(.30-.12*d)*m;col[k*3+2]=(.22-.04*d)*m}else{const tr=T.TRM.get(k);if(tr===1){col[k*3]=.30*m;col[k*3+1]=.24*m;col[k*3+2]=.16*m}else if(tr===2){col[k*3]=.44*m;col[k*3+1]=.37*m;col[k*3+2]=.25*m}else{const s=Math.min(1,h/2.2),v=Math.min(1,Math.max(0,(h-2.2)/6)),i=k%(N+1),j=(k/(N+1))|0,pn=T.hash(i>>3,j>>3)*.6+T.hash(i>>2,(j>>2)+77)*.4,sc=s*(pn>.55?1:.55+pn*.6);col[k*3]=(.56-.22*sc+.02*v)*m;col[k*3+1]=(.50-.16*sc+.03*v)*m;col[k*3+2]=(.34-.18*sc-.04*v)*m}}}else{const t=Math.min(1,Math.max(0,(H[k]+2.5)/5));col[k*3]=(.26+.18*t)*m;col[k*3+1]=(.22+.17*t)*m;col[k*3+2]=(.13+.08*t)*m}   /* v0.43 island: wet sand under the water, pale coral sand on the beach, scrub inland */
   if(wetOn){const i=k%R,wc=T.wetCell(k,H,-W+i*ST,-W+((k/R)|0)*ST);if(wc>=2){col[k*3]=.10*m+.02;col[k*3+1]=.12*m+.02;col[k*3+2]=.13*m+.03}else if(wc===1){col[k*3]*=.68;col[k*3+1]*=.66;col[k*3+2]*=.62}}   /* v0.31: standing water and mud in the rain */
   const i=k%R,j=(k/R)|0,hx=H[k+(i<N?1:0)]-H[k-(i>0?1:0)],hz=H[k+(j<N?R:0)]-H[k-(j>0?R:0)],sx=(i>0&&i<N?2:1)*ST,sz=(j>0&&j<N?2:1)*ST,nx=-hx/sx,nz=-hz/sz,l=1/Math.hypot(nx,1,nz);nrm[k*3]=nx*l;nrm[k*3+1]=l;nrm[k*3+2]=nz*l}
  for(const r of T.ROOMS){const rj0=Math.max(j0,Math.floor((r.z0+W)/ST)),rj1=Math.min(j1,Math.ceil((r.z1+W)/ST));if(rj0>rj1)continue;const i0=Math.max(0,Math.floor((r.x0+W)/ST)),i1=Math.min(N,Math.ceil((r.x1+W)/ST));for(let j=rj0;j<=rj1;j++)for(let i=i0;i<=i1;i++){const k=j*R+i;if(H[k]<r.rb-.3){col[k*3]*=.5;col[k*3+1]*=.5;col[k*3+2]*=.5}}}
@@ -244,7 +244,11 @@ const STRN=[];function structNight(n){for(const q of STRN){if(q.G){q.G.attribute
   /* charred planks: vertical boards, black char where the fire took them */
   woodT=tx(32,32,(i,j)=>{const bd=i>>2,gap=(i&3)===3,n=(hz(i,j)-.5)*16,ch=hz(bd,j>>3)<.18;if(gap)return[34,28,24];return ch?[60+n,50+n,42+n]:[146+n+hz(bd,1)*24,118+n,86+n]}),
   brM=BM(0xffffff,brickT),stM=BM(0xffffff,stoneT),rustM=BM(0x7a5a44),darkM=BM(0x3a342c),charM=BM(0xffffff,woodT),hayM=BM(0xb39a58),
-  M={brick:brM,stone:stM,wood:charM,metal:rustM};
+  /* v0.45 island materials: fresh planks, corrugated iron, shuttered concrete, sandbags, weathered posts */
+  plankT=tx(32,32,(i,j)=>{const bd=j>>2,gap=(j&3)===3,n=(hz(i,j)-.5)*14,v=hz(bd,(i+bd*7)>>4);if(gap)return[70,58,44];return[150+n+v*28,124+n+v*18,88+n+v*8]}),
+  tinT=tx(32,32,(i,j)=>{const r=Math.sin(i*1.57)*16,n=(hz(i,j)-.5)*12,rust=hz(i>>3,j>>2)<.22;return rust?[120+n+r*.5,72+n,44+n]:[118+r+n,120+r+n,116+r+n]}),
+  concT=tx(32,32,(i,j)=>{const n=(hz(i,j)-.5)*20,form=(j&7)===7||((i+(j>>3)*13)&15)===15;return form?[118+n,116+n,108+n]:[164+n,160+n,148+n]}),
+  M={brick:brM,stone:stM,wood:charM,metal:rustM,plank:BM(0xffffff,plankT),tin:BM(0xffffff,tinT),concrete:BM(0xffffff,concT),bag:BM(0xffffff,TXP('tx_burlap',true)),post:BM(0x8a6a48)};
  const MG=new Map(),addG=(g,m,x,y,z,rx,ry,rz)=>{const o=new THREE.Object3D();o.position.set(x,y,z);o.rotation.order='YXZ';o.rotation.set(rx||0,ry||0,rz||0);o.updateMatrix();let q=g.index?g.toNonIndexed():g;q.applyMatrix4(o.matrix);if(!MG.has(m))MG.set(m,[]);MG.get(m).push(q)},
   boxT=(w,h,d,m,x,y,z,ry)=>{const g=new THREE.BoxGeometry(w,h,d),uv=g.attributes.uv;if(uv)for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*Math.max(w,d)/2,uv.getY(i)*h/2);addG(g,m,x,y,z,0,ry)},
   cyl=(r,h,m,x,y,z,rx,ry,rz)=>addG(new THREE.CylinderGeometry(r,r,h,10),m,x,y,z,rx,ry,rz);   /* every piece is merged into one mesh per material: a few draw calls for the lot */
@@ -258,6 +262,12 @@ const STRN=[];function structNight(n){for(const q of STRN){if(q.G){q.G.attribute
    B(10.5,.28,.28,charM,0,1.3,.4,0,.2);for(const lx of[-4.2,-1.4,1.4,4.2])B(.2,.2,5.2,charM,lx,1.25,hz(lx,S.x)<.5?-1.6:1.6,hz(lx,S.z)<.5?.48:-.48,0);
    B(4.6,.1,3.2,charM,2.2,.85,-1.1,.32,0);B(1.3,.75,1,hayM,-3.2,.38,1.6,0,0);B(1.1,.6,.9,hayM,-2,.3,2.2,0,.3);B(1.2,.5,1,hayM,-3.4,1,1.7,.1,0)}
   else if(S.k==='wagon'){const[x,z]=L(.9,1);cyl(.6,.1,charM,x,g0+.35,z,1.2,S.yaw,0)}}
+ /* v0.45 Wake: plank revetments and duckboards in the carved trenches, posts for the wire belts */
+ if(WAKE){const plk=M.plank,dk=BM(0xffffff,TXP('tx_timber',true));
+  for(const tr of T.WTR){const P=tr.pts;for(let i=0;i+1<P.length;i++){const [ax,az]=P[i],[bx,bz]=P[i+1],L=Math.hypot(bx-ax,bz-az),cx=(ax+bx)/2,cz=(az+bz)/2,yaw=Math.atan2(bx-ax,bz-az),fy=hAt(cx,cz),nx=Math.cos(yaw),nz=-Math.sin(yaw);
+    if(i>0&&i<P.length-2){for(const sd of[-1,1])boxT(.06,tr.D+.05,L+.05,plk,cx+nx*sd*.66,fy+tr.D/2,cz+nz*sd*.66,yaw)}
+    boxT(.7,.05,L,dk,cx,fy+.04,cz,yaw)}}
+  for(const w of T.WWIRE)for(let a=-w.hx;a<=w.hx+.01;a+=1.5)for(const sd of[-.6,.6]){const px=w.cx+w.c*a-w.s*sd,pz=w.cz-w.s*a-w.c*sd;boxT(.07,1.1,.07,M.post,px,hAt(px,pz)+.5,pz,w.yaw)}}
  for(const [m,L] of MG){let n=0;for(const g of L)n+=g.attributes.position.count;const P=new Float32Array(n*3),Nn=new Float32Array(n*3),U=new Float32Array(n*2);let o=0;
   for(const g of L){const c=g.attributes.position.count;P.set(g.attributes.position.array,o*3);if(g.attributes.normal)Nn.set(g.attributes.normal.array,o*3);if(g.attributes.uv)U.set(g.attributes.uv.array,o*2);o+=c;g.dispose&&g.dispose()}
   const Cc=new Float32Array(n*3);for(let i=0;i<n;i++){const nx=Nn[i*3],ny=Nn[i*3+1],nz=Nn[i*3+2],py=P[i*3+1],gy=hAt(P[i*3],P[i*3+2]),k=Math.max(.42,Math.min(1,.62+.3*ny+.16*nx-.08*nz))*Math.min(1,.72+.28*Math.min(1,Math.max(0,(py-gy)/2.2)));Cc[i*3]=k;Cc[i*3+1]=k*.98;Cc[i*3+2]=k*.94}
@@ -357,10 +367,17 @@ T.NEST.forEach(n=>{const g=hAt(n.x,n.z),dir=n.team===0?-1:1;for(let k=-3;k<=3;k+
 /* v0.43 Wake Atoll scenery from the owner's art: palms where the map has them (one in seven shattered), beach scrub at the map's
    bushes, and grass tufts scattered inland. Sprites are camera-facing quads in the static batches (ssAdd). */
 if(WAKE){const M=T.MP.meta,pm=n=>{const t=TXP(n);return new THREE.SpriteMaterial({map:t,alphaTest:.5})},palm=[pm('palm0'),pm('palm1')],PL=[];for(let i=0;i<21;i++)PL.push(pm('plant'+i));
- const BUSH=[3,4,8,13,15],TUFT=[0,1,2,5,6,9,10,11,12,14,16,17,18,19,20],land=(x,z)=>hAt(x,z)>.6,farFlag=(x,z)=>T.OBJ.every(o=>Math.hypot(o.x-x,o.z-z)>5);
+ const BUSH=[3,4,8,13,15],TUFT=[0,1,2,5,6,9,10,11,12,14,16,17,18,19,20],land=(x,z)=>hAt(x,z)>.6,farFlag=(x,z)=>T.OBJ.every(o=>Math.hypot(o.x-x,o.z-z)>5)&&!M.props.some(p=>p.k==='strip'&&Math.hypot(p.x-x,p.z-z)<15||p.k==='road'&&Math.hypot(p.x-x,p.z-z)<17)&&!T.TRM.has(Math.round((z+W)/ST)*(N+1)+Math.round((x+W)/ST));
  M.props.forEach((p,i)=>{if(!land(p.x,p.z))return;const h=T.hash(i,801);
   if(p.k==='palm'){if(h<.14){const hh=2.2+T.hash(i,802)*.6;ssAdd(palm[1],p.x,hAt(p.x,p.z),p.z,hh*1.97,hh,.04,1e9)}else{const hh=5.5+T.hash(i,803)*3;ssAdd(palm[0],p.x,hAt(p.x,p.z),p.z,hh*.71,hh,.03,1e9)}}
   else if(p.k==='bush'){const k=BUSH[Math.floor(h*BUSH.length)],hh=.9+T.hash(i,804)*.6,im=PL[k].map.image;ssAdd(PL[k],p.x,hAt(p.x,p.z),p.z,hh*1.3,hh,.04,220)}});
+ /* v0.45: wire coils on the beach-obstacle belts; the airstrip and sand roads as flat strips laid on the ground */
+ {const coil=pm('wirecoil');for(const w of T.WWIRE)for(let a=-w.hx+.6;a<w.hx;a+=1.1){const x=w.cx+w.c*a,z=w.cz-w.s*a;ssAdd(coil,x,hAt(x,z),z,1.5,.85,.04,200)}}
+ {const lay=(cx,cz,yaw,len,wid,col,tex,seed)=>{const nx=Math.max(2,Math.ceil(wid/2)),nz=Math.max(2,Math.ceil(len/2)),g=new THREE.PlaneGeometry(wid,len,nx,nz),p=g.attributes.position,c=Math.cos(yaw),sn=Math.sin(yaw),cols=[];
+   for(let i=0;i<p.count;i++){const lx=p.getX(i),lz=-p.getY(i),x=cx+lx*c+lz*sn,z=cz-lx*sn+lz*c;p.setXYZ(i,x,hAt(x,z)+.05,z);const v=.9+T.hash(i,seed)*.15;cols.push(col[0]*v,col[1]*v,col[2]*v)}
+   g.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));if(tex){const uv=g.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*wid/6,uv.getY(i)*len/6)}g.computeVertexNormals();const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,map:tex||null,polygonOffset:true,polygonOffsetFactor:-2,side:THREE.DoubleSide}));scene.add(m)};
+  const stripT=(()=>{const c=document.createElement('canvas');c.width=32;c.height=32;const g=c.getContext('2d');for(let j=0;j<32;j++)for(let i=0;i<32;i++){const n=(T.hash(i,j+900)-.5)*22,rut=(j>8&&j<11)||(j>20&&j<23);g.fillStyle=`rgb(${(rut?150:186)+n|0},${(rut?138:172)+n|0},${(rut?110:136)+n|0})`;g.fillRect(i,j,1,1)}return pxTex(c,true)})();
+  M.props.forEach((p,i)=>{if(!land(p.x,p.z))return;if(p.k==='strip')lay(p.x,p.z,p.r||0,26,12.6,[1,1,1],stripT,i);else if(p.k==='road')lay(p.x,p.z,p.r||0,32.5,4.5,[.78,.70,.52],null,i)})}
  for(let n=0,put=0;n<6000&&put<900;n++){const x=(T.hash(n,810)-.5)*2*W,z=(T.hash(n,811)-.5)*2*W;if(!land(x,z)||hAt(x,z)<1.2||!farFlag(x,z))continue;const k=TUFT[Math.floor(T.hash(n,812)*TUFT.length)],hh=.45+T.hash(n,813)*.7;ssAdd(PL[k],x,hAt(x,z),z,hh*1.1,hh,.04,120);put++}}
 /* ------------------------------------------------------------------ trench walls, duckboards, dugouts (visual; the shapes are in the terrain and shared.js) */
 {
