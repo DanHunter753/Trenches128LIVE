@@ -25,7 +25,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ck('gunNeverLeftHidden', await a.evaluate(() => new Promise(res => { itemPlay([0, 1], .05); setTimeout(() => res(getComputedStyle($('gun')).opacity === '1' && !itemHid && $('item').style.display === 'none'), 500); })));
   ck('gunWakeRestores', await a.evaluate(() => new Promise(res => { gunWake(); setTimeout(() => res(getComputedStyle($('gun')).opacity === '1' && gIdx !== -1), 300); })));
   // ---- ping chip and scoreboard column
-  await a.waitForFunction(() => /PING \d+ ms/.test($('net').textContent), null, { timeout: 6000 }).catch(() => {}); ck('pingChip', await a.evaluate(() => /PING \d+ ms/.test($('net').textContent) && getComputedStyle($('net')).display !== 'none'));
+  await a.waitForFunction(() => /PING \d+ ms/.test($('net').textContent), null, { timeout: 6000 }).catch(() => {}); await a.waitForFunction(() => /FPS/.test($('net').textContent) && nfFps > 0, null, { timeout: 6000 }).catch(() => {}); ck('pingChip', await a.evaluate(() => /PING \d+ ms · SERVER \d+ ms.* · \d+ FPS/.test($('net').textContent) && getComputedStyle($('net')).display !== 'none'));
+  ck('noDataReadout', await a.evaluate(() => { const sv = lastSnapAt; lastSnapAt = performance.now() - 3200; netTick(performance.now()); const t = $('net').textContent; lastSnapAt = sv; return /NO DATA FROM SERVER 3\.\d s/.test(t); }));
   await sleep(2200); ck('pingOnScoreboard', await a.evaluate(() => new Promise(res => { sendJ({ t: 'sbq' }); setTimeout(() => { const me_ = $('sb').querySelector('tr.me'); res(/<th>ping<\/th>/.test($('sb').innerHTML) && !!me_ && /^\d+$/.test(me_.lastElementChild.textContent)); }, 700); })));
   // ---- building respawn point: the radio, not the sandbag ring
   ck('radioModel', await a.evaluate(() => { const n0 = fposts.size; syncPosts([[901, me.team, 5, 120, 1e9, 0, [3.2, 118.4, .4, hAt(3.2, 118.4)]], [902, me.team, 30, 120, 300, 0, 0]]); const r = fposts.get(901), p = fposts.get(902);
