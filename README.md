@@ -73,6 +73,20 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.39 - customize your soldier
+- The **Customize** tab (before you deploy, and from Pause > Change loadout) is now a page per class:
+  - **Slots** down the left: primary weapon, gadget, grenades, melee, class ability, and specializations (locked until the
+    perk tree; it shows the perk points you have banked).
+  - **Choices** for the open slot beside them; locked ones show the rank that unlocks them.
+  - **Your soldier** in the middle, in your side's uniform for that class, turned with the arrows or a click. This is where
+    appearance options will go.
+  - **Stats** on the right for whatever you point at: damage, accuracy, hip fire and control bars; rate of fire, magazine,
+    reload, range, scope, bayonet; and a damage-by-range graph showing the one-shot sweet spot. They are worked out from
+    the real weapon numbers, including class bonuses (the rifleman's faster bolt, the assault's faster reload).
+- ◂ ▸ step through the classes. **Each class remembers its own weapon and gadget**; a class you have not unlocked can be
+  looked at but not taken. The Deploy button says which class you will deploy as.
+- New test `browser_customize`.
+
 ## v0.38 - playtest fixes: rubber-banding, phones, medics
 **Lag when moving and shooting (found and fixed)**
 - *Moving.* The server lets each player move only as much time as has passed (the "movement bank", v0.32.1), but it refilled

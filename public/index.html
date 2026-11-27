@@ -110,6 +110,20 @@ button:hover:not(:disabled),button.on{border-color:var(--ac);color:var(--ac)}
 #grid{display:flex;flex-wrap:wrap;gap:10px;min-height:150px;max-height:46vh;overflow:auto}
 #grid h3{width:100%;margin:6px 0 0;color:var(--ac);font-size:13px;letter-spacing:.1em;text-transform:uppercase}
 .card{width:200px;padding:11px;background:#221e14;border:1px solid #4a4028;cursor:pointer}
+/* v0.39 customize screen: one page per class. Slots on the left, the choices for the open slot beside them, your soldier in
+   the middle, and what the highlighted choice does on the right. */
+.box.wide{max-width:1180px;width:97%}.box.wide #grid{display:none}
+.czh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid #5a4e34;padding-bottom:6px;margin:8px 0 10px}.czh h2{margin:0;font-size:26px;letter-spacing:.16em;font-weight:normal;color:var(--fg)}.czh span{font-size:12px;opacity:.85;white-space:nowrap}
+.czb{display:grid;grid-template-columns:172px minmax(250px,1fr) 250px 280px;gap:10px;text-align:left;align-items:stretch}
+.czb>div{min-width:0}.czcol{display:flex;flex-direction:column;gap:4px}
+.cznav{display:flex;align-items:center;justify-content:space-between;background:#3a3118;border:1px solid var(--ac);padding:2px}.cznav b{letter-spacing:.12em;font-size:12px}.cznav button{padding:2px 9px}
+.czslot{display:block;width:100%;padding:5px 6px 6px;background:#221e14;border:1px solid #4a4028;cursor:pointer;text-align:center;font-size:11px;line-height:1.25;color:var(--fg)}.czslot b{display:block;letter-spacing:.1em;font-size:10px;opacity:.8;color:var(--fg)}.czslot.on{background:#e8e0c8;color:#1b170f;border-color:#fff}.czslot.on b{color:#1b170f}.czslot img{height:16px;max-width:120px;image-rendering:pixelated;display:block;margin:3px auto 2px}.czslot.lock{opacity:.5}
+.czlist{background:#0005;border:1px solid #4a4028;padding:5px;overflow:auto;max-height:430px}.czo{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;margin:0 0 3px;background:#2a2518;border:1px solid #4a4028;color:var(--fg);cursor:pointer;text-align:left;font-size:12px}.czo img{height:14px;width:64px;object-fit:contain;image-rendering:pixelated;flex:0 0 auto}.czo span{flex:1 1 auto}.czo small{opacity:.7;white-space:nowrap}.czo.on{background:#e8e0c8;color:#1b170f;border-color:#fff}.czo.dis{opacity:.42;cursor:not-allowed}.czo.inf{cursor:default}.czlock{font-size:12px;color:#e0b040;padding:4px 6px 8px}
+.czmodel{position:relative;background:radial-gradient(ellipse at 50% 38%,#6a6048 0%,#2a2418 62%,#17130c 100%);border:1px solid #4a4028;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:330px;overflow:hidden}.czmodel canvas{width:100%;max-width:250px;image-rendering:pixelated;display:block}.czmodel .rot{position:absolute;top:44%;width:100%;display:flex;justify-content:space-between;padding:0 4px;box-sizing:border-box}.czmodel .rot button{padding:3px 9px;opacity:.75}.czmodel small{display:block;text-align:center;padding:4px 6px 6px;opacity:.75;font-size:11px;line-height:1.3}
+.czinfo{background:#0005;border:1px solid #4a4028;padding:10px 12px;font-size:12px;line-height:1.45}.czinfo h3{margin:0 0 2px;font-size:17px;text-align:center;color:var(--fg);letter-spacing:.04em;text-transform:none}.czinfo .ic{height:26px;max-width:210px;image-rendering:pixelated;display:block;margin:2px auto 6px}.czinfo p{margin:0 0 8px;text-align:center;opacity:.9}
+.czs{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:10px;letter-spacing:.08em}.czs span{flex:0 0 78px}.czs i{flex:1 1 auto;height:6px;background:#0009;border:1px solid #000}.czs i b{display:block;height:100%;background:#8fbf6a}.czn{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.08em;margin:3px 0}.czn b{font-size:13px;color:var(--fg);letter-spacing:0}.czinfo canvas{width:100%;display:block;margin-top:4px;background:#0006;border:1px solid #000}.czinfo .gt{font-size:10px;letter-spacing:.08em;margin-top:8px}
+@media (max-height:560px){.box.wide{max-height:100vh;overflow:auto;padding:6px 10px;box-sizing:border-box;align-self:flex-start}.box.wide>h1,.box.wide>span,.box.wide>br{display:none}.box.wide #tabs{margin:0}.box.wide #tabs button{padding:3px 10px}.czh{margin:3px 0 5px;padding-bottom:2px}.czh span:last-child{display:none}.czmodel{min-height:0!important;justify-content:flex-start}.czmodel canvas{width:auto;height:58vh;max-width:none}.czmodel .rot{top:30%}.box.wide #go{position:fixed;right:64px;top:4px;padding:4px 12px;z-index:3}}
+@media (max-width:1000px),(max-height:560px){.czb{grid-template-columns:132px minmax(150px,1fr) 150px 216px;gap:6px}.czh h2{font-size:17px}.czmodel{min-height:200px}.czslot{padding:3px 4px}.czslot img{height:12px}.czlist{max-height:300px}.czinfo{padding:6px 8px}}
 .card p{margin:5px 0;opacity:.8}.card small{opacity:.65}.card.on{border-color:var(--ac);background:#3a3118}.card.dis{opacity:.4;cursor:not-allowed}
 .err{color:var(--rd);min-height:1.4em}.acct{margin:4px 0 8px;font-size:12px;color:#c8c0a8}.acct a{color:#e8c070}.srv{margin-top:10px;max-height:190px;overflow:auto;font-size:12px}.srv table{width:100%;border-collapse:collapse}.srv td{padding:2px 6px;border-bottom:1px solid #fff2}.srv tr:hover{background:#fff1}.srv a{color:#e8c070}.srv button{padding:1px 8px}
 #off{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:4;display:none;flex-direction:column;gap:6px;align-items:center;padding:10px 14px;background:rgba(14,12,8,.97);border:1px solid #5a4e34;max-width:80vw}
@@ -891,9 +905,13 @@ document.addEventListener('pointerlockchange',()=>{locked=lockedNow();if(deploye
 addEventListener('click',e=>{if(e.target&&e.target.closest&&e.target.closest('#set,#gear'))return;if(deployed&&!me.officer&&!lockedNow()&&$('ov').style.display==='none')lockMouse()});
 function resize(){sizeR();cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}addEventListener('resize',resize);resize();
 /* ------------------------------------------------------------------ menus */
-const L={cls:'rifleman',w:'bolt',u:'bandage',sq:0};let tab='class';
-function fixL(){const r=me.rank,ok=(k,v)=>r>=(REQ[k+':'+v]||0);if(!CLS[L.cls]||!ok('cls',L.cls))L.cls='rifleman';if(!CLS[L.cls].w.includes(L.w)||!ok('w',L.w))L.w=CLS[L.cls].w.find(w=>ok('w',w))||CLS[L.cls].w[0];if(!UT[L.u]||!ok('u',L.u))L.u='bandage'}
-function overlay(html,err){$('ov').style.display='flex';$('ovb').innerHTML=html+'<div class="err">'+(err||'')+'</div>'}
+const L={cls:'rifleman',w:'bolt',u:'bandage',sq:0,by:{}};let tab='class';
+/* v0.39: every class remembers its own weapon and utility (L.by), so each class page keeps what you set on it */
+const optOk=(k,v)=>me.rank>=(REQ[k+':'+v]||0),clsOk=c=>!!CLS[c]&&optOk('cls',c);
+function byOf(c){if(!L.by||typeof L.by!=='object')L.by={};let b=L.by[c];if(!b||typeof b!=='object')b=L.by[c]=c===L.cls?{w:L.w,u:L.u}:{};const W=CLS[c].w;if(!W.includes(b.w)||!optOk('w',b.w))b.w=W.find(w=>optOk('w',w))||W[0];if(!UT[b.u]||!optOk('u',b.u))b.u='bandage';return b}
+function setCls(c){if(!clsOk(c))return false;L.cls=c;const b=byOf(c);L.w=b.w;L.u=b.u;return true}
+function fixL(){const r=me.rank,ok=(k,v)=>r>=(REQ[k+':'+v]||0);if(!CLS[L.cls]||!ok('cls',L.cls))L.cls='rifleman';if(!CLS[L.cls].w.includes(L.w)||!ok('w',L.w))L.w=CLS[L.cls].w.find(w=>ok('w',w))||CLS[L.cls].w[0];if(!UT[L.u]||!ok('u',L.u))L.u='bandage';if(!L.by||typeof L.by!=='object')L.by={};L.by[L.cls]={w:L.w,u:L.u}}
+function overlay(html,err){$('ov').style.display='flex';$('ovb').classList.remove('wide');$('ovb').innerHTML=html+'<div class="err">'+(err||'')+'</div>'}
 /* v0.29.1 audit: the saved callsign and a ?server= link go into this HTML, so both are escaped (a crafted link could
    otherwise run script on the game page and read saved account tokens) */
 const escA=t=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -935,7 +953,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wrecked guns.</b> Shells knock out MG nests, field guns and AA guns; hold E beside one to repair it (sappers are fastest).<br>
  <b>Phones.</b> Touch controls turn on by themselves; play in landscape. The ✎ button lets you move the buttons where you like.<br>
  <b>Your career.</b> Every game earns XP toward 100 levels and the ranks up to General. Your service record is on this screen.
- </div></details><div class="ver">v0.38</div>`,'');
+ </div></details><div class="ver">v0.39</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -971,17 +989,60 @@ let srvSeq=0;async function srvList(){const el=$('srv');if(!el)return;const mb=m
   el.querySelectorAll('tr[data-u]').forEach((tr,i)=>{tr.querySelector('button').onclick=()=>{$('host').value=hostKey(tr.dataset.u);acctShow();$('cn').click()};const t0=performance.now();fetch(tr.dataset.u+'/health',{cache:'no-store'}).then(()=>{const c=$('pg'+i);if(c)c.textContent=Math.round(performance.now()-t0)+' ms'}).catch(()=>{const c=$('pg'+i);if(c)c.textContent='—'})})}
  catch(e){if(my===srvSeq)el.innerHTML=''}}
 const card=(k,v,on,t,d,x='',dis=0)=>{const q=REQ[k+':'+v]||0;if(me.rank<q){dis=1;x+=`<small>Requires ${RK[q][0]}</small>`}return `<div class="card${on?' on':''}${dis?' dis':''}" data-k="${k}" data-v="${v}"><b>${t}</b><p>${d}</p>${x}</div>`};
+const CZO=['rifleman','assault','gunner','medic','sapper','recon','officer'],CZROW={rifleman:0,assault:1,gunner:2,medic:3,sapper:4,officer:5,recon:6};
+const CZAB={rifleman:['Rifle grenade','[N] fits a grenade to the muzzle and lobs it 30–110 m. Faster bolt and aim, steadier under fire, a longer bayonet charge.'],assault:['Morphine','[N] 10 s of extra speed and 40% less damage taken, twice a life. Faster reloads; crouch while sprinting to slide.'],gunner:['Ammo box','[N] puts down a box that refills teammates\' magazines, grenades and utility. Crouch to brace the gun.'],medic:['Field medicine','Sees hurt teammates\' health. [H] bandages the man in front of you; hold [E] to revive the downed.'],sapper:['Field works','[B] build menu: cover, wire, redoubts, blockhouses, pillboxes and respawn points. Digs bigger holes; cheaper grenades.'],recon:['Spotting','[T] marks every enemy in your sights for the team and the officer. A scoped headshot kills outright.'],officer:['Command','A view from above: order squads and call in barrages, bombers, supply drops and reinforcements.']};
+const czImg=new Image();let czCls='rifleman',czSlot='w',czHov=null,czView=0,czImgGo=false;
+const czGr=c=>c==='assault'?4:c==='sapper'?3:2,czBd=(c,u)=>u==='gasnade'||u==='smokenade'?2:u==='flare'?3:u==='bandage'?(c==='medic'?5:3):0;
+const czIc=k=>ICON[k]&&ICON[k].src?`<img src="${ICON[k].src}" alt="">`:'';
+function czHtml(){const c=czCls,C=CLS[c],ok=clsOk(c),b=byOf(c),off=c==='officer',W=WPN[b.w],bay=!off&&W&&W.bay,lv=T.levelOf(me.xp||0).lv,req=REQ['cls:'+c]||0;
+ const slot=(k,t,body,lock)=>`<button class="czslot${czSlot===k?' on':''}${lock?' lock':''}" data-cz="slot" data-v="${k}"><b>${t}</b>${body}</button>`;
+ const slots=slot('w','PRIMARY',off?'No weapon':czIc(b.w)+esc(W.n))+slot('u','GADGET',off?'—':esc(UT[b.u].n))+slot('gr','GRENADES',off?'—':'Mills bomb × '+czGr(c))+slot('ml','MELEE',off?'—':bay?'Bayonet':'Rifle butt')+slot('ab','CLASS ABILITY',esc(CZAB[c][0]))+slot('sp','SPECIALIZATIONS','🔒 coming later',1);
+ let list='';const opt=(k,v,name,on,extra)=>{const q=REQ[k+':'+v]||0,dis=!ok||me.rank<q;return `<button class="czo${on?' on':''}${dis?' dis':''}" data-k="${k}" data-v="${v}">${k==='w'?czIc(v):''}<span>${esc(name)}</span><small>${me.rank<q?'🔒 '+RK[q][0]:extra||''}</small></button>`},inf=(t,x)=>`<div class="czo inf"><span>${t}</span><small>${x||''}</small></div>`;
+ if(!ok)list+=`<div class="czlock">🔒 ${esc(C.n)} unlocks at ${RK[req][0]}. You can look around, but not deploy as this class yet.</div>`;
+ if(off&&(czSlot==='w'||czSlot==='u'||czSlot==='gr'||czSlot==='ml'))list+=inf('Officers carry no weapon and cannot be hit','');
+ else if(czSlot==='w')C.w.forEach(k=>{list+=opt('w',k,WPN[k].n,b.w===k,WPN[k].auto?'automatic':WPN[k].scope?WPN[k].scope+'× scope':'')});
+ else if(czSlot==='u')for(const k in UT)list+=opt('u',k,UT[k].n,b.u===k,czBd(c,k)?'× '+czBd(c,k):'');
+ else if(czSlot==='gr'){list+=inf('Mills bomb','× '+czGr(c));if(c==='rifleman')list+=inf('Rifle grenade (uses a Mills bomb)','[N]')}
+ else if(czSlot==='ml')list+=inf(bay?'Bayonet':'Rifle butt',bay?'kills outright':'60 damage')+(bay?inf('Bayonet charge','hold melee while sprinting'):'');
+ else if(czSlot==='ab')list+=inf(esc(CZAB[c][0]),c==='rifleman'||c==='assault'||c==='gunner'?'[N]':'');
+ else list+=inf('Specialization 1','🔒')+inf('Specialization 2','🔒')+inf('Specialization 3','🔒');
+ return `<div class="cz"><div class="czh"><span>◆ ${esc(C.n.toUpperCase())} · ${RK[me.rank][0]} · Level ${lv}</span><h2>CUSTOMIZE ${esc(C.n.toUpperCase())}</h2><span>${lv} perk point${lv===1?'':'s'} ★</span></div>
+ <div class="czb"><div class="czcol"><div class="cznav"><button data-cz="prev" title="Previous class">◂</button><b>LOADOUT</b><button data-cz="next" title="Next class">▸</button></div>${slots}</div>
+ <div class="czlist" id="czl">${list}</div>
+ <div class="czmodel"><div class="rot"><button data-cz="rl" title="Turn">⟲</button><button data-cz="rr" title="Turn">⟳</button></div><canvas id="czc" width="320" height="300"></canvas><small>${me.team?'GREEN':'BLUE'} TEAM · ${esc(C.n)}<br>HP ${C.hp} · speed ${Math.round(C.sp*100)}%${ok?'':' · locked'}</small></div>
+ <div class="czinfo" id="czi"></div></div></div>`}
+function czInfo(){const el=$('czi');if(!el)return;const c=czCls,C=CLS[c],b=byOf(c),off=c==='officer';let h='';const bar=(t,v)=>`<div class="czs"><span>${t}</span><i><b style="width:${Math.round(Math.max(3,Math.min(100,v)))}%"></b></i></div>`,num=(t,v)=>`<div class="czn"><span>${t}</span><b>${v}</b></div>`;let graph=null;
+ if(off&&czSlot!=='ab'&&czSlot!=='sp')h=`<h3>Command role</h3><p>${esc(C.d)}</p>`;
+ else if(czSlot==='w'){const k=czHov&&czHov[0]==='w'?czHov[1]:b.w,w=WPN[k],rof=60/(w.cd*(c==='rifleman'&&k==='bolt'?.8:1)),rl=w.rl*(c==='assault'?.7:1),top=w.sw?w.sw[2]:w.dmg*w.pel;graph=w;
+  h=`<h3>${esc(w.n)}</h3><img class="ic" src="${ICON[k]?ICON[k].src:''}" alt=""><p>${esc(w.d)}</p>`+bar('DAMAGE',top)+bar('ACCURACY',100*(1-w.spr/.1))+bar('HIP FIRE',100*(1-(w.spr+w.hip)/.15))+bar('CONTROL',100*(1-w.rcl/.1))
+   +num('RATE OF FIRE',Math.round(rof)+' rpm')+num('FIRE MODE',w.auto?'Automatic':w.pel>1?'Pump · '+w.pel+' pellets':'Single shot')+num('MAGAZINE',w.mag)+num('RELOAD',rl.toFixed(1)+' s')+num('RANGE',w.rng+' m')+(w.scope?num('SCOPE',w.scope+'×'):'')+num('BAYONET',w.bay?'Yes':'No')+`<div class="gt">DAMAGE BY RANGE (m)</div><canvas id="czg" width="256" height="92"></canvas>`}
+ else if(czSlot==='u'){const k=czHov&&czHov[0]==='u'?czHov[1]:b.u,u=UT[k],n=czBd(c,k);h=`<h3>${esc(u.n)}</h3><p>${esc(k==='bandage'&&c==='medic'?'H · heal 70 HP: the hurt teammate in front of you first, otherwise yourself (1 supply)':u.d)}</p>`+(n?num('CARRIED',n):'')+(k==='bandage'?num('HEALS',(c==='medic'?70:40)+' HP'):'')}
+ else if(czSlot==='gr')h=`<h3>Mills bomb</h3><p>[G] thrown about 30 m, bursts after a short fuse. Costs ${c==='sapper'||b.u==='nade'?1:2} supply each.</p>`+num('CARRIED',czGr(c))+(c==='rifleman'?num('RIFLE GRENADE','30–110 m'):'');
+ else if(czSlot==='ml'){const bay=WPN[b.w].bay;h=`<h3>${bay?'Bayonet':'Rifle butt'}</h3><p>${bay?'[V] a thrust that kills outright. Hold it while sprinting forward to charge.':'[V] a blow with the weapon. This gun takes no bayonet: pick a rifle, carbine or shotgun for one.'}</p>`+num('DAMAGE',bay?'Kills':'60')+(bay?num('CHARGE',(c==='rifleman'?4.5:3)+' s'):'')}
+ else if(czSlot==='ab')h=`<h3>${esc(CZAB[c][0])}</h3><p>${esc(CZAB[c][1])}</p>`;
+ else h=`<h3>Specializations</h3><p>Not in the game yet. They will arrive with the perk tree: every level you gain already banks one perk point for it.</p>`+num('PERK POINTS BANKED',T.levelOf(me.xp||0).lv);
+ el.innerHTML=h;const g=$('czg');if(g&&graph){const x=g.getContext('2d'),w=graph,W_=256,H_=92,mx=Math.max(110,Math.ceil(w.rng/50)*50+10),top=Math.max(100,w.sw?w.sw[2]:0,w.dmg*w.pel)*1.12,X=d=>18+d/mx*(W_-26),Y=v=>H_-16-v/top*(H_-26);x.clearRect(0,0,W_,H_);x.strokeStyle='#fff3';x.fillStyle='#cfc6ae';x.font='9px monospace';x.lineWidth=1;
+  for(let d=0;d<=mx;d+=50){x.beginPath();x.moveTo(X(d),8);x.lineTo(X(d),H_-16);x.stroke();x.fillText(d,X(d)-6,H_-4)}x.setLineDash([3,3]);x.strokeStyle='#e0b04099';x.beginPath();x.moveTo(X(0),Y(100));x.lineTo(X(mx),Y(100));x.stroke();x.setLineDash([]);x.fillText('kill',W_-26,Y(100)-3);
+  const base=w.dmg*w.pel,pts=[[0,base]];if(w.sw){pts.push([w.sw[0],base],[w.sw[0],w.sw[2]],[Math.min(w.sw[1],w.rng),w.sw[2]],[Math.min(w.sw[1],w.rng),base])}pts.push([w.rng,base],[w.rng,0]);x.strokeStyle='#fff';x.lineWidth=2;x.beginPath();pts.forEach((q,i)=>i?x.lineTo(X(q[0]),Y(q[1])):x.moveTo(X(q[0]),Y(q[1])));x.stroke()}}
+function czDraw(){const c=$('czc');if(!c)return;const g=c.getContext('2d');g.clearRect(0,0,320,300);g.fillStyle='rgba(0,0,0,.35)';g.beginPath();g.ellipse(160,286,62,9,0,0,6.3);g.fill();if(!czImg.naturalWidth)return;g.imageSmoothingEnabled=false;const fw=czImg.naturalWidth>=2560?160:Math.round(czImg.naturalWidth/16),rows=Math.round(czImg.naturalHeight/150),row=Math.min(rows-1,(me.team?7:0)+(CZROW[czCls]||0));g.drawImage(czImg,(czView&3)*fw,row*150,fw,150,160-fw,0,fw*2,300)}
+function czWire(live){if(!czImgGo){czImgGo=true;czImg.onload=czDraw;imgRetry(czImg,'assets/soldiers.png')}czInfo();czDraw();const root=$('ovb').querySelector('.cz');if(!root)return;
+ root.onclick=e=>{const t=e.target.closest('[data-cz],.czo[data-k]');if(!t)return;const a=t.dataset.cz;
+  if(a==='prev'||a==='next'){const i=CZO.indexOf(czCls);czCls=CZO[(i+(a==='next'?1:CZO.length-1))%CZO.length];czHov=null;setCls(czCls);loadoutScreen(live)}   /* looking at a class you have unlocked also selects it */
+  else if(a==='slot'){czSlot=t.dataset.v;czHov=null;loadoutScreen(live)}
+  else if(a==='rl'||a==='rr'){czView=(czView+(a==='rr'?1:3))&3;czDraw()}
+  else if(t.dataset.k&&!t.classList.contains('dis')){const b=byOf(czCls);b[t.dataset.k]=t.dataset.v;if(czCls===L.cls){L.w=b.w;L.u=b.u}czHov=null;try{localStorage.setItem('t128mp',JSON.stringify(L))}catch(x){}loadoutScreen(live)}};
+ root.onmouseover=e=>{const t=e.target.closest('.czo[data-k]');const h=t?[t.dataset.k,t.dataset.v]:null;if(String(h)!==String(czHov)){czHov=h;czInfo()}};
+ $('czc').onclick=()=>{czView=(czView+1)&3;czDraw()}}
 function loadoutScreen(live){
  const nx=RK[me.rank+1];let h=`<h1>${me.team?'GREEN':'BLUE'} TEAM · ${RK[me.rank][0]}</h1><span>Level ${T.levelOf(me.xp).lv} · ${me.xp.toLocaleString()} XP${nx?' · next rank: '+nx[0]+' at '+nx[1].toLocaleString():' · top rank'}</span>
- <div id="tabs">${['class','load','squad'].map((t,i)=>`<button data-t="${t}" class="${tab===t?'on':''}">${i+1} · ${['Class','Loadout','Squad'][i]}</button>`).join('')}</div><div id="grid">`;
+ <div id="tabs">${['class','load','squad'].map((t,i)=>`<button data-t="${t}" class="${tab===t?'on':''}">${i+1} · ${['Class','Customize','Squad'][i]}</button>`).join('')}</div><div id="grid">`;
  if(tab==='class')for(const k in CLS){const c=CLS[k];h+=card('cls',k,L.cls===k,c.n,c.d,`<small>HP ${c.hp} · Speed ${Math.round(c.sp*100)}%</small>`)}
- else if(tab==='load'&&L.cls==='officer')h+='<h3>Command role</h3><p>Officers carry no weapon and cannot be hit. You command from the map: order squads and call in support using the team supply pool. Limit 2 per team.</p>';
- else if(tab==='load'){h+='<h3>Primary weapon</h3>';CLS[L.cls].w.forEach(k=>{const w=WPN[k];h+=card('w',k,L.w===k,w.n,w.d,`<small>Dmg ${w.dmg}${w.pel>1?'×'+w.pel:''} · Mag ${w.mag}${w.auto?' · Auto':''}</small>`)});h+='<h3>Utility</h3>';for(const k in UT)h+=card('u',k,L.u===k,UT[k].n,UT[k].d)}
+ else if(tab==='load'){if(!CLS[czCls])czCls=L.cls;h+='</div>'+czHtml()+'<div>'}
  else if(tab==='squad'&&L.cls==='officer')h+='<h3>Squad</h3><p>Officers command every squad and do not join one.</p>';
  else{h+='<h3>Squad (you spawn on living squadmates)</h3>';T.SQUADS.forEach((s,i)=>{const n=prof.sq[i]||0,full=n>=prof.max&&L.sq!==i;h+=card('sq',i,L.sq===i,s,n+'/'+prof.max+' members',full?'<small>FULL</small>':'',full)})}
- h+=`</div><br><button id="go">${live?'Apply at next respawn':'Deploy ▸'}</button>`;overlay(h,'');
- $('ovb').querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;loadoutScreen(live)});
- $('grid').onclick=e=>{const c=e.target.closest('.card');if(!c||c.classList.contains('dis'))return;const k=c.dataset.k,v=c.dataset.v;L[k]=(k==='sq')?+v:v;if(k==='cls'&&!CLS[v].w.includes(L.w))L.w=CLS[v].w[0];loadoutScreen(live)};
+ h+=`</div><br><button id="go">${live?'Apply at next respawn':'Deploy as '+CLS[L.cls].n+' ▸'}</button>`;overlay(h,'');if(tab==='load'){$('ovb').classList.add('wide');czWire(live)}
+ $('ovb').querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;if(tab==='load'){czCls=L.cls;czSlot='w';czHov=null}loadoutScreen(live)});
+ $('grid').onclick=e=>{const c=e.target.closest('.card');if(!c||c.classList.contains('dis'))return;const k=c.dataset.k,v=c.dataset.v;if(k==='cls')setCls(v);else L[k]=(k==='sq')?+v:v;loadoutScreen(live)};
  $('go').onclick=()=>{landscape();try{localStorage.setItem('t128mp',JSON.stringify(L))}catch(e){}sendJ({t:live?'loadout':'join',cls:L.cls,w:L.w,u:L.u,sq:L.sq});if(live){$('ov').style.display='none';if(L.cls!=='officer')lockMouse()}}}
 function pauseScreen(){overlay(`<h1>PAUSED</h1>The battle continues without you. Stay hidden!<br><br><button id="rs">Resume</button> <button id="st">Settings</button> <button id="cl">Change loadout</button> <button id="lv">Leave server</button><br><small>Esc also resumes</small>`,'');
  $('rs').onclick=()=>{if(me.officer)$('ov').style.display='none';else lockMouse()};$('st').onclick=()=>openSet();$('cl').onclick=()=>loadoutScreen(true);$('lv').onclick=()=>location.reload()}
