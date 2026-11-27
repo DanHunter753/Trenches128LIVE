@@ -26,19 +26,34 @@ jobs:
           [ "${GITHUB_REF_NAME}" = "launcher-v$v" ] || { echo "tag ${GITHUB_REF_NAME} but package.json says $v"; exit 1; }
       - run: npm install --no-audit --no-fund
       - run: npm test
-      - name: Create the release first (uploads all go into one release)
+      # The installer is built first and published afterwards with one tool. Letting electron-builder publish made its three
+      # parallel uploads create the release twice under the same tag (v1.0.0): the page GitHub serves for that tag was the one
+      # holding only the .blockmap, so releases/latest/download/Trench128-Setup.exe answered 404.
+      - name: Build
+        run: npx electron-builder --win --x64 --publish never
+      - name: Write latest.yml if the build did not
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          v=$(node -p "require('./package.json').version")
-          gh release view "v$v" >/dev/null 2>&1 || gh release create "v$v" --title "$v" --notes "Trench 128 launcher $v" --repo "$GITHUB_REPOSITORY"
-      - name: Build and publish
-        run: npx electron-builder --win --x64 --publish always
+          [ -f dist/latest.yml ] || node -e "
+            const fs=require('fs'),c=require('crypto'),v=require('./package.json').version,f='dist/Trench128-Setup.exe',b=fs.readFileSync(f),h=c.createHash('sha512').update(b).digest('base64');
+            fs.writeFileSync('dist/latest.yml','version: '+v+'\nfiles:\n  - url: Trench128-Setup.exe\n    sha512: '+h+'\n    size: '+b.length+'\npath: Trench128-Setup.exe\nsha512: '+h+'\nreleaseDate: \''+new Date().toISOString()+'\'\n');"
+          ls -l dist
+      - name: Publish to one release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
         env:
           # the workflow's own token can publish to this repository; to publish to another (public) repository, add a
           # personal access token as the secret GH_RELEASE_TOKEN and it is used instead
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          n=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq "[.[] | select(.tag_name==\"v$v\")] | length")
+          [ "$n" -le 1 ] || { echo "There are $n releases tagged v$v: delete the extra ones on the Releases page, then run this again."; exit 1; }
+          [ "$n" -eq 1 ] || gh release create "v$v" --title "$v" --notes "Trench 128 launcher $v" --repo "$GITHUB_REPOSITORY"
+          gh release upload "v$v" dist/Trench128-Setup.exe dist/Trench128-Setup.exe.blockmap dist/latest.yml --clobber --repo "$GITHUB_REPOSITORY"
+          # the link the game and the website hand out must really answer
+          code=$(curl -s -o /dev/null -w '%{http_code}' -I "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/Trench128-Setup.exe")
+          echo "download link answers $code"; [ "$code" = 302 ] || [ "$code" = 200 ]
       - uses: actions/upload-artifact@v4
         with:
           name: Trench128-Setup
