@@ -81,6 +81,12 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - Under the hood: the world size is per map (the client gets the island's heightmap with the page), positions travel at a 2 cm quantum on the big map, bots pick flags instead of trench lines, and the trench-only pieces (lines, dugouts, nests, phones, tunnels, structures, lamps) are simply absent on the island.
 - Still to come: the Domination HUD and after-action report, the restyle (huts, sandbags, towers, coastal guns, bridges, airstrip, flag trenches), carriers and landing craft, and map rotation.
 
+## v0.42 — Rifles reach further
+
+- Rifle bullets no longer vanish at 110–130 m. Reach is now: bolt rifle 240 m, carbine 190 m, marksman rifle 300 m, sniper rifle 360 m, light machine gun 150 m, machine-gun nests 200 m, anti-tank rifle 340 m, MG 08/15 260 m. Shotgun and submachine gun are unchanged.
+- Longer one-shot sweet spots: bolt 40–120 m (was 40–80), marksman 70–180 m (was 70–130), sniper 90–260 m (was 90–200).
+- Sights are zeroed at 100 m (scoped rifles at 150 m): a bullet rises a few centimetres through the line of sight and is back on it at that range, instead of falling below the crosshair from the muzzle on. Beyond that you still hold a little high (about 0.6 m at 200 m with the bolt).
+
 ## v0.41 — Revolver and climbing-hands art, hit boxes, parachutes
 
 - **Revolver art.** The last-stand revolver now uses the supplied pictures: the side view at the hip and the rear view when you hold aim while down. It kicks with a muzzle flash when it fires and dips and turns during the slow reload. Aiming while down is real: it cuts the revolver's spread to 40%.
