@@ -2011,42 +2011,56 @@ function encodeEnt(e) {   // once per entity per tick, shared by every client's 
   k[6] = tickNo;
 }
 const SNAP = Buffer.allocUnsafe(36 + 400 * 12 + 2 + 2 * 1024);
-function snapshot(p) {
-  const off = p.cmd, lead = p.sq >= 0 && leaders.get(p.team * 100 + p.sq) === p, sent = p.sent || (p.sent = new Map()), live = p.live || (p.live = new Set());
-  live.clear(); let o = 36, n = 0;
+// v0.46: one table per tick of everything a snapshot might carry, in typed arrays. The per-player loop then reads flat numbers
+// instead of touching ~270 soldier objects of many shapes for each of up to 256 players (that loop was a quarter of the tick).
+const SPM = 4096, SP_ID = new Int32Array(SPM), SP_X = new Float32Array(SPM), SP_Z = new Float32Array(SPM), SP_T = new Int8Array(SPM), SP_H = new Int8Array(SPM), SP_SQ = new Int16Array(SPM),
+  SP_S0 = new Int32Array(SPM), SP_S1 = new Int32Array(SPM), SP_E = new Int32Array(SPM * 6); let SP_N = 0, SP_AT = -1;
+function snapPrep() {
+  SP_AT = tickNo; let i = 0;
   for (const e of ents.values()) {
-    if (e === p || (!e.alive && !(e.down > 0)) || e.manned || e.cmd || e.inV) continue;
-    let vis = false, due = true;
-    if (off) vis = e.team === p.team || vis_[p.team].has(e.id);          // officers: the whole friendly army + enemies inside their soldiers' sight (fog of war)
+    if ((!e.alive && !(e.down > 0)) || e.manned || e.cmd || e.inV || i >= SPM) continue;
+    const k = e.enc; if (!k || k[6] !== tickNo) encodeEnt(e); const ec = e.enc, j = i * 6;
+    SP_ID[i] = e.id; SP_X[i] = e.x; SP_Z[i] = e.z; SP_T[i] = e.team; SP_H[i] = e.bot ? 0 : 1; SP_SQ[i] = e.sq == null ? -1 : e.sq;
+    SP_S0[i] = e.sp ? e.sp[0] | 0 : 0; SP_S1[i] = e.sp ? e.sp[1] | 0 : 0;
+    SP_E[j] = ec[0]; SP_E[j + 1] = ec[1]; SP_E[j + 2] = ec[2]; SP_E[j + 3] = ec[3]; SP_E[j + 4] = ec[4]; SP_E[j + 5] = ec[5]; i++;
+  }
+  SP_N = i;
+}
+function snapshot(p, framed) {   // framed: return a ready WebSocket binary frame (one allocation, no concat) instead of the bare payload
+  if (SP_AT !== tickNo) snapPrep();
+  const off = p.cmd, lead = p.sq >= 0 && leaders.get(p.team * 100 + p.sq) === p, sent = p.sent || (p.sent = new Map()), ss = p.ss = ((p.ss | 0) + 1) & 0x3fffffff;   // entries seen this snapshot carry the stamp ss
+  let o = 36, n = 0; const B = SNAP, pid = p.id, px = p.x, pz = p.z, pt = p.team, psq = p.sq, rec = p.cls === 'recon', rr = p.ads ? 240 : 170, SPo = pt ? SP_S1 : SP_S0, vt = off ? vis_[pt] : null;
+  for (let i = 0; i < SP_N; i++) {
+    const id = SP_ID[i]; if (id === pid) continue;
+    const et = SP_T[i]; let vis = false, due = true;
+    if (off) vis = et === pt || vt.has(id);          // officers: the whole friendly army + enemies inside their soldiers' sight (fog of war)
     else {
-      const ax = Math.abs(e.x - p.x), az = Math.abs(e.z - p.z);
-      if (ax < VIEW_R && az < VIEW_R) { vis = true; due = (ax < 50 && az < 50) || ((e.id + tickNo) & 1) === 0; }   // far entities at half rate
-      else if (e.team === p.team && !e.bot && e.sq === p.sq && p.sq >= 0) vis = true;
-      else if (lead && e.team !== p.team && e.sp[p.team] > tickNo) vis = true;                     // squad leaders get map-wide spotted enemies
-      else if (p.cls === 'recon' && ax < (p.ads ? 240 : 170) && az < (p.ads ? 240 : 170)) { vis = true; due = ((e.id + tickNo) % 3) === 0; }   // recon sees further (third rate)
+      const ax = Math.abs(SP_X[i] - px), az = Math.abs(SP_Z[i] - pz);
+      if (ax < VIEW_R && az < VIEW_R) { vis = true; due = (ax < 50 && az < 50) || ((id + tickNo) & 1) === 0; }   // far entities at half rate
+      else if (et === pt && SP_H[i] && SP_SQ[i] === psq && psq >= 0) vis = true;
+      else if (lead && et !== pt && SPo[i] > tickNo) vis = true;                     // squad leaders get map-wide spotted enemies
+      else if (rec && ax < rr && az < rr) { vis = true; due = ((id + tickNo) % 3) === 0; }   // recon sees further (third rate)
     }
     if (!vis) continue;
-    live.add(e.id);
-    let c = sent.get(e.id); if (c && !due) continue; if (n >= 400) continue;
-    const k = e.enc; if (!k || k[6] !== tickNo) encodeEnt(e);
-    const ec = e.enc, qx = ec[0], qy = ec[1], qz = ec[2], yw = ec[3], fl = ec[4] | (e.team !== p.team && e.sp[p.team] > tickNo ? 32 : 0);
-    const lk = ec[5] | (!e.bot && e !== p && e.team === p.team && p.sq >= 0 && e.sq === p.sq ? 64 : 0);   // v0.33.3: 64 = in the receiver's squad
+    let c = sent.get(id); if (c) { c[6] = ss; if (!due) continue; } if (n >= 400) continue;
+    const j = i * 6, qx = SP_E[j], qy = SP_E[j + 1], qz = SP_E[j + 2], yw = SP_E[j + 3], fl = SP_E[j + 4] | (et !== pt && SPo[i] > tickNo ? 32 : 0);
+    const lk = SP_E[j + 5] | (SP_H[i] && et === pt && psq >= 0 && SP_SQ[i] === psq ? 64 : 0);   // v0.33.3: 64 = in the receiver's squad
     let m = 0, dx = 0, dy = 0, dz = 0;
-    if (!c) { m = 1 | 4 | 8 | 16; c = [0, 0, 0, 0, 0, 0]; sent.set(e.id, c); }
+    if (!c) { m = 1 | 4 | 8 | 16; c = [0, 0, 0, 0, 0, 0, ss]; sent.set(id, c); }
     else {
       dx = qx - c[0]; dy = qy - c[1]; dz = qz - c[2];
       if (dx || dy || dz) m |= (dx < -127 || dx > 127 || dy < -127 || dy > 127 || dz < -127 || dz > 127) ? 1 : 2;
       if (yw !== c[3]) m |= 4; if (fl !== c[4]) m |= 8; if (lk !== c[5]) m |= 16;
       if (!m) continue;
     }
-    SNAP.writeUInt16LE(e.id, o); SNAP[o + 2] = m; o += 3;
-    if (m & 1) { SNAP.writeInt16LE(qx, o); SNAP.writeInt16LE(qy, o + 2); SNAP.writeInt16LE(qz, o + 4); o += 6; }
-    else if (m & 2) { SNAP.writeInt8(dx, o); SNAP.writeInt8(dy, o + 1); SNAP.writeInt8(dz, o + 2); o += 3; }
-    if (m & 4) SNAP[o++] = yw; if (m & 8) SNAP[o++] = fl; if (m & 16) SNAP[o++] = lk;
+    B[o] = id & 255; B[o + 1] = (id >> 8) & 255; B[o + 2] = m; o += 3;   // (plain byte stores: the Buffer write methods were a large part of the cost)
+    if (m & 1) { B[o] = qx & 255; B[o + 1] = (qx >> 8) & 255; B[o + 2] = qy & 255; B[o + 3] = (qy >> 8) & 255; B[o + 4] = qz & 255; B[o + 5] = (qz >> 8) & 255; o += 6; }
+    else if (m & 2) { B[o] = dx & 255; B[o + 1] = dy & 255; B[o + 2] = dz & 255; o += 3; }
+    if (m & 4) B[o++] = yw; if (m & 8) B[o++] = fl; if (m & 16) B[o++] = lk;
     c[0] = qx; c[1] = qy; c[2] = qz; c[3] = yw; c[4] = fl; c[5] = lk; n++;
   }
   const ro = o; o += 2; let nr = 0;
-  for (const id of sent.keys()) if (!live.has(id) && nr < 1024) { sent.delete(id); SNAP.writeUInt16LE(id, o); o += 2; nr++; }
+  for (const [id, c] of sent) if (c[6] !== ss && nr < 1024) { sent.delete(id); B[o] = id & 255; B[o + 1] = (id >> 8) & 255; o += 2; nr++; }
   SNAP.writeUInt16LE(nr, ro);
   let h = 0; SNAP[h] = 3; h += 1; SNAP.writeUInt32LE(tickNo >>> 0, h); h += 4; SNAP.writeUInt32LE(p.ack >>> 0, h); h += 4;
   SNAP.writeFloatLE(p.x, h); h += 4; SNAP.writeFloatLE(p.y, h); h += 4; SNAP.writeFloatLE(p.z, h); h += 4; SNAP.writeFloatLE(p.vy, h); h += 4;
@@ -2056,6 +2070,7 @@ function snapshot(p) {
   SNAP.writeUInt16LE(nn ? nn.belt : p.down > 0 && p.ps ? p.ps.ammo : Math.max(0, p.ammo | 0), h); h += 2; SNAP.writeUInt16LE(Math.min(65535, supply[p.team] | 0), h); h += 2;
   SNAP[h++] = nn ? Math.round(nn.heat * 100) : 0; SNAP.writeUInt16LE(n, h); h += 2;
   SNAP.writeUInt16LE((Math.max(0, p.gr | 0) & 255) | ((Math.max(0, p.bd | 0) & 255) << 8), h);   // grenades left (low byte), bandages left (high byte)
+  if (framed) { const hl = o < 126 ? 2 : 4, out = Buffer.allocUnsafe(hl + o); out[0] = 130; if (hl === 2) out[1] = o; else { out[1] = 126; out[2] = o >> 8; out[3] = o & 255; } SNAP.copy(out, hl, 0, o); return out; }
   return Buffer.from(SNAP.subarray(0, o));
 }
 const CLASS_IDX = { rifleman: 0, assault: 1, gunner: 2, medic: 3, sapper: 4, officer: 5, recon: 6 };
@@ -2086,7 +2101,7 @@ function broadcastState() {
     if (!p.deployed || !p.ws.open) continue;
     if (p.ws.socket.writableLength > 250000) { p.sent = null; continue; }   // slow client: skip it and send it a full snapshot next time
     if (p.sent === null) { wsSend(p.ws, 1, Buffer.from('{"t":"snapReset"}')); p.sent = new Map(); }
-    const b = snapshot(p); wsSend(p.ws, 2, b); bytesOut += b.length;
+    if (LAGSIM) { const b = snapshot(p); wsSend(p.ws, 2, b); bytesOut += b.length; } else { const f = snapshot(p, true); p.ws.socket.write(f); bytesOut += f.length; }
     if (shots.length) { const j = shFor(p); if (j) { wsSend(p.ws, 2, j); bytesOut += j.length; } }
     if (objMsgs) wsSend(p.ws, 1, objMsgs[p.team]);
   }
