@@ -10,7 +10,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Server tests: each starts its own server in-process on its own port.
 const UNIT = ['snapdec', 'trench', 'climb', 'dugouts', 'destruct', 'net', 'round', 'limits', 'posts', 'forts', 'revive', 'officer', 'ops', 'gunplay',
-  'ai', 'command', 'rts', 'recon', 'comms', 'vehicles', 'bots27', 'live', 'tanktrench', 'v29', 'fuzz', 'launcherfiles', 'maps', 'wrecks', 'mud', 'phones', 'tunnels', 'planes', 'spawnmap', 'structs', 'movebank', 'flying', 'spacing', 'botjobs', 'lights', 'classes', 'v38', 'laststand'];
+  'ai', 'command', 'rts', 'recon', 'comms', 'vehicles', 'bots27', 'live', 'tanktrench', 'v29', 'fuzz', 'launcherfiles', 'maps', 'wrecks', 'mud', 'phones', 'tunnels', 'planes', 'spawnmap', 'structs', 'movebank', 'flying', 'spacing', 'botjobs', 'lights', 'classes', 'v38', 'laststand', 'hitboxes'];
 // Browser tests: run against a fresh T128_TEST server on :8099 with a seeded xp.json (ranks the tests need).
 const SEED = { offtester: 800, officerbrowser: 800, leaderbrowser: 150, settester: 900, camtester: 800, cmdbrowser: 800, reconbrowser: 150, rtsbrowser: 800, gunnerbrowser: 150 };
 const BROWSER = [['browser'], ['browser_ads'], ['browser_audio'], ['browser_climb'], ['browser_command'], ['browser_comms'], ['browser_forts'], ['browser_gunplay'],

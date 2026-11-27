@@ -373,7 +373,7 @@ function pistolFire(p) {
   const s = p.ps; if (!s || s.cd > 0 || s.rel > 0) return;
   if (s.ammo <= 0) { s.rel = PISTOL.rl; return; }
   s.ammo--; s.cd = PISTOL.cd; p.flash = 3;
-  fireBullet(p, p.x, p.y + .45, p.z, p.yaw + (rnd() - .5) * PISTOL.spr, p.pitch + (rnd() - .5) * PISTOL.spr, PISTOL.rng, PISTOL.dmg, 'pistol', PISTOL.vel);
+  fireBullet(p, p.x, p.y + .45, p.z, p.yaw + (rnd() - .5) * PISTOL.spr * (p.ads ? .4 : 1), p.pitch + (rnd() - .5) * PISTOL.spr * (p.ads ? .4 : 1), PISTOL.rng, PISTOL.dmg, 'pistol', PISTOL.vel);
 }
 const medicNear = e => { for (const q of ents.values()) if (q !== e && q.team === e.team && q.alive && (q.kit || q.cls === 'medic') && !q.mg && Math.abs(q.x - e.x) < 45 && Math.abs(q.z - e.z) < 45) return true; return false; };
 function downEnt(e, by) {   // knocked down instead of killed: a medic can revive, or hold E to respawn
@@ -459,6 +459,8 @@ function histAt(e, rw, out) {   // position of e rw ticks ago (falls back to now
   const k = ((tickNo - rw) % HIST + HIST) % HIST; out[0] = h[k * 4]; out[1] = h[k * 4 + 1]; out[2] = h[k * 4 + 2]; out[3] = h[k * 4 + 3]; return out;
 }
 const RW = [0, 0, 0, 0];
+// hit boxes follow the soldier art (measured on assets/soldiers.png, 1.95 m cell): standing head 1.54-1.83 m, kneeling figure 1.38 m tall with the head at 1.08-1.38 m
+const HEAD_STAND = 1.52, HIT_KNEEL = 1.42, HEAD_KNEEL = 1.08;
 const bullets = [], SUPW = { mg: .3, lmg: .22, smg: .1, shotgun: .12, bolt: .18, carbine: .14, mark: .25, hmg: .3, atr: .35 };
 function fireBullet(by, ox, oy, oz, yw, pt, rng, dmg, wk, vel, sw) {
   const cp = Math.cos(pt), dx = -Math.sin(yw) * cp, dy = Math.sin(pt), dz = -Math.cos(yw) * cp, b = { by, team: by.team, x: ox, y: oy, z: oz, vx: dx * vel, vy: dy * vel, vz: dz * vel, d: 0, rng, dmg, wk, sw, sup: null, rw: by.bot ? 0 : clamp(by.rw || 0, 0, LAGC_MAX) };
@@ -484,8 +486,8 @@ function bulletStep(b, dt) {   // true when the bullet is spent
     for (const e of downed) if (e.team !== b.team && e.down > 0 && Math.abs(e.x - x) < .8 && Math.abs(e.z - z) < .8 && y > e.y - .1 && y < e.y + .65) { finishHit(e, b.dmg, b.by); return true; }   // a wounded man on the ground: low, and easy to finish
     for (const e of cand) {
       if (!e.alive) continue; const P = histAt(e, b.rw, RW), ex = P[0] - x, ez = P[2] - z, ey = P[1], cr = P[3];
-      if (Math.abs(ex) < .6 && Math.abs(ez) < .6 && y > ey && y < ey + (cr ? 1.3 : 1.9)) {
-        const head = y >= ey + (cr ? 1.0 : 1.55), scoped = b.by.cls === 'recon' && WPN[b.wk] && WPN[b.wk].scope;
+      if (Math.abs(ex) < .6 && Math.abs(ez) < .6 && y > ey && y < ey + (cr ? HIT_KNEEL : 1.9)) {
+        const head = y >= ey + (cr ? HEAD_KNEEL : HEAD_STAND), scoped = b.by.cls === 'recon' && WPN[b.wk] && WPN[b.wk].scope;
         const dmg = head && scoped ? 250 : b.sw && b.d >= b.sw[0] && b.d <= b.sw[1] ? b.sw[2] : b.dmg;   // recon scoped headshot kills outright; bolt/marksman/sniper sweet spot
         damage(e, dmg, b.by, head, null, b.wk === 'pistol' ? 'pistol' : undefined); return true;
       }
@@ -908,7 +910,7 @@ function processCmds(p) {
     let dt = clamp((c[1] | 0) / 1000, 0, .05); if (dt > p.tBank) dt = Math.max(0, p.tBank); p.tBank -= dt;
     if (p.down > 0 && !p.alive && !p.cmd && p.ps) {   // v0.40 last stand
       const yw = +c[5], pt = clamp(+c[6], -1.2, 1.2); if (!isFinite(yw) || !isFinite(pt)) continue;
-      const f2 = clamp(Math.round(+c[2] || 0), -1, 1), s2 = clamp(Math.round(+c[3] || 0), -1, 1), want = !!((c[4] | 0) & 8), ps = p.ps;
+      const f2 = clamp(Math.round(+c[2] || 0), -1, 1), s2 = clamp(Math.round(+c[3] || 0), -1, 1), want = !!((c[4] | 0) & 8), ps = p.ps; p.ads = !!((c[4] | 0) & 32);
       ps.cd -= dt; if (ps.rel > 0) { ps.rel -= dt; if (ps.rel <= 0) { ps.rel = 0; ps.ammo = PISTOL.mag; } }
       T.crawl(p, { dt, f: f2, s: s2, yaw: yw }, terr.H); p.yaw = yw; p.pitch = pt;
       if (want && !p.hold) pistolFire(p); p.hold = want; continue;
@@ -1913,6 +1915,7 @@ function encodeEnt(e) {   // once per entity per tick, shared by every client's 
   k[0] = Math.round(e.x * Q); k[1] = Math.round(e.y * Q); k[2] = Math.round(e.z * Q);
   k[3] = Math.floor(((e.yaw % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) / (2 * Math.PI) * 256) & 255;
   k[4] = (e.team ? 1 : 0) | (e.bot ? 2 : 0) | ((e.mg != null && e.mg !== false) ? 4 : 0) | (e.crouch ? 8 : 0) | (e.flash > 0 ? 16 : 0) | (e.down > 0 ? 64 : 0) | (aiming(e) ? 128 : 0);
+  if (e.para) k[4] |= 68;   // a parachutist: the 'mounted gun' and 'down' bits together (never both at once otherwise), so the client draws a canopy only for the paratroopers call-in
   k[5] = e.elite ? lookByte(e) : (CLASS_IDX[e.cls] || 0) | ((W_IDX[e.mg === true || e.mg === false || e.mg == null ? (e.w || 'bolt') : 'lmg'] || 0) << 3);   // class 7 = elite   // look byte: class (bits 0-2) + weapon (bits 3-5)
   k[6] = tickNo;
 }
@@ -2295,4 +2298,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

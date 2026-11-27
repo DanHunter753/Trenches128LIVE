@@ -74,6 +74,13 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.41 — Revolver and climbing-hands art, hit boxes, parachutes
+
+- **Revolver art.** The last-stand revolver now uses the supplied pictures: the side view at the hip and the rear view when you hold aim while down. It kicks with a muzzle flash when it fires and dips and turns during the slow reload. Aiming while down is real: it cuts the revolver's spread to 40%.
+- **Climbing hands.** The climb animation uses the supplied picture of two hands on a ledge, moved hand over hand and then pushed down as you haul yourself over. The old thin-arm frames are gone.
+- **Parachutes only for paratroopers.** Soldiers climbing out of a trench no longer grow a parachute; the canopy shows only for men dropped by the paratroopers call-in.
+- **Hit boxes.** A kneeling soldier's box now matches the drawn figure (1.42 m tall, head from 1.08 m), so the top of a kneeling head can be hit and the chest is no longer counted as the head. Standing and machine-gun-nest boxes were measured against the art and were already correct.
+
 ## v0.40 — Last stand, mouse binds, version check
 
 - **Last stand.** When you are knocked down you draw a revolver: 6 rounds, about one shot a second, and a slow 4 s reload ([R]). The move keys crawl at roughly 0.6 m/s.
