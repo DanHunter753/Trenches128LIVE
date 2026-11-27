@@ -202,7 +202,7 @@ function spawnEnt(e) {
   e.died = false; e.hist = null; e.mask = 0; e.hitBy = null; e.lastHit = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; e.bloom = 0;
   e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = grMax(e); e.gCd = 0; e.bd = bdMax(e); e.sld = 0; e.sldCd = 0; e.pb = 0; e.rg = 0; e.rgAt = 0; e.rgCd = 0; e.mph = false; e.mphU = 0; e.mphN = e.cls === 'assault' ? MPH_DOSES : 0; e.boxCd = 0; e.healCd = 0; e.mgCd = 0; e.para = false;
   let { x, z } = home(e.team), py = null;
-  const atPost = q => { x = q.x + (rnd() - .5) * (q.fort ? 1.2 : 3); z = q.z + (rnd() - .5) * (q.fort ? 1.2 : 3); py = q.fort ? null : q.y; };
+  const atPost = q => { x = q.x + (rnd() - .5) * (q.fort ? 1 : 3); z = q.z + (rnd() - .5) * (q.fort ? 1 : 3); py = q.fort ? null : q.y; };
   if (e.mg === true) { x = e.hx; z = e.hz; }
   if (!e.bot) {
     applyLoadout(e); e.cmd = e.cls === 'officer';
@@ -290,7 +290,7 @@ function morphine(p) {
 function botAbility(b) {
   if (!b.alive || b.down > 0 || (b.mg != null && b.mg !== false) || b.inV || b.elite) return;
   if (b.cls === 'assault' && !b.mph && b.mphN > 0 && b.tgt && b.hp < 60) morphine(b);
-  else if (b.cls === 'rifleman' && b.gr > 0 && (b.rgCd || 0) <= tickNo && supply[b.team] >= 8) {   // rifle grenades onto manned enemy guns, or a knot of enemies
+  else if (b.cls === 'rifleman' && b.gr > 0 && (b.rgCd || 0) <= tickNo && supply[b.team] >= 30) {   // rifle grenades onto manned enemy guns, or a knot of enemies
     let best = null, bs = 0;
     const cand = e => { if (e.team === b.team || !e.alive || e.cmd || e.inV || (e.rgTgt || 0) > tickNo) return; const d = Math.hypot(e.x - b.x, e.z - b.z); if (d < 35 || d > 110) return;
       const gun = e.mg != null && e.mg !== false; let n = 0; if (!gun) forNear(e.x, e.z, 5, q => { if (q.team === e.team && q.alive && Math.hypot(q.x - e.x, q.z - e.z) < 4) n++; });
@@ -336,7 +336,7 @@ function creditKill(e, by, head) {
   { const sp = e.spBy; if (sp && sp !== by && sp.team === by.team && !sp.bot && sp.deployed && e.sp[by.team] > tickNo) { addXp(sp, 5); tell(sp, 'Spot assist (+5 XP)'); } }
   addXp(by, 10); if (!by.bot) send(by, { t: 'k', n: e.bot ? 'enemy soldier' : e.name });
   const m = by.revBy;   // the medic who revived this soldier earns a smaller share of every kill
-  if (m && m !== by && m.team === by.team && !m.bot) { addXp(m, REV_KILL_XP); tell(m, 'Your revived soldier got a kill (+' + REV_KILL_XP + ' XP)'); }
+  if (m && m !== by && m.team === by.team && !m.bot && humans.has(m)) { addXp(m, REV_KILL_XP); tell(m, 'Your revived soldier got a kill (+' + REV_KILL_XP + ' XP)'); }
 }
 function damage(e, dmg, by, head, src, kind) {
   if (!e.alive || e.cmd || (e.inV && kind !== 'veh')) return;   // inside a tank: only the tank can be hurt
@@ -553,6 +553,21 @@ function throwGrenade(p) {
   const g = { fx: p.x, fy: ey, fz: p.z, tx: p.x + dx * t, tz: p.z + dz * t, t: 1.4, by: p };
   grenades.push(g); bcast({ t: 'gr', f: [+g.fx.toFixed(1), +g.fy.toFixed(1), +g.fz.toFixed(1)], to: [+g.tx.toFixed(1), +g.tz.toFixed(1)], tm: p.team });
 }
+// v0.38 medics: the hurt teammate a medic's bandage goes to (within arm's reach and roughly in front of him; the worst hurt first)
+const MED_HEAL_XP = 8, MED_SEE = 45, MED_REACH = 2.8;
+function medicTarget(p) {
+  const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); let best = null, bs = 1;
+  for (const e of ents.values()) { if (e === p || e.team !== p.team || !e.alive || e.down > 0 || e.cmd || e.inV || e.hp >= maxHp(e)) continue;
+    const dx = e.x - p.x, dz = e.z - p.z, d = Math.hypot(dx, dz); if (d > MED_REACH || Math.abs(e.y - p.y) > 1.8 || (d > .7 && (dx * fx + dz * fz) / d < .35)) continue;
+    const fr = e.hp / maxHp(e); if (fr < bs) { bs = fr; best = e; } }
+  return best;
+}
+/** Twice a second each medic is told the health of the hurt teammates near him: [id, % health]. */
+function medicSee() {
+  for (const p of humans) { if (!p.deployed || !p.alive || p.cls !== 'medic' || p.cmd) { continue; }
+    const L = []; forNear(p.x, p.z, MED_SEE, e => { if (e === p || e.team !== p.team || !e.alive || e.down > 0 || e.cmd || e.inV || e.hp >= maxHp(e) || L.length >= 40) return; if (Math.hypot(e.x - p.x, e.z - p.z) <= MED_SEE) L.push([e.id, Math.max(1, Math.round(e.hp / maxHp(e) * 100))]); });
+    if (L.length || p.mhN) send(p, { t: 'mh', l: L }); p.mhN = L.length; }
+}
 function reviveAct(p) {
   if (!p.alive || p.cls !== 'medic' || p.mg != null) return;
   let t = null, bd = 2.7; for (const e of ents.values()) if (e.down > 0 && e.team === p.team && Math.hypot(e.x - p.x, e.z - p.z) < bd) { bd = Math.hypot(e.x - p.x, e.z - p.z); t = e; }   // humans and downed bots
@@ -590,11 +605,16 @@ function onAct(p, a, m) {
   else if (a === 'heal') {
     if (p.u === 'gasnade' || p.u === 'smokenade') { throwUtil(p); return; }
     if (p.u === 'flare') { fireFlare(p); return; }
-    if (p.u !== 'bandage' || p.mg != null || p.hp >= maxHp(p)) return;
+    if (p.u !== 'bandage' || p.mg != null) return;
+    const mate = p.cls === 'medic' ? medicTarget(p) : null;   // v0.38: a medic bandages the hurt teammate in front of him before himself
+    if (!mate && p.hp >= maxHp(p)) return;
     if (!(p.bd > 0)) { if ((p.msgCd || 0) <= tickNo) { tell(p, 'No bandages left'); p.msgCd = tickNo + 2 * TICK; } return; }
     if ((p.healCd || 0) > tickNo) return;   // 6 s between bandages
     if (supply[p.team] < 1) { tell(p, 'No supplies for bandages'); return; }
-    supply[p.team]--; p.bd--; p.healCd = tickNo + 6 * TICK; p.hp = Math.min(maxHp(p), p.hp + (p.cls === 'medic' ? 70 : 40));
+    supply[p.team]--; p.bd--;
+    if (mate) { const h0 = mate.hp; mate.hp = Math.min(maxHp(mate), mate.hp + 70); mate.burn = 0; p.healCd = tickNo + 3 * TICK; const gain = Math.round(mate.hp - h0), xp = gain >= 20 ? MED_HEAL_XP : 2;
+      st(p).heal = (st(p).heal || 0) + 1; addXp(p, xp); send(p, { t: 'mhd', id: mate.id, n: nameOf(mate), hp: gain, xp }); if (!mate.bot) tell(mate, p.name + ' bandaged you (+' + gain + ' HP)'); p.mhAt = 0; return; }
+    p.healCd = tickNo + 6 * TICK; p.hp = Math.min(maxHp(p), p.hp + (p.cls === 'medic' ? 70 : 40));
   } else if (a === 'dig') {
     if (p.u !== 'tool' || p.mg != null || (p.digCd || 0) > tickNo) return;
     if (supply[p.team] < 1) { tell(p, 'No supplies for digging'); return; }
@@ -838,7 +858,7 @@ function fortSpawn(p) {
   if (f.spawn) { tell(p, 'This building already has a respawn point'); return; }
   if (supply[p.team] < 5) { tell(p, 'A respawn point costs 5 supply'); return; }
   supply[p.team] -= 5; f.spawn = 1; const w = T.fortWorld(f);
-  posts.push({ id: postId++, team: p.team, x: w.sp.x, z: w.sp.z, y: f.y, hp: 1e9, by: p, fort: f.id }); addXp(p, 15); fortSync(f);
+  posts.push({ id: postId++, team: p.team, x: w.sp.x, z: w.sp.z, y: f.y, hp: 1e9, by: p, fort: f.id, radio: w.radio }); addXp(p, 15); fortSync(f);
   tellTeam(p.team, 'Respawn point set up in a ' + T.FORT[f.k].n.toLowerCase());
 }
 // bots walk around finished structures instead of through them
@@ -852,9 +872,12 @@ function botMove(b, mx, mz) {
 // (0.12 s of movement a tick) threw away movement whenever inputs arrived bunched up (network jitter, or after a slow server
 // tick). The player's own screen had already moved him the full distance, so he was snapped back: worst when sprinting.
 // The bank still stops speed hacks: over any stretch of time nobody moves faster than the clock.
-const MOVE_BANK = .6;
+const MOVE_BANK = 1;
 function processCmds(p) {
-  p.tBank = Math.min(MOVE_BANK, (p.tBank == null ? .25 : p.tBank) + DT);
+  // v0.38: the bank refills with the real time that passed (not a nominal 50 ms a tick: the timer runs a little slow and a busy
+  // tick later still, which starved every moving player of 2-4% of his movement and pulled him back several times a second),
+  // plus 3% for clock and rounding differences.
+  { const now = hr(), el = p.tAt ? Math.min(.3, (now - p.tAt) / 1000) : DT; p.tAt = now; p.tBank = Math.min(MOVE_BANK, (p.tBank == null ? .25 : p.tBank) + el * 1.03); }
   const q = p.q; p.q = [];
   for (const c of q) {
     const seq = +c[0]; if (!Number.isFinite(seq) || seq <= p.ack) continue; p.ack = seq;
@@ -944,7 +967,7 @@ function botBuildWork(b) {   // returns true while the bot is busy building
   f.done = Math.min(1, f.done + DT / T.FORT[f.k].work); b.crouch = false;
   if (f.done >= 1) {
     fortComplete(f); b.buildF = null;
-    if (supply[b.team] >= 5 && rnd() < .6) { supply[b.team] -= 5; f.spawn = 1; const w = T.fortWorld(f); posts.push({ id: postId++, team: b.team, x: w.sp.x, z: w.sp.z, y: f.y, hp: 1e9, by: null, fort: f.id }); fortSync(f); }
+    if (supply[b.team] >= 5 && rnd() < .6) { supply[b.team] -= 5; f.spawn = 1; const w = T.fortWorld(f); posts.push({ id: postId++, team: b.team, x: w.sp.x, z: w.sp.z, y: f.y, hp: 1e9, by: null, fort: f.id, radio: w.radio }); fortSync(f); }
   } else if (tickNo - (f.lastB || 0) >= 10) fortSync(f);
   return true;
 }
@@ -1485,7 +1508,7 @@ function opTick() {
 function scoreRows(t, me) {
   const sc = e => { const s = st(e); return s.sc + (e.bot ? s.k * 10 + s.a * 3 : 0); };
   const hum = [...humans].filter(p => p.deployed && p.team === t), bots = [...ents.values()].filter(e => e.bot && !e.mg && e.team === t && e.st && (e.st.k || e.st.d));
-  const row = e => { const s = st(e); return [nameOf(e), e.bot ? -1 : T.rankOf(e.xp || 0), e.cmd ? 'Officer' : e.bot ? 'AI ' + (AI_SQ[e.squad] || '') : e.sq >= 0 ? T.SQUADS[e.sq] : '-', e.cls, s.k, s.d, s.a, sc(e), e.bot ? 1 : 0, e === me ? 1 : 0, e.alive ? 1 : 0]; };
+  const row = e => { const s = st(e); return [nameOf(e), e.bot ? -1 : T.rankOf(e.xp || 0), e.cmd ? 'Officer' : e.bot ? 'AI ' + (AI_SQ[e.squad] || '') : e.sq >= 0 ? T.SQUADS[e.sq] : '-', e.cls, s.k, s.d, s.a, sc(e), e.bot ? 1 : 0, e === me ? 1 : 0, e.alive ? 1 : 0, e.bot ? -1 : e.ping == null ? -1 : e.ping]; };   // [11] ping in ms (humans)
   const L = hum.concat(bots.sort((a, b) => sc(b) - sc(a)).slice(0, Math.max(0, 24 - hum.length))).sort((a, b) => sc(b) - sc(a)).map(row);
   const all = [...ents.values()].filter(e => e.team === t && e.st);
   return { l: L.slice(0, 40), k: all.reduce((a, e) => a + e.st.k, 0), d: all.reduce((a, e) => a + e.st.d, 0), n: hum.length, ai: [...ents.values()].filter(e => e.bot && e.team === t).length };
@@ -1920,7 +1943,7 @@ function broadcastState() {
   if (tickNo % 10 === 0) {
     const base = { t: 'o', o: OB.map(o => [o.owner, +o.p.toFixed(2), Math.ceil(o.lock)]), w: [wave.side, Math.round(wave.t)], r: round.state, hv: [...humans].filter(p => p.deployed).length,
       dp: DP.map(d => [d.owner, +d.p.toFixed(2)]), op: op && [op.att, op.sector, OPS.nsec, op.tk, op.tkMax, op.bat, OPS.nbat, Math.ceil(op.regroup), op.stall ? 1 : 0, OB.indexOf(opTarget())] };
-    const fpFor = t => posts.filter(q => q.team === t || [...humans].some(h => h.team === t && h.alive && !h.cmd && Math.hypot(h.x - q.x, h.z - q.z) < 110)).map(q => [q.id, q.team, +q.x.toFixed(1), +q.z.toFixed(1), Math.ceil(q.hp), q.rally ? Math.max(0, Math.ceil((q.rally - tickNo) / TICK)) : 0]);   // [5] rally point seconds left
+    const fpFor = t => posts.filter(q => q.team === t || [...humans].some(h => h.team === t && h.alive && !h.cmd && Math.hypot(h.x - q.x, h.z - q.z) < 110)).map(q => [q.id, q.team, +q.x.toFixed(1), +q.z.toFixed(1), Math.ceil(q.hp), q.rally ? Math.max(0, Math.ceil((q.rally - tickNo) / TICK)) : 0, q.radio ? [+q.radio.x.toFixed(2), +q.radio.z.toFixed(2), +q.radio.yaw.toFixed(2), +q.y.toFixed(2)] : 0]);   // [5] rally point seconds left, [6] a building's respawn point: where its radio stands
     const abFor = t => aboxes.filter(b => b.team === t || [...humans].some(h => h.team === t && h.alive && Math.hypot(h.x - b.x, h.z - b.z) < 80)).map(b => [b.id, b.team, +b.x.toFixed(2), +b.z.toFixed(2), b.uses]);
     objMsgs = [Buffer.from(JSON.stringify({ ...base, fp: fpFor(0), ab: abFor(0) })), Buffer.from(JSON.stringify({ ...base, fp: fpFor(1), ab: abFor(1) }))];
   }
@@ -1974,7 +1997,7 @@ function tickBody() {
   for (const n of NESTS) if (n.heat > 0) { n.heat = Math.max(0, n.heat - DT * (n.over ? .3 : .2)); if (n.over && n.heat <= .35) n.over = false; }
   if (round.state === 'play') guard('objectives', objectivesTick);
   if (tickNo % 40 === 0) guard('fill', fillBots);
-  if (tickNo % 10 === 0) { guard('orders', orderTick); guard('crates', crateTick); guard('aboxes', aboxTick); }
+  if (tickNo % 10 === 0) { guard('orders', orderTick); guard('crates', crateTick); guard('aboxes', aboxTick); guard('medics', medicSee); }
   if (tickNo % 4 === 0) for (const e of ents.values()) if (e.mph && e.mphU <= tickNo) { e.mph = false; if (!e.bot) send(e, { t: 'mph', s: 0, n: e.mphN }); }
   if (tickNo % 20 === 0) guard('sqs', sendSqs);
   { const t = hr(); broadcastState(); prof('send', hr() - t); }
@@ -2048,7 +2071,7 @@ function onText(c, txt) {
   } else if (m.t === 'wxs' && process.env.T128_TEST && T.WXS[m.k]) { setWx(m.k);
   } else if (m.t === 'act') onAct(p, String(m.a), m);
   else if (m.t === 'cmd') { if (p.deployed && p.cmd && p.alive) { if (m.k === 'order') issueOrder(p, m); else if (m.k === 'sup') callSupport(p, m); } }
-  else if (m.t === 'ping') send(p, { t: 'pong', c: m.c });
+  else if (m.t === 'ping') { if (Number.isFinite(m.p)) p.ping = clamp(Math.round(m.p), 0, 9999); send(p, { t: 'pong', c: m.c }); }   // the client reports the round trip it last measured (for the scoreboard)
   else if (m.t === 'chat') chatMsg(p, m);
   else if (m.t === 'sbq' && p.deployed && (p.sbAt || 0) <= tickNo) { p.sbAt = tickNo + TICK; send(p, { t: 'sb', s: [scoreRows(0, p), scoreRows(1, p)] }); }
 }
@@ -2073,7 +2096,14 @@ function onClose(c) {
 }
 
 // ------------------------------------------------------------------ minimal WebSocket (RFC 6455) + static files
+// Test-only network conditions (T128_TEST=1 T128_LAG="base,jitter" in ms, each way): messages keep their order, as on TCP.
+const LAGSIM = process.env.T128_TEST && process.env.T128_LAG ? String(process.env.T128_LAG).split(',').map(Number) : null;
+function lagQ(c, key, fn) {
+  const at = Math.max(c[key] || 0, Date.now() + LAGSIM[0] + Math.random() * (LAGSIM[1] || 0)); c[key] = at; const Q = c[key + 'Q'] || (c[key + 'Q'] = []); Q.push([at, fn]);
+  setTimeout(() => { while (Q.length && Q[0][0] <= Date.now() + .5) Q.shift()[1](); }, Math.max(0, at - Date.now()) + 1);   // strictly first in, first out
+}
 function wsSend(c, op, payload) {
+  if (LAGSIM && c.player && !c._raw) { const pl = Buffer.from(payload); return lagQ(c, 'lagOut', () => { c._raw = true; try { wsSend(c, op, pl); } finally { c._raw = false; } }); }
   if (!c.open) return; const n = payload.length; let h;
   if (n < 126) h = Buffer.from([128 | op, n]); else if (n < 65536) h = Buffer.from([128 | op, 126, n >> 8, n & 255]);
   else { h = Buffer.alloc(10); h[0] = 128 | op; h[1] = 127; h.writeUInt32BE(n, 6); }
@@ -2095,7 +2125,7 @@ function wsData(c, d) {
     if (op === 8) return wsClose(c);
     if (op === 9) { wsSend(c, 10, pl); continue; }
     if (op === 1 || op === 2) { c.fop = op; c.frags = [pl]; c.fragN = len; } else if (op === 0 && c.frags) { c.frags.push(pl); c.fragN += len; if (c.fragN > 65536) return wsClose(c); } else continue;   // fragmented messages capped at 64 KB in total
-    if (fin) { const full = Buffer.concat(c.frags); c.frags = null; if (c.fop === 1) { try { onText(c, full.toString('utf8')); } catch (e) { console.error('message error', e && e.stack || e); } } }   // one bad message must never take the server down
+    if (fin) { const full = Buffer.concat(c.frags); c.frags = null; if (c.fop === 1 && LAGSIM && c.player) { const tx = full.toString('utf8'); lagQ(c, 'lagIn', () => { try { onText(c, tx); } catch (e) { console.error(e); } }); } else if (c.fop === 1) { try { onText(c, full.toString('utf8')); } catch (e) { console.error('message error', e && e.stack || e); } } }   // one bad message must never take the server down
   }
 }
 const FILES = { '/': ['public/index.html', 'text/html; charset=utf-8'], '/index.html': ['public/index.html', 'text/html; charset=utf-8'], '/shared.js': ['shared.js', 'text/javascript; charset=utf-8'] };
@@ -2220,4 +2250,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

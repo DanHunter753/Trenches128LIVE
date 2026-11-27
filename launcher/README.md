@@ -27,6 +27,8 @@ launcher only has to update itself, and only when you change the launcher.
 - Updates are published as GitHub releases of the public repository `DanHunter753/Trenches128LIVE` (`build.publish`
   in `package.json`); the installer is always named `Trench128-Setup.exe`, so
   `https://github.com/DanHunter753/Trenches128LIVE/releases/latest/download/Trench128-Setup.exe` is the newest one.
+  The workflow builds first and then uploads the installer, its `.blockmap` and `latest.yml` to **one** release; it stops
+  if two releases share the tag (that is what made this link answer 404 for v1.0.0) and checks the link at the end.
 - The game server's `/download` sends players there (`T128_LAUNCHER_URL` in `.env`), and the web connect screen shows a
   "Download the Windows launcher" link. Copying installer files into `public/launcher/` on a server still works and wins.
 

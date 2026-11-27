@@ -73,6 +73,50 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.38 - playtest fixes: rubber-banding, phones, medics
+**Lag when moving and shooting (found and fixed)**
+- *Moving.* The server lets each player move only as much time as has passed (the "movement bank", v0.32.1), but it refilled
+  that allowance by a nominal 50 ms a tick while its timer really fires every 51-54 ms, and a 60 Hz client rounds each
+  16.7 ms frame up to 17. After about 20 s of play every player's allowance was empty and stayed empty: the server then
+  dropped 2-4% of his movement and pulled him back, a third of all snapshots, for the rest of the session (1-13 cm on a good
+  connection, more with jitter). The allowance now refills with the time that really passed (plus 3%), holds 1 s instead of
+  0.6, and the client carries its rounding remainder so the time it sends adds up exactly. Measured with simulated latency
+  (25-40 s of sprinting): 0 pull-backs, was 60-75 per 10 s.
+- *Shooting.* Your own shot (kick, sound, tracer) was only shown when the server's answer came back, a full ping later. It is
+  now shown the instant you fire, following the same rules the server applies (rate of fire, sprint-to-fire delay,
+  semi-automatic trigger); the server still decides what is hit. Each confirmed shot is matched to a shown one.
+- **Ping** is always on screen (bottom left; green / amber / red, "unsteady" when snapshots arrive in bursts, "NO SIGNAL"
+  when they stop) and every player's ping is a column on the TAB scoreboard.
+- `T128_TEST=1 T128_LAG="90,70"` makes the server delay every message (base, jitter in ms each way) for testing.
+
+**Phones**
+- **Officer view works with touch.** Drag to move the map, pinch to zoom, twist two fingers to turn, two fingers up/down to
+  tilt; a tap still gives the order. The command panel covered the whole screen on a phone: it is now a strip along the
+  bottom whose rows scroll sideways, with a Hide button, and it is no longer redrawn under your finger (taps were lost).
+- **Invisible soldiers / missing gun on slow connections.** The soldier art is one 2.3 MB picture (each gun is 0.3-0.5 MB).
+  Until it had arrived nobody was drawn, only the markers over their heads; if the download failed, for the whole session.
+  Soldiers are now drawn as plain uniformed figures until the art arrives, every picture retries when its download fails,
+  and the soldier and gun art is fetched first.
+- **Gun missing after spawning.** An item animation could leave the gun hidden for good; the gun picture is also redrawn
+  every 2 s and its layer is woken after a spawn, a rotation or going full screen (which is what bandaging used to do by
+  accident).
+
+**Medics**
+- A health bar hangs over every hurt teammate within 45 m, seen through cover.
+- [H] bandages the hurt teammate in front of you (within 2.8 m, worst hurt first; 70 HP, +8 XP) before yourself.
+- The medic who revives a man earns 4 XP for each kill that man makes until he dies (this was already in; now tested and
+  it stops if the medic leaves).
+
+**Also**
+- **Assault morphine** plays the syringe hands (the owner's art in `fpv_items.png`).
+- **Building respawn points** are a small field telephone in a back corner instead of the big sandbag ring and tent that
+  filled the room, and blockhouse and pillbox doorways are 1.9 / 1.8 m wide (were 1.4 / 1.3: easy to get stuck in).
+- Rifleman bots only fire rifle grenades when their side has 30+ supply (they were spending it all).
+- **Launcher download link.** `releases/latest/download/Trench128-Setup.exe` answered 404 because the release build had
+  created two releases under the tag v1.0.0. The workflow now builds first and uploads all three files to one release,
+  refuses to run while duplicates exist, and checks that the link answers.
+- Tests: `v38`, `browser_v38`, `browser_netfeel` (runs with simulated latency), `movebank` extended.
+
 ## v0.37 - the rifleman: rifle grenades, and the bolt rifle is his alone
 - **Only riflemen carry the bolt-action rifle.** Sappers now choose a shotgun or a carbine (a saved sapper loadout with the
   bolt rifle switches to the shotgun).
