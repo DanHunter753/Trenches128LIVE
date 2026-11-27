@@ -14,7 +14,7 @@ module.exports = function makeNav(T, getH) {
     const i0 = Math.max(0, Math.floor(x0 + OFF)), i1 = Math.min(N - 1, Math.floor(x1 + OFF)), j0 = Math.max(0, Math.floor(z0 + OFF)), j1 = Math.min(N - 1, Math.floor(z1 + OFF));
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const c = j * N + i, x = i - OFF + .5, z = j - OFF + .5, y = T.hAt(H, x, z); h[c] = y;
-      blk[c] = Math.abs(x) > T.W - 3 || Math.abs(z) > T.W - 3 || ((T.FORTS.size || T.SBOX.length) && T.fortHit(x, y, z, .2, true)) ? 1 : 0;
+      blk[c] = Math.abs(x) > T.W - 3 || Math.abs(z) > T.W - 3 || (T.isSea && T.isSea(H, x, z)) || ((T.FORTS.size || T.SBOX.length) && T.fortHit(x, y, z, .2, true)) ? 1 : 0;
       wir[c] = T.wireK(x, z) < 1 ? 1 : 0;
       const r = T.roomAt(x, z); room[c] = r ? T.ROOMS.indexOf(r) + 1 : 0;
       door[c] = r && Math.abs(x - r.xc) < 1.2 && (z - r.c) * -r.sg > 1.2 && (z - r.c) * -r.sg < 3.6 ? 1 : 0;

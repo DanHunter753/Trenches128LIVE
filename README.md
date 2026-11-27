@@ -74,6 +74,13 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.43 — Wake Atoll and Domination (stage 1)
+
+- **New map: Wake Atoll** (`--maps wake`, or `T128_MAPS=wake`). An 800 m world imported from the owner's Wake Island map: the three islets with the lagoon between them, fords where the original had its bridges, 5 flags (Airfield, South Battery, North Camp, Wilkes Landing, Peale Point), palms, scrub and grass from the supplied art. The sea is wadeable to chest depth; deeper water is a wall for men and bots.
+- **Domination.** Any flag can be taken by either side: outnumber the enemy inside 14 m for about 20 s and it goes neutral, then yours. Every 8 s a side scores a point per flag held; first to 100 wins. When the leader passes 25, 50, 75 and 90 the trailing side gets a rally: morale, an instant respawn wave, +30 supply and a paratroop drop at its nearest enemy flag. The garrison starts at the Airfield, the landing force at Wilkes Landing (the fleet comes later).
+- Under the hood: the world size is per map (the client gets the island's heightmap with the page), positions travel at a 2 cm quantum on the big map, bots pick flags instead of trench lines, and the trench-only pieces (lines, dugouts, nests, phones, tunnels, structures, lamps) are simply absent on the island.
+- Still to come: the Domination HUD and after-action report, the restyle (huts, sandbags, towers, coastal guns, bridges, airstrip, flag trenches), carriers and landing craft, and map rotation.
+
 ## v0.42 — Rifles reach further
 
 - Rifle bullets no longer vanish at 110–130 m. Reach is now: bolt rifle 240 m, carbine 190 m, marksman rifle 300 m, sniper rifle 360 m, light machine gun 150 m, machine-gun nests 200 m, anti-tank rifle 340 m, MG 08/15 260 m. Shotgun and submachine gun are unchanged.

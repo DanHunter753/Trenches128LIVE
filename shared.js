@@ -3,14 +3,22 @@
 // so terrain, movement and stat tables can never drift apart.
 (function (root) {
 // v0.21: 320 m square (was 240). Lines meander and the line objectives are staggered along them.
-const S = 400, N = 800, ST = S / N, W = S / 2, NV = (N + 1) * (N + 1);
+let S = 400, N = 800, ST = S / N, W = S / 2, NV = (N + 1) * (N + 1);
+// v0.43 imported maps: the world can be another size (Wake Atoll is 800 m at 1 m). The size is fixed for the life of a page
+// (the client caches W/N/ST at load and reloads for a new map); the server re-reads them through the API getters.
+function setWorld(size, res) { S = size; N = res; ST = S / N; W = S / 2; NV = (N + 1) * (N + 1); }
+const WAKE_SEED = 1000000001;   // the seed number that means "the Wake Atoll map" (it is not a layout roll)
+let HM = null;                  // imported heightmap: Float32Array (N+1)^2 in metres, sea at 0
+function hmSample(x, z) { const u = (x + W) / ST, v = (z + W) / ST, i = Math.max(0, Math.min(N - 1, Math.floor(u))), j = Math.max(0, Math.min(N - 1, Math.floor(v))), a = Math.max(0, Math.min(1, u - i)), b = Math.max(0, Math.min(1, v - j)), k = j * (N + 1) + i; return HM[k] * (1 - a) * (1 - b) + HM[k + 1] * a * (1 - b) + HM[k + N + 1] * (1 - a) * b + HM[k + N + 2] * a * b; }
+const SEA_WADE = -1.25;         // a man wades until the seabed is this far under the surface; deeper water is a wall (and nav blocks it)
+const isSea = (H, x, z) => MP.kind === 'wake' && hAt(H, x, z) < SEA_WADE;
 const FL = [100, 64, 30, -30, -64, -100], CT = [], GAPS = [];
 const CZ0 = 28, CZ1 = 104, HOME_Z = 140, NML = 44;     // communication trenches run |z| CZ0..CZ1; home bases at ±HOME_Z; no-man's land |z| < NML
 const OBX = [];                                         // objective x along each line (zig-zag instead of a straight column)
 // team 0 = blue (holds +z), team 1 = red (holds -z)
 const tri = x => Math.abs(((x / 7) % 2 + 2) % 2 - 1) * 2.4 - 1.2;
 // v0.30 procedural maps: setMap(seed) re-rolls the layout below (seed 0 = the classic map). MP holds the per-map numbers.
-const MP = { seed: 0, ph1: 0, ph2: 0, a1: 1, a2: 1, gx: 0, gz: 0, hs: 0 };
+const MP = { seed: 0, ph1: 0, ph2: 0, a1: 1, a2: 1, gx: 0, gz: 0, hs: 0, kind: 'trench', meta: null };   // kind: 'trench' (the generated lines) or 'wake' (imported island); meta: the imported map's json
 const mea = (t, x) => 6 * MP.a1 * Math.sin(x * .041 + t * .37 + MP.ph1) + 2.5 * MP.a2 * Math.sin(x * .097 + t * 1.3 + MP.ph2);   // the line's long bends
 const trenchC = (t, x) => t + tri(x) + mea(t, x);         // centre line z of line t at x (bends + zig-zag bays)
 const trenchSlope = (t, x) => (trenchC(t, x + 1) - trenchC(t, x - 1)) / 2;
@@ -88,6 +96,7 @@ function collapsed(t, cell) {
   return .45 + hsh(cell, t) * .2;
 }
 function gen(x, z) {
+  if (MP.kind === 'wake') return hmSample(x, z);
   const b = base(x, z); let h = b, az = Math.abs(z), mound = 0;
   for (const t of FL) {
     if (Math.abs(z - t) > 18) continue;
@@ -135,7 +144,7 @@ function makeTerrain() {
   const H = new Float32Array(NV), D = new Float32Array(NV).fill(1), mk = !FLOOR;
   if (mk) FLOOR = new Uint8Array(NV);
   for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
-    const x = -W + i * ST, z = -W + j * ST, k = j * (N + 1) + i, h = H[k] = gen(x, z); if (!mk) continue;
+    const x = -W + i * ST, z = -W + j * ST, k = j * (N + 1) + i, h = H[k] = gen(x, z); if (!mk || MP.kind === 'wake') continue;
     const d = h - base(x, z); let fl = d <= TR_FLOOR + .1;                       // main floor (fire trenches and communication trenches)
     if (!fl && Math.abs(d - FS_TOP) < .12) for (const t of FL) { if (Math.abs(z - t) > 14) continue; const u = (z - trenchC(t, x)) * sgn(t); if (u > 1.6 && u < 2.2) { fl = true; break; } }   // fire step
     FLOOR[k] = fl ? 1 : 0;
@@ -509,11 +518,11 @@ function step(p, cmd, H, spdMul) {
   else if (p.cls === 'assault' && !p.elite && (bits & 2) && !(pb & 2) && (pb & 1) && f > 0 && !chg && !(p.sldCd > 0) && p.y <= groundAt(H, p.x, p.z, p.y) + .1) { p.sld = SLIDE.t; p.sdx = mx; p.sdz = mz; p.sldX = 0; }
   const sliding = p.sld > 0, su = sliding ? p.sld / SLIDE.t : 0;
   if (sliding) { mx = p.sdx; mz = p.sdz; p.sld = Math.max(0, p.sld - dt); if (p.sld <= 0) { p.sldCd = SLIDE.cd; p.sldX = 0; } }
-  const sp = (sliding ? SLIDE.v1 + (SLIDE.v0 - SLIDE.v1) * su : chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul * WET_SPD[wetAt(H, p.x, p.z)];
+  const sp = (sliding ? SLIDE.v1 + (SLIDE.v0 - SLIDE.v1) * su : chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul * WET_SPD[wetAt(H, p.x, p.z)] * (MP.kind === 'wake' && p.y < 0 ? Math.max(.35, 1 + p.y * .55) : 1);   // v0.43 wading: knee-deep 0.8, chest-deep 0.35
   const nx = p.x + mx * sp * dt, nz = p.z + mz * sp * dt, sl = (groundAt(H, nx, nz, p.y) - groundAt(H, p.x, p.z, p.y)) / Math.max(.01, sp * dt);
   const k = (sl > 0 ? Math.max(.35, 1 - sl * .5) : 1) * wireK(p.x, p.z);
   // walls: moving is refused where the ground half a metre ahead is more than 0.62 m above the feet (steep trench walls, pit walls)
-  const dx = mx * sp * dt * k, dz = mz * sp * dt * k, blocked = (ax, az) => { const L = Math.hypot(ax, az); if (L < 1e-6) return false; return groundAt(H, p.x + ax / L * .5, p.z + az / L * .5, p.y) - p.y > .62; };
+  const dx = mx * sp * dt * k, dz = mz * sp * dt * k, sea = MP.kind === 'wake', blocked = (ax, az) => { const L = Math.hypot(ax, az); if (L < 1e-6) return false; const g = groundAt(H, p.x + ax / L * .5, p.z + az / L * .5, p.y); return g - p.y > .62 || (sea && g < SEA_WADE); };
   let ox = dx, oz = dz;
   if (blocked(dx, dz)) { if (!blocked(dx, 0)) oz = 0; else if (!blocked(0, dz)) ox = 0; else { ox = 0; oz = 0; } if (sliding) { p.sld = 0; p.sldCd = SLIDE.cd; } }
   if (!sbHit(H, p.x, p.y, p.z, 0) && sbHit(H, p.x + ox, p.y, p.z + oz, .3)) { if (!sbHit(H, p.x + ox, p.y, p.z, .3)) oz = 0; else if (!sbHit(H, p.x, p.y, p.z + oz, .3)) ox = 0; else { ox = 0; oz = 0; } }
@@ -661,9 +670,36 @@ function mapCheck() {
   for (const n of NEST) if (Math.abs(gen(n.x, n.z) - base(n.x, n.z)) > 2.5) return 'nest at ' + n.x + ' in the trench';
   return '';
 }
+// ---- v0.43 Wake Atoll: an imported island (public/maps/wake.hm + wake.json, baked by build/wake/bake.py). No trench lines:
+// the line-based pieces (dugouts, nests, phones, tunnels, structures, lamps) are left empty; props come from the map's json.
+function loadWake() {
+  if (typeof require === 'function' && typeof module !== 'undefined') {   // Node: read the files
+    try { const fs = require('fs'), path = require('path'), dir = path.join(__dirname, 'public', 'maps'); const meta = JSON.parse(fs.readFileSync(path.join(dir, 'wake.json'), 'utf8')), buf = fs.readFileSync(path.join(dir, 'wake.hm'));
+      const n = (meta.N + 1) * (meta.N + 1), h = new Float32Array(n); for (let i = 0; i < n; i++) h[i] = buf.readInt16LE(i * 2) / 100; return { meta, h }; } catch (e) { return null; }
+  }
+  const g = root.T128_HM, meta = root.T128_WAKE; if (!g || !meta) return null;   // browser: public/maps/wake.js set these before shared.js ran
+  const bin = atob(g.b64), n = (meta.N + 1) * (meta.N + 1), h = new Float32Array(n); for (let i = 0; i < n; i++) { let v = bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8); if (v & 32768) v -= 65536; h[i] = v / 100; } return { meta, h };
+}
+function applyWake() {
+  const d = loadWake(); if (!d) return false; const m = d.meta;
+  setWorld(m.S, m.N); HM = d.h; MP.kind = 'wake'; MP.meta = m; MP.seed = WAKE_SEED; Object.assign(MP, { ph1: 0, ph2: 0, a1: 1, a2: 1, gx: 0, gz: 0, hs: 0 });
+  const fill = (a, v) => { a.length = 0; a.push(...v); };
+  fill(GAPS, []); fill(CT, []); fill(ROOM_X, []); fill(OBX, m.flags.map(f => f.x)); fill(MINES, []);
+  fill(NEST, m.props.filter(p => p.k === 'nest').map(p => ({ x: p.x, z: p.z, team: p.team == null ? 1 : p.team, yaw: p.r || 0 })));
+  fill(HQS, []); fill(EMPL, m.props.filter(p => p.k === 'gun').map(p => ({ k: 'fgun', team: p.team == null ? 1 : p.team, x: p.x, z: p.z, yaw: p.r || 0 })));
+  fill(OBJ, m.flags.map((f, i) => ({ t: 0, x: f.x, z: f.z, n: f.n, id: f.id })));   // the five flags (the sixth line objective is unused)
+  FL.length = 0;   // no trench lines: every per-line loop on both ends does nothing
+  while (OBJ.length < 6) OBJ.push({ ...OBJ[0] });
+  fill(DEPOTS, []);
+  ROOMS.length = 0; SB.length = 0; SBG.clear(); SGRID.clear(); SBOX.length = 0; PHONES.length = 0; TUNNELS.length = 0; AA.length = 0; STRUCT.length = 0; LIGHTS.length = 0; LGRID = new Map(); BAYS.clear();
+  AIRF[0] = { x: -300, z: -300, yaw: 0 }; AIRF[1] = { x: 262, z: 258, yaw: -Math.PI / 2 };   // v0.43: the garrison's strip; the landing force has no airfield yet
+  FLOOR = null; PRISTINE = null; return true;
+}
 /** Build the map for `seed` (0 = classic). Returns the seed actually used (a failing layout moves on to the next seed). */
 function setMap(seed) {
   seed = Math.abs(Math.floor(+seed || 0)) % 2147483647;
+  if (seed === WAKE_SEED) { if (applyWake()) return WAKE_SEED; seed = 0; }
+  else if (MP.kind === 'wake') { MP.kind = 'trench'; MP.meta = null; HM = null; setWorld(400, 800); FL.length = 0; FL.push(100, 64, 30, -30, -64, -100); }
   for (let k = 0; k < 20; k++) {
     const sd = seed ? 1 + (seed + k - 1) % 2147483646 : 0;
     applyLayout(sd ? rollLayout(sd) : { ...CLASSIC }); MP.seed = sd;
@@ -676,7 +712,7 @@ const newSeed = () => 1 + Math.floor(Math.random() * 2147483645);
 function terrainFor(seed) { const used = setMap(seed); const t = makeTerrain(); return { seed: used, H: t.H, F: FLOOR }; }
 function adoptTerrain(H, F) { if (!(H instanceof Float32Array) || !(F instanceof Uint8Array) || H.length !== NV || F.length !== NV) return false; PRISTINE = H.slice(); FLOOR = F; return true; }
 // the page that loads this file picks up the map it was told to build (a reload after the server changed maps)
-setMap(typeof sessionStorage !== 'undefined' ? (() => { try { return +sessionStorage.getItem('t128map') || 0; } catch (e) { return 0; } })() : 0);
+setMap(typeof sessionStorage !== 'undefined' ? (() => { try { return +sessionStorage.getItem('t128map') || +root.T128_MAPSEED || 0; } catch (e) { return +root.T128_MAPSEED || 0; } })() : 0);
 const CHG_MAX = 3, GRAV = 9.8;
 const chgMax = p => CHG_MAX * (p && p.cls === 'rifleman' && !p.elite ? 1.5 : 1);   // v0.37: riflemen charge for longer
 // v0.37 rifle grenades: a grenade fired from a cup on the rifle's muzzle. Same flight on server and client (the client draws
@@ -753,7 +789,8 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { crawl, CRAWL, RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, S, N, ST, W, NV, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { setWorld, WAKE_SEED, isSea, SEA_WADE, hmSample: (x, z) => HM ? hmSample(x, z) : 0, crawl, CRAWL, RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+for (const [k, g] of [['S', () => S], ['N', () => N], ['ST', () => ST], ['W', () => W], ['NV', () => NV]]) Object.defineProperty(API, k, { get: g, enumerable: true });   // world size can change with the map
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof window !== 'undefined' ? window : globalThis);
