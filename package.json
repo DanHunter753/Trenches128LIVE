@@ -1,6 +1,6 @@
 {
   "name": "trench128-server",
-  "version": "0.45.0",
+  "version": "0.46.0",
   "private": true,
   "description": "Authoritative server for Trench 128 (zero dependencies)",
   "main": "server.js",

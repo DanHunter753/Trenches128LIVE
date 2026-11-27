@@ -205,7 +205,9 @@ function buildSB() {
       SB.push({ x, z, hx: .95, hz: .4, t, cell: Math.floor((x + W) / 9), gone: false });
     }
   }
-  for (const b of SB) { const k = Math.floor(b.x / 8); if (!SBG.has(k)) SBG.set(k, []); SBG.get(k).push(b); }
+  // v0.46: a 4 m square grid; each bag is listed in every cell its footprint (plus 1 m) touches, so a lookup reads one short list
+  // (it was keyed by an 8 m column of x only, which held every bag of every line in that column)
+  for (const b of SB) for (let cx = Math.floor((b.x - b.hx - 1) / 4); cx <= Math.floor((b.x + b.hx + 1) / 4); cx++) for (let cz = Math.floor((b.z - b.hz - 1) / 4); cz <= Math.floor((b.z + b.hz + 1) / 4); cz++) { const k = cx * 65536 + cz; let a = SBG.get(k); if (!a) SBG.set(k, a = []); a.push(b); }
 }
 // ---- v0.26/v0.27 dynamic destruction: a heavy shell landing in a trench can blow the 9 m bay in. The bay half fills with spoil
 // (same shape as the bays collapsed at map generation), its sandbags and revetments are gone. Server and client apply the same
@@ -231,8 +233,8 @@ function collapseBay(Tr, t, cell) {
 function resetBays() { BAYS.clear(); for (const b of SB) b.gone = false; }
 const applyEv = (Tr, c) => c[0] === 'b' ? collapseBay(Tr, c[1], c[2]) : dig(Tr, c[0], c[1], c[2], c[3]);   // a crater-list entry
 function sbHit(H, x, y, z, r) {
-  r = r || 0; const k = Math.floor(x / 8);
-  for (let d = -1; d <= 1; d++) { const a = SBG.get(k + d); if (a) for (const b of a) if (!b.gone && Math.abs(x - b.x) < b.hx + r && Math.abs(z - b.z) < b.hz + r && y < hAt(H, b.x, b.z) + SB_H - .08) return b; }
+  r = r || 0; const cx = Math.floor(x / 4), cz = Math.floor(z / 4), w = r > 1 ? Math.ceil((r - 1) / 4) : 0;
+  for (let i = cx - w; i <= cx + w; i++) for (let j = cz - w; j <= cz + w; j++) { const a = SBG.get(i * 65536 + j); if (a) for (const b of a) if (!b.gone && Math.abs(x - b.x) < b.hx + r && Math.abs(z - b.z) < b.hz + r && y < hAt(H, b.x, b.z) + SB_H - .08) return b; }
   return null;
 }
 // ---- player-built fortifications. The server owns the list; clients mirror it (events fo/fa/fx) so prediction, sight and drawing agree.
@@ -455,10 +457,12 @@ function fortSeg(x0, y0, z0, x1, y1, z1) {   // segments up to one grid cell (6 
 }
 function wireK(x, z) { let k = MP.kind === 'wake' ? 1 : wireK0(x, z); for (const w of WWIRE) if (inBox(w, x, z, 0)) { k = .4; break; } for (const w of FWIRE) if (inBox(w, x, z, 0)) { k = Math.min(k, .3); break; } return k; }
 function los(H, x1, y1, z1, x2, y2, z2) {
-  const n = Math.max(10, Math.min(120, Math.ceil(Math.hypot(x2 - x1, z2 - z1) / 1.0)));
-  let px = x1, py = y1, pz = z1;
+  const L = Math.hypot(x2 - x1, z2 - z1), n = Math.max(10, Math.min(120, Math.ceil(L / 1.0))), g = Math.max(1, Math.floor(5 / Math.max(1e-6, L / n)));   // g steps make one structure check (<= 5 m)
+  let px = x1, py = y1, pz = z1, fx = x1, fy = y1, fz = z1;
   for (let i = 1; i <= n; i++) { const t = i / n, x = x1 + (x2 - x1) * t, z = z1 + (z2 - z1) * t, y = y1 + (y2 - y1) * t;
-    if ((i < n && (hAt(H, x, z) > y || inRoof(x, y, z) || sbHit(H, x, y, z))) || sbHit(H, (x + px) / 2, (y + py) / 2, (z + pz) / 2) || fortSeg(px, py, pz, x, y, z) >= 0) return false;   // bags 0.8 m thick: half-metre checks catch them; timber walls are clipped exactly
+    if ((i < n && (hAt(H, x, z) > y || inRoof(x, y, z) || sbHit(H, x, y, z))) || sbHit(H, (x + px) / 2, (y + py) / 2, (z + pz) / 2)) return false;   // bags 0.8 m thick: half-metre checks catch them
+    if ((i % g === 0 || i === n) && fortSeg(fx, fy, fz, x, y, z) >= 0) return false;   // timber walls and structures clipped exactly, in pieces of up to 5 m (v0.46: was every metre)
+    if (i % g === 0) { fx = x; fy = y; fz = z; }
     px = x; py = y; pz = z; }
   return true;
 }

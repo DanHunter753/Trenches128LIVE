@@ -74,6 +74,20 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.46 — Server performance: half the tick time under load
+
+Measured with 64 simulated players plus bots (266 soldiers) on a trench map, the server and the load generator each on its own CPU core:
+
+| | before | after |
+|---|---|---|
+| average tick | 26–34 ms | 15–16 ms |
+| ticks over 40 ms (per 15 s) | 17–67 | 0–2 |
+| server CPU busy (70 s run) | 53.5 s | 35.2 s |
+
+- **Snapshots** (what each player is sent 20 times a second) were a quarter of every tick. Each tick now builds one flat table of every soldier, and each player's snapshot reads from it instead of visiting ~270 soldier objects again; bytes are written directly and each snapshot is sent as one ready frame.
+- **Line-of-sight checks** (bots looking for targets): sandbag lookups use a small 2D grid instead of a whole map column, and walls and structures are tested in 5 m pieces instead of every metre. Results are identical (checked on 60,000 random sight lines on three maps).
+- **Wake Atoll at full size** (128 v 128 bots, plus 64 players): 7–11 ms average, worst 25 ms, about 5 KB/s per player. It's lighter than the trench maps because the soldiers are spread over five flags, so it's safe to turn on `T128_MAPS=rotate`.
+
 ## v0.45 — Wake Atoll stage 3: the island rebuilt in WW1 style, new bolt-rifle aim view
 
 - **Fighting trenches at every flag.** Three short plank-revetted trenches with duckboards ring each flag inside the capture circle, about 1.2 m deep with a spoil bank thrown up behind. Climb out over the side or walk out of the sloped ends; the map's own trench pieces near Wilkes Landing are dug too.
