@@ -694,17 +694,17 @@ function rgPath(H, x, y, z, yaw, pitch) {
   return { x: px, y: py, z: pz, t, vx, vy, vz };
 }   // bayonet-charge stamina (s), bullet gravity (m/s²)
 const WPN = {
-  bolt: { n: 'Bolt Rifle', d: 'Slow. One-shot kills in its 40–80 m sweet spot. Bayonet.', dmg: 50, cd: .6, mag: 8, pel: 1, spr: 0, rng: 130, hip: .025, rl: 1.5, auto: 0, vel: 420, rcl: .055, blm: 0, bay: 1, sw: [40, 80, 100] },
-  carbine: { n: 'Semi-auto Carbine', d: 'Quicker follow-up shots. Bayonet.', dmg: 34, cd: .35, mag: 10, pel: 1, spr: .012, rng: 110, hip: .03, rl: 1.5, auto: 0, vel: 380, rcl: .03, blm: .006, bay: 1 },
+  bolt: { n: 'Bolt Rifle', d: 'Slow. One-shot kills in its 40–120 m sweet spot. Bayonet.', dmg: 50, cd: .6, mag: 8, pel: 1, spr: 0, rng: 240, hip: .025, rl: 1.5, auto: 0, vel: 420, rcl: .055, blm: 0, bay: 1, sw: [40, 120, 100] },
+  carbine: { n: 'Semi-auto Carbine', d: 'Quicker follow-up shots. Bayonet.', dmg: 34, cd: .35, mag: 10, pel: 1, spr: .012, rng: 190, hip: .03, rl: 1.5, auto: 0, vel: 380, rcl: .03, blm: .006, bay: 1 },
   shotgun: { n: 'Trench Shotgun', d: 'Devastating inside 25 m. Bayonet.', dmg: 22, cd: .9, mag: 5, pel: 6, spr: .09, rng: 28, hip: .05, rl: 2, auto: 0, vel: 330, rcl: .08, blm: 0, bay: 1 },
   smg: { n: 'Submachine Gun', d: 'Automatic. Hold to fire.', dmg: 18, cd: .1, mag: 32, pel: 1, spr: .03, rng: 60, hip: .05, rl: 1.8, auto: 1, vel: 300, rcl: .011, blm: .004 },
-  lmg: { n: 'Light Machine Gun', d: 'Heavy sustained fire. Strong suppression.', dmg: 24, cd: .12, mag: 45, pel: 1, spr: .035, rng: 90, hip: .06, rl: 2.8, auto: 1, vel: 400, rcl: .016, blm: .005 },
-  mark: { n: 'Marksman Rifle', d: 'Long range, heavy hit, 3.5x scope. One-shot kills at 70–130 m. The scope glints.', dmg: 80, cd: 1, mag: 5, pel: 1, spr: 0, rng: 170, hip: .035, rl: 2, auto: 0, vel: 520, rcl: .07, blm: 0, sw: [70, 130, 100], scope: 3.5 },
+  lmg: { n: 'Light Machine Gun', d: 'Heavy sustained fire. Strong suppression.', dmg: 24, cd: .12, mag: 45, pel: 1, spr: .035, rng: 150, hip: .06, rl: 2.8, auto: 1, vel: 400, rcl: .016, blm: .005 },
+  mark: { n: 'Marksman Rifle', d: 'Long range, heavy hit, 3.5x scope. One-shot kills at 70–180 m. The scope glints.', dmg: 80, cd: 1, mag: 5, pel: 1, spr: 0, rng: 300, hip: .035, rl: 2, auto: 0, vel: 520, rcl: .07, blm: 0, sw: [70, 180, 100], scope: 3.5 },
   // v0.26 elite kits (Operations pickups): not in any class list, so no loadout can ask for them
   flame: { n: 'Flammenwerfer', d: 'Flamethrower. A 14 m jet that sets men and ground alight. R refuels (3 supply).', dmg: 6, cd: .1, mag: 100, pel: 1, spr: .01, rng: 14, hip: .02, rl: 4, auto: 1, vel: 30, rcl: .004, blm: 0, flame: 1, elite: 1 },
-  atr: { n: 'Tankgewehr M1918', d: '13 mm anti-tank rifle: pierces tank armour, kills a man outright. Its grenades are bundle charges.', dmg: 150, cd: 2.2, mag: 1, pel: 1, spr: 0, rng: 260, hip: .09, rl: 2.8, auto: 0, vel: 780, rcl: .2, blm: 0, at: 150, elite: 1 },
-  hmg: { n: 'MG 08/15', d: 'Water-cooled machine gun carried by an armoured sentry. 100-round belts.', dmg: 22, cd: .105, mag: 100, pel: 1, spr: .028, rng: 180, hip: .05, rl: 5, auto: 1, vel: 800, rcl: .035, blm: .0025, elite: 1 },
-  sniper: { n: 'Sniper Rifle', d: '6x telescopic sight, sways while scoped: hold Shift to hold your breath. One-shot kills at 90–200 m. The scope glints.', dmg: 90, cd: 1.4, mag: 5, pel: 1, spr: 0, rng: 230, hip: .06, rl: 2.4, auto: 0, vel: 620, rcl: .085, blm: 0, sw: [90, 200, 100], scope: 6 },
+  atr: { n: 'Tankgewehr M1918', d: '13 mm anti-tank rifle: pierces tank armour, kills a man outright. Its grenades are bundle charges.', dmg: 150, cd: 2.2, mag: 1, pel: 1, spr: 0, rng: 340, hip: .09, rl: 2.8, auto: 0, vel: 780, rcl: .2, blm: 0, at: 150, elite: 1 },
+  hmg: { n: 'MG 08/15', d: 'Water-cooled machine gun carried by an armoured sentry. 100-round belts.', dmg: 22, cd: .105, mag: 100, pel: 1, spr: .028, rng: 260, hip: .05, rl: 5, auto: 1, vel: 800, rcl: .035, blm: .0025, elite: 1 },
+  sniper: { n: 'Sniper Rifle', d: '6x telescopic sight, sways while scoped: hold Shift to hold your breath. One-shot kills at 90–260 m. The scope glints.', dmg: 90, cd: 1.4, mag: 5, pel: 1, spr: 0, rng: 360, hip: .06, rl: 2.4, auto: 0, vel: 620, rcl: .085, blm: 0, sw: [90, 260, 100], scope: 6 },
 };
 const CLS = {
   rifleman: { n: 'Rifleman', d: 'The only class with the bolt-action rifle. Works the bolt and aims faster, shrugs off suppression, and charges with the bayonet for longer. [N] fits a rifle grenade to the muzzle: lob it 30–110 m onto a machine-gun nest or a knot of men.', hp: 100, sp: 1, w: ['bolt', 'carbine'] },
