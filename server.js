@@ -47,8 +47,8 @@ let posts = [], postId = 1;
 // v0.36 class abilities ([N]): the machine gunner drops ammo boxes, the assault man injects morphine
 const ABOX_USES = 10, ABOX_LIFE = 150 * TICK, ABOX_CD = 35 * TICK, ABOX_COST = 3, ABOX_R = 2.6, ABOX_RE = 25 * TICK, ABOX_MAX = 2, MPH_T = 10 * TICK, MPH_DOSES = 2, MPH_SPD = 1.2, MPH_ARM = .6;
 let aboxes = [], aboxId = 1;
-const grMax = e => e.cls === 'assault' ? 4 : e.cls === 'sapper' ? 3 : 2;
-const bdMax = e => e.u === 'gasnade' || e.u === 'smokenade' ? 2 : e.u === 'flare' ? 3 : e.cls === 'medic' ? 5 : 3;   // sapper field posts: shared, destructible respawn points
+const grMax = e => (e.cls === 'assault' ? 4 : e.cls === 'sapper' ? 3 : 2) + (T.hasPk(e, 'bomber') ? 1 : 0) - (T.hasPk(e, 'light') ? 1 : 0);   // v0.47 perks
+const bdMax = e => e.u === 'gasnade' || e.u === 'smokenade' ? 2 : e.u === 'flare' ? 3 + (T.hasPk(e, 'flarehand') ? 1 : 0) : e.cls === 'medic' ? 5 + (T.hasPk(e, 'fieldkit') ? 2 : 0) : 3;   // sapper field posts: shared, destructible respawn points
 const POST_HP = 300, POST_COST = 10, POST_MAX = 3;
 const ents = new Map();      // id -> entity (humans and bots share one id space)
 const humans = new Set();
@@ -205,6 +205,7 @@ function spawnEnt(e) {
     op.tk--; if (op.tk === 0 && !op.stall) attackStalls();
   }
   if (e.veh && VEHM) VEHM.leave(e, true); if (e.elite) eliteLost(e); e.burn = 0; e.goTo = null; e.job = null;
+  e.pk = !e.bot && e.acct && !e.cmd ? T.perkActive(T.perkNorm(e.acct.perks), e.cls, T.levelOf(e.xp || 0).lv) : null; e.rlN = 0; e.crT = 0; e.sbB = false;   // v0.47: this life's perks
   e.died = false; e.hist = null; e.mask = 0; e.hitBy = null; e.lastHit = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; e.bloom = 0;
   e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = grMax(e); e.gCd = 0; e.bd = bdMax(e); e.sld = 0; e.sldCd = 0; e.pb = 0; e.rg = 0; e.rgAt = 0; e.rgCd = 0; e.mph = false; e.mphU = 0; e.mphN = e.cls === 'assault' ? MPH_DOSES : 0; e.boxCd = 0; e.healCd = 0; e.mgCd = 0; e.para = false;
   let { x, z } = home(e.team), py = null;
@@ -235,7 +236,7 @@ function spawnEnt(e) {
     for (let a = 0; a < 8 && !ok; a++) { const x2 = e.x + Math.cos(a * .785) * r, z2 = e.z + Math.sin(a * .785) * r; if (!T.fortHit(x2, T.groundAt(terr.H, x2, z2, 99), z2, .4, true)) { e.x = x2; e.z = z2; ok = true; } } if (ok) break; }
   e.y = py != null ? py : T.groundAt(terr.H, e.x, e.z, 99); e.vy = 0;
   e.hp = maxHp(e); e.alive = true; e.rel = 0; e.cd = 0; e.yaw = faceYaw(e.team); e.pitch = 0;
-  if (!e.bot) send(e, { t: 'sp', x: e.x, y: e.y, z: e.z, cls: e.cls, w: e.w, u: e.u, hp: e.hp, sq: e.sq });
+  if (!e.bot) send(e, { t: 'sp', x: e.x, y: e.y, z: e.z, cls: e.cls, w: e.w, u: e.u, hp: e.hp, sq: e.sq, pk: e.pk || [] });
   if (!e.bot && e.sq >= 0) sendOrderTo(e);
 }
 const pickPost = t => { const a = posts.filter(q => q.team === t); return a.length ? a[(rnd() * a.length) | 0] : null; };
@@ -282,7 +283,7 @@ function rgUnload(p) { p.rg = 0; if (!p.bot) send(p, { t: 'rg', s: 0 }); }
 function fireRifleGrenade(p) {
   const c = gCost(p); if (!(p.gr > 0) || supply[p.team] < c) { rgUnload(p); if (!p.bot) tell(p, !(p.gr > 0) ? 'Out of grenades' : 'Need ' + c + ' supply'); return false; }
   supply[p.team] -= c; p.gr--; p.rg = 0; p.cd = T.RG.cd; p.flash = 3;
-  const ey = p.y + eyeH(p), path = T.rgPath(terr.H, p.x, ey, p.z, p.yaw, p.pitch);
+  const ey = p.y + eyeH(p), path = T.rgPath(terr.H, p.x, ey, p.z, p.yaw, p.pitch, T.hasPk(p, 'riflegren') ? Math.sqrt(1.15) : 1);
   grenades.push({ tx: path.x, tz: path.z, t: path.t, by: p, pow: T.RG.pow });
   bcast({ t: 'rgf', f: [+p.x.toFixed(2), +ey.toFixed(2), +p.z.toFixed(2)], v: [+path.vx.toFixed(3), +path.vy.toFixed(3), +path.vz.toFixed(3)], T: +path.t.toFixed(3), to: [+path.x.toFixed(1), +path.y.toFixed(1), +path.z.toFixed(1)], tm: p.team, id: p.id });
   if (!p.bot) send(p, { t: 'rg', s: 0 }); return true;
@@ -292,7 +293,7 @@ function rgAim(d, dh) { const V = T.RG.v, g = T.RG.g, q = V ** 4 - g * (g * d * 
 function morphine(p) {
   if (p.mph) return false;
   if (!(p.mphN > 0)) { if (!p.bot) tell(p, 'No morphine left'); return false; }
-  p.mphN--; p.mph = true; p.mphU = tickNo + MPH_T; p.hp = Math.min(maxHp(p), p.hp + 15);
+  p.mphN--; p.mph = true; p.mphU = tickNo + MPH_T + (T.hasPk(p, 'secondwind') ? 3 * TICK : 0); p.hp = Math.min(maxHp(p), p.hp + 15);
   if (!p.bot) send(p, { t: 'mph', s: MPH_T / TICK, n: p.mphN }); return true;
 }
 function botAbility(b) {
@@ -319,12 +320,13 @@ function botAbility(b) {
 function buildPost(p) {
   if (p.cls !== 'sapper' || p.mg != null) return;
   if ((p.postCd || 0) > tickNo) { tell(p, 'Field post: wait ' + Math.ceil((p.postCd - tickNo) / TICK) + 's'); return; }
-  if (supply[p.team] < POST_COST) { tell(p, 'A field post costs ' + POST_COST + ' supply'); return; }
+  const pc = POST_COST - (T.hasPk(p, 'fpost') ? 1 : 0);   // v0.47 Forward Post
+  if (supply[p.team] < pc) { tell(p, 'A field post costs ' + pc + ' supply'); return; }
   if (enemiesNear(p, 20).length) { tell(p, 'Enemies too close to build'); return; }
   if (posts.some(q => q.team === p.team && Math.hypot(q.x - p.x, q.z - p.z) < 25)) { tell(p, 'Too close to another field post'); return; }
-  supply[p.team] -= POST_COST; p.postCd = tickNo + 20 * TICK;
+  supply[p.team] -= pc; p.postCd = tickNo + 20 * TICK;
   const mine = posts.filter(q => q.team === p.team && !q.fort); if (mine.length >= POST_MAX) posts = posts.filter(q => q !== mine[0]);
-  posts.push({ id: postId++, team: p.team, x: p.x, z: p.z, y: p.y, hp: POST_HP, by: p }); addXp(p, 15);
+  posts.push({ id: postId++, team: p.team, x: p.x, z: p.z, y: p.y, hp: POST_HP * (T.hasPk(p, 'fpost') ? .9 : 1), by: p }); addXp(p, 15);
   tellTeam(p.team, 'Field post established — your team can now respawn there');
 }
 const BLEED = 30, REV_T = 3, REV_BOT_T = 4, REV_XP = 30, REV_KILL_XP = 4;
@@ -349,7 +351,8 @@ function creditKill(e, by, head) {
 function damage(e, dmg, by, head, src, kind) {
   if (!e.alive || e.cmd || (e.inV && kind !== 'veh')) return;   // inside a tank: only the tank can be hurt
   if (e.charging && kind !== 'melee') dmg *= .6;          // a bayonet charge shrugs off some damage
-  if (e.mph && kind !== 'gas') dmg *= MPH_ARM;              // v0.36: on morphine a man keeps going through wounds that would drop him
+  if (e.mph && kind !== 'gas') dmg *= MPH_ARM;
+  if (Array.isArray(src) && T.hasPk(e, 'thick')) dmg *= .92;   // v0.47 Thick Skin: grenades, shells and bombs (blasts pass their origin as src)              // v0.36: on morphine a man keeps going through wounds that would drop him
   e.hp -= dmg;
   if (by && by !== e && by.team !== e.team) (e.hitBy || (e.hitBy = new Map())).set(by.id, [by, tickNo]);
   e.lastHit = kind || (src ? (by && by.cmd ? 'artillery' : by ? 'grenade' : 'shell') : by ? (by.mg != null && by.mg !== false ? 'mg' : by.w || 'bolt') : 'shell');
@@ -366,6 +369,7 @@ const BOT_BLEED = 20;
 // v0.40 last stand. A downed player draws his revolver: slow single shots, six rounds, a 4 s reload, and he can drag himself along
 // at a crawl. A downed man can also be finished off: bullets, blasts and bayonets wear down DOWN_HP and then he is dead.
 const DOWN_HP = 60, PISTOL = { dmg: 30, cd: 1.1, mag: 6, rl: 4, rng: 45, vel: 260, spr: .045 };
+const psMag = e => PISTOL.mag + (T.hasPk(e, 'lastwords') ? 2 : 0);
 let downed = [];   // everyone lying wounded this tick (bullets and blasts look here: the grid holds only men on their feet)
 function finishHit(e, dmg, by, how) {
   if (!(e.down > 0) || e.alive || (by && by !== e && by.team === e.team)) return false;
@@ -384,8 +388,9 @@ function pistolFire(p) {
 }
 const medicNear = e => { for (const q of ents.values()) if (q !== e && q.team === e.team && q.alive && (q.kit || q.cls === 'medic') && !q.mg && Math.abs(q.x - e.x) < 45 && Math.abs(q.z - e.z) < 45) return true; return false; };
 function downEnt(e, by) {   // knocked down instead of killed: a medic can revive, or hold E to respawn
-  e.alive = false; e.hp = 0; e.down = e.bot ? BOT_BLEED : BLEED; e.rt = 1e9; e.crouch = false; e.rvT = 0; e.charging = false; e.shelter = null;
-  e.dhp = DOWN_HP; e.ps = e.bot ? null : { ammo: PISTOL.mag, cd: 1.2, rel: 0 }; e.cl = null; e.sld = 0; e.rg = 0; e.hold = true;   // the revolver takes a moment to draw; a held trigger does not fire it
+  const lw = T.hasPk(e, 'lastwords');   // v0.47 Last Words: more rounds and health while down, a shorter bleed-out
+  e.alive = false; e.hp = 0; e.down = e.bot ? BOT_BLEED : BLEED * (lw ? .8 : 1); e.rt = 1e9; e.crouch = false; e.rvT = 0; e.charging = false; e.shelter = null;
+  e.dhp = DOWN_HP + (lw ? 15 : 0); e.ps = e.bot ? null : { ammo: psMag(e), cd: 1.2, rel: 0 }; e.cl = null; e.sld = 0; e.rg = 0; e.hold = true;   // the revolver takes a moment to draw; a held trigger does not fire it
   if (e.bot) { BSTAT.downs = (BSTAT.downs || 0) + 1; moraleHit(e, 4); creditKill(e, by); killFeed(e, by, false); return; }
   if (e.mg != null) dismount(e, true); if (e.veh) VEHM.leave(e, true);
   killFeed(e, by, false); creditKill(e, by);   // a player knocked down shows in the feed like a kill
@@ -400,14 +405,15 @@ function reviveEnt(e, by) {
   e.down = 0; e.alive = true; e.hp = Math.ceil(maxHp(e) * .4); e.rel = 0; e.cd = 0; e.rvT = 0; e.revBy = by.bot ? null : by; BSTAT.revives++;
   if (by.bot) st(by).rev++;
   if (e.bot) { e.tgt = null; e.cov = null; e.hist = null; if (!by.bot) { st(by).rev++; addXp(by, 15); tell(by, 'Revived ' + nameOf(e) + ' (+15 XP)'); } return; }
-  send(e, { t: 'sp', x: e.x, y: e.y, z: e.z, cls: e.cls, w: e.w, u: e.u, hp: e.hp, sq: e.sq, rv: 1 });
+  send(e, { t: 'sp', x: e.x, y: e.y, z: e.z, cls: e.cls, w: e.w, u: e.u, hp: e.hp, sq: e.sq, rv: 1, pk: e.pk || [] });
   tell(e, by.bot ? nameOf(by) + ' patched you up' : by.name + ' revived you');
   if (!by.bot) { st(by).rev++; addXp(by, REV_XP); tell(by, 'Revived ' + nameOf(e) + ' (+' + REV_XP + ' XP)'); }
 }
 const bodies = [];
 const EIDX = { flame: 0, atr: 1, hmg: 2 };   // elites: class 7, weapon bits = which kit
 const lookByte = e => e.elite ? 7 | (EIDX[e.elite] << 3) : (CLASS_IDX[e.cls] || 0) | ((W_IDX[e.w] || 0) << 3);
-function bodyOut(e, imp) { bodies.push([e.id, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), ...(imp || [0, 0, 0]).map(v => +v.toFixed(2)), e.team ? 1 : 0, lookByte(e), +(e.yaw || 0).toFixed(2)]); }
+const kits = [];   // v0.47 Scrounger: where soldiers fell (each body refills one magazine, once per scrounger)
+function bodyOut(e, imp) { kits.push({ x: e.x, z: e.z, until: tickNo + 90 * TICK, by: new Set() }); if (kits.length > 400) kits.shift(); bodies.push([e.id, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), ...(imp || [0, 0, 0]).map(v => +v.toFixed(2)), e.team ? 1 : 0, lookByte(e), +(e.yaw || 0).toFixed(2)]); }
 function killEnt(e, by) {
   e.died = true; moraleHit(e, 8);
   if (!e.cmd) bodyOut(e, e._imp); e._imp = null; if (e.fortNest) leaveFortNest(e);
@@ -517,7 +523,8 @@ function startReload(p) {
   if (p.rel > 0 || p.mg != null) return; const w = WPN[p.w]; if (p.ammo >= w.mag) return;
   const cost = w.flame ? 3 : 1;   // a fresh fuel tank costs more than a clip
   if (supply[p.team] < cost) { tell(p, 'Out of supplies. Hold more lines.'); return; }
-  supply[p.team] -= cost; p.rel = w.rl * (p.cls === 'assault' && !p.elite ? .7 : 1);   // v0.36: the assault man is quick with a clip
+  p.rlN = (p.rlN | 0) + 1; if (!(T.hasPk(p, 'pockets') && p.rlN % 3 === 0)) supply[p.team] -= cost;   // Deep Pockets: every third clip is his own
+  p.rel = w.rl * (p.cls === 'assault' && !p.elite ? .7 : 1) * (T.hasPk(p, 'quick') ? .92 : 1) * (T.hasPk(p, 'riflegren') ? 1.1 : 1) * (T.hasPk(p, 'belt') && p.w === 'lmg' ? .85 : 1);   // v0.36: the assault man is quick with a clip; v0.47 perks
 }
 function fireWeapon(p) {
   const w = WPN[p.w]; if (p.cd > 0 || p.rel > 0 || p.charging || p.sprOut > 0 || (p.mask && tickNo < p.mask)) return;   // no firing while sprinting or charging
@@ -527,9 +534,10 @@ function fireWeapon(p) {
   if (w.flame) { flameJet(p, p.yaw, p.pitch); return; }
   const ey = p.y + eyeH(p);
   // aiming down sights is far tighter than hip fire; suppression and sustained automatic fire (bloom) open the cone
-  const brace = p.cls === 'gunner' && !p.elite && p.crouch && (p.mg == null || p.mg === false);   // v0.36: a gunner who kneels to fire braces the gun
-  const sp = ((p.ads ? w.spr * .35 : w.spr + (w.hip || 0)) * (1 + (p.supp || 0) * 1.2) + (p.bloom || 0)) * (brace ? .55 : 1);
-  p.bloom = Math.min(.05, (p.bloom || 0) + (w.blm || 0) * (brace ? .4 : 1));
+  const brace = p.cls === 'gunner' && !p.elite && p.crouch && (p.mg == null || p.mg === false) && (!T.hasPk(p, 'dugin') || (p.crT || 0) >= .5);   // v0.36: a gunner who kneels to fire braces the gun (Dug In: after half a second)
+  let pkS = 1; if (p.ads && p.pk) { if (T.hasPk(p, 'steady')) pkS *= .9; if (T.hasPk(p, 'breath')) pkS *= .85; if (T.hasPk(p, 'still') && w.scope && p.crouch && (p.stillT || 0) > .3) pkS *= .8; }   // v0.47 perks
+  const sp = ((p.ads ? w.spr * .35 : w.spr + (w.hip || 0)) * (1 + (p.supp || 0) * 1.2) + (p.bloom || 0)) * (brace ? (T.hasPk(p, 'dugin') ? .495 : .55) : 1) * pkS;
+  p.bloom = Math.min(.05, (p.bloom || 0) + (w.blm || 0) * (brace ? .4 : 1) * (T.hasPk(p, 'cool') ? .85 : 1));
   const zero = sightZero(w);   // v0.42 sights zeroed at 100 m: the round rises through the line of sight and falls back to it there
   for (let q = 0; q < w.pel; q++) fireBullet(p, p.x, ey, p.z, p.yaw + (rnd() - .5) * sp, p.pitch + zero + (rnd() - .5) * sp, w.rng, w.dmg, p.w, w.vel || 400, w.sw);
 }
@@ -610,13 +618,14 @@ function reviveAct(p) {
   const gap = tickNo - (p.rvLast || -99);
   if (p.rvTgt !== t || gap > 8) { p.rvT = 0; p.rvTgt = t; p.rvLast = tickNo; }
   p.rvT += Math.min(gap, 6) * DT; p.rvLast = tickNo;
-  send(p, { t: 'rvp', p: Math.min(1, p.rvT / REV_T) }); if (!t.bot) send(t, { t: 'rvp', p: Math.min(1, p.rvT / REV_T), by: p.name });
-  if (p.rvT >= REV_T) { supply[p.team] -= 2; p.rvT = 0; p.rvTgt = null; reviveEnt(t, p); }
+  const rvT = REV_T * (T.hasPk(p, 'triage') ? .8 : 1);   // v0.47 Triage
+  send(p, { t: 'rvp', p: Math.min(1, p.rvT / rvT) }); if (!t.bot) send(t, { t: 'rvp', p: Math.min(1, p.rvT / rvT), by: p.name });
+  if (p.rvT >= rvT) { supply[p.team] -= 2; p.rvT = 0; p.rvTgt = null; reviveEnt(t, p); }
 }
 function onAct(p, a, m) {
   if (p.deployed && a === 'postToggle') { p.usePost = p.usePost === false; tell(p, p.usePost === false ? 'Respawn: normal line' : 'Respawn: field posts when available'); return; }
   if (p.deployed && a === 'giveup' && p.down > 0) { finishDown(p, 'your own choice'); return; }
-  if (p.deployed && a === 'reload' && p.down > 0 && !p.alive && p.ps) { if (p.ps.rel <= 0 && p.ps.ammo < PISTOL.mag) p.ps.rel = PISTOL.rl; return; }
+  if (p.deployed && a === 'reload' && p.down > 0 && !p.alive && p.ps) { if (p.ps.rel <= 0 && p.ps.ammo < psMag(p)) p.ps.rel = PISTOL.rl; return; }
   if (p.deployed && a === 'revive') { reviveAct(p); return; }
   if (p.deployed && a === 'ping' && p.down > 0) { callMedic(p); return; }
   if (p.deployed && a === 'work') { workAct(p); return; }
@@ -647,13 +656,13 @@ function onAct(p, a, m) {
     if ((p.healCd || 0) > tickNo) return;   // 6 s between bandages
     if (supply[p.team] < 1) { tell(p, 'No supplies for bandages'); return; }
     supply[p.team]--; p.bd--;
-    if (mate) { const h0 = mate.hp; mate.hp = Math.min(maxHp(mate), mate.hp + 70); mate.burn = 0; p.healCd = tickNo + 3 * TICK; const gain = Math.round(mate.hp - h0), xp = gain >= 20 ? MED_HEAL_XP : 2;
+    if (mate) { const h0 = mate.hp; mate.hp = Math.min(maxHp(mate), mate.hp + 70 + (T.hasPk(p, 'dress') ? 10 : 0)); mate.burn = 0; p.healCd = tickNo + 3 * TICK; const gain = Math.round(mate.hp - h0), xp = gain >= 20 ? MED_HEAL_XP : 2;
       st(p).heal = (st(p).heal || 0) + 1; addXp(p, xp); send(p, { t: 'mhd', id: mate.id, n: nameOf(mate), hp: gain, xp }); if (!mate.bot) tell(mate, p.name + ' bandaged you (+' + gain + ' HP)'); p.mhAt = 0; return; }
-    p.healCd = tickNo + 6 * TICK; p.hp = Math.min(maxHp(p), p.hp + (p.cls === 'medic' ? 70 : 40));
+    p.healCd = tickNo + 6 * TICK; p.hp = Math.min(maxHp(p), p.hp + (p.cls === 'medic' ? 70 : 40) + (T.hasPk(p, 'dress') ? 10 : 0));
   } else if (a === 'dig') {
     if (p.u !== 'tool' || p.mg != null || (p.digCd || 0) > tickNo) return;
     if (supply[p.team] < 1) { tell(p, 'No supplies for digging'); return; }
-    supply[p.team]--; p.digCd = tickNo + 3 * TICK;
+    supply[p.team]--; p.digCd = tickNo + Math.round((T.hasPk(p, 'spade') ? 2.4 : 3) * TICK);
     const r = p.cls === 'sapper' ? 3.4 : 2.4; { const c = [+p.x.toFixed(2), +p.z.toFixed(2), r, 1.4]; T.dig(terr, c[0], c[1], r, 1.4); craters.push(c); } bcast({ t: 'cr', c: craters[craters.length - 1] });
   }
 }
@@ -920,7 +929,7 @@ function processCmds(p) {
     if (p.down > 0 && !p.alive && !p.cmd && p.ps) {   // v0.40 last stand
       const yw = +c[5], pt = clamp(+c[6], -1.2, 1.2); if (!isFinite(yw) || !isFinite(pt)) continue;
       const f2 = clamp(Math.round(+c[2] || 0), -1, 1), s2 = clamp(Math.round(+c[3] || 0), -1, 1), want = !!((c[4] | 0) & 8), ps = p.ps; p.ads = !!((c[4] | 0) & 32);
-      ps.cd -= dt; if (ps.rel > 0) { ps.rel -= dt; if (ps.rel <= 0) { ps.rel = 0; ps.ammo = PISTOL.mag; } }
+      ps.cd -= dt; if (ps.rel > 0) { ps.rel -= dt; if (ps.rel <= 0) { ps.rel = 0; ps.ammo = psMag(p); } }
       T.crawl(p, { dt, f: f2, s: s2, yaw: yw }, terr.H); p.yaw = yw; p.pitch = pt;
       if (want && !p.hold) pistolFire(p); p.hold = want; continue;
     }
@@ -944,9 +953,28 @@ function processCmds(p) {
     p.hold = want;
   }
 }
+// v0.47 perk tree: buy / equip / respec over the socket. Accounts only; the record lives on the account (accounts.json).
+const perkState = p => { const pk = p.acct ? T.perkNorm(p.acct.perks) : null, lv = T.levelOf(p.xp || 0).lv; return { t: 'perks', acct: p.acct ? 1 : 0, pk, lv, pts: pk ? T.perkPts(pk, lv) : 0, slots: T.perkSlots(lv), xp: p.xp || 0, rsp: !!(p.acct && T.respecOk(p.xp || 0, lv)) }; };
+function perkMsg(p, m) {
+  if (!p.acct) { send(p, Object.assign(perkState(p), { err: 'Register or log in to unlock perks: they are kept with your account.' })); return; }
+  const pk = T.perkNorm(p.acct.perks), lv = T.levelOf(p.xp || 0).lv; let err = null;
+  if (m.a === 'buy') err = T.perkBuy(pk, String(m.id), lv);
+  else if (m.a === 'eq') err = T.perkEquip(pk, String(m.cls), Array.isArray(m.ids) ? m.ids.slice(0, 4).map(String) : null, lv);
+  else if (m.a === 'respec') { if (!T.respecOk(p.xp || 0, lv)) err = 'A refund costs ' + T.RESPEC_XP + ' XP and may not cost you your level: earn ' + (T.RESPEC_XP - (p.xp - T.lvXp(lv))) + ' more XP first.'; else if (!pk.own.length) err = 'Nothing to refund.';
+    else { p.xp = ACC.addXp(p.acct, -T.RESPEC_XP); pk.own = []; pk.eq = {}; pk.st = null; send(p, { t: 'xp', xp: p.xp, rank: T.rankOf(p.xp), up: false }); } }
+  else if (m.a !== 'get') err = 'Unknown request.';
+  if (!err && m.a !== 'get') { p.acct.perks = pk; ACC.touch(); }
+  send(p, Object.assign(perkState(p), err ? { err } : {}));
+}
 function humanTick(p) {
   if (!p.deployed) return;
   processCmds(p);
+  if (p.pk && p.pk.length) {   // v0.47 perk bookkeeping: kneel time (Dug In), standing still (Still Hunter), a downed mate near (Stretcher Bearer), bodies (Scrounger)
+    p.crT = p.crouch ? (p.crT || 0) + DT : 0;
+    const mv = p.lpx == null ? 0 : Math.hypot(p.x - p.lpx, p.z - p.lpz); p.stillT = mv < .03 ? (p.stillT || 0) + DT : 0; p.lpx = p.x; p.lpz = p.z;
+    if (T.hasPk(p, 'stretcher')) { let b = false; for (const q of ents.values()) if (q !== p && q.team === p.team && !q.alive && q.down > 0 && Math.abs(q.x - p.x) < 10 && Math.abs(q.z - p.z) < 10 && Math.hypot(q.x - p.x, q.z - p.z) < 10) { b = true; break; } p.sbB = b; }
+    if (tickNo % 5 === 0 && p.alive && T.hasPk(p, 'scrounger') && WPN[p.w] && p.ammo < WPN[p.w].mag) for (const k of kits) if (k.until > tickNo && !k.by.has(p.id) && Math.abs(k.x - p.x) < 1.6 && Math.abs(k.z - p.z) < 1.6) { k.by.add(p.id); p.ammo = WPN[p.w].mag; p.rel = 0; tell(p, 'Scrounged a full magazine'); break; }
+  }
   if (p.supp > 0) p.supp = Math.max(0, p.supp - DT * .3);
   if (p.supSend) { p.supSend = false; send(p, { t: 'sup', v: +p.supp.toFixed(2), x: +p.supSrc[0].toFixed(1), z: +p.supSrc[1].toFixed(1) }); }
   if (p.alive && p.charging) meleeStrike(p, true);
@@ -1475,7 +1503,7 @@ function reconSpot(p, passive) {   // recon: everything in the sights is spotted
   const cone = passive ? .03 : p.ads && w.scope ? .1 / Math.sqrt(w.scope / 3) : .16, reach = p.ads && w.scope ? 240 : 120; const got = [];
   for (const e of ents.values()) { if (e.team === p.team || !e.alive || e.cmd) continue; const vx = e.x - p.x, vy = e.y + 1.2 - ey, vz = e.z - p.z, l = Math.hypot(vx, vy, vz); if (l > reach || l < 2) continue;
     if (Math.acos(clamp((vx * dx + vy * dy + vz * dz) / l, -1, 1)) < cone && T.los(terr.H, p.x, ey, p.z, e.x, e.y + 1.2, e.z) && !(smokes.length && smokeBlocks(p.x, p.z, e.x, e.z))) {
-      const fresh = !(e.sp[p.team] > tickNo + 2 * TICK); e.sp[p.team] = Math.max(e.sp[p.team], tickNo + (passive ? 6 : 12) * TICK); e.spBy = p; if (fresh) got.push(e); } }
+      const fresh = !(e.sp[p.team] > tickNo + 2 * TICK); e.sp[p.team] = Math.max(e.sp[p.team], tickNo + ((passive ? 6 : 12) + (T.hasPk(p, 'spotter') ? 3 : 0)) * TICK); e.spBy = p; if (fresh) got.push(e); } }
   return got;
 }
 // quick chat: requests and pings for the team (artillery / smoke requests also reach the officer)
@@ -1508,7 +1536,7 @@ function callMedic(p) {   // a downed player shouts for a medic: the nearest fre
 const masked = e => !!e.mask && tickNo >= e.mask;
 function maskAct(p) {
   if (!p.alive || p.cmd) return;
-  if (p.mask) { p.mask = 0; send(p, { t: 'mask', on: 0 }); } else { p.mask = tickNo + Math.round(1.5 * TICK); send(p, { t: 'mask', on: 1, d: 1.5 }); }
+  if (p.mask) { p.mask = 0; send(p, { t: 'mask', on: 0 }); } else { const d = T.hasPk(p, 'gasdrill') ? .9 : 1.5; p.mask = tickNo + Math.round(d * TICK); send(p, { t: 'mask', on: 1, d }); }
 }
 function throwUtil(p) {   // smoke or gas grenade (utility slot, 2 per life, on the bandage key)
   if (p.mg != null || !p.alive) return; if (!(p.bd > 0)) { tell(p, 'None left'); return; } if ((p.gCd || 0) > tickNo) return;
@@ -1680,7 +1708,7 @@ function resetRound() {
   OB.forEach((o, i) => { o.owner = i < 3 ? 0 : 1; o.p = i < 3 ? 1 : -1; o.lock = 0; });
   supply = [12, 12]; op = isWake() ? null : newOp(op ? op.def : 0); wave = { side: op ? op.att : 0, t: 0 }; dom = null;
   orders[0].clear(); orders[1].clear(); crates.length = 0; sched = []; supCd = [supZero(), supZero()]; for (const e of ents.values()) { e.st = null; e.elite = null; if (e.w0) { e.w = e.w0; e.w0 = null; } e.burn = 0; e.goTo = null; } for (const p of humans) p.st = null;
-  VEHM.reset(); ekits.length = 0; fires.length = 0; flares.length = 0; alarms.length = 0; setWx(pickWx()); roundStartExtras(); cmdPts = [CP_START, CP_START]; smokes.length = 0; gases.length = 0; recons.length = 0; marks.length = 0; SQM.clear(); alertAt.clear(); vis[0].clear(); vis[1].clear(); for (const d of DP) { d.owner = -1; d.p = 0; } for (const e of ents.values()) e.depot = null;
+  VEHM.reset(); ekits.length = 0; kits.length = 0; fires.length = 0; flares.length = 0; alarms.length = 0; setWx(pickWx()); roundStartExtras(); cmdPts = [CP_START, CP_START]; smokes.length = 0; gases.length = 0; recons.length = 0; marks.length = 0; SQM.clear(); alertAt.clear(); vis[0].clear(); vis[1].clear(); for (const d of DP) { d.owner = -1; d.p = 0; } for (const e of ents.values()) e.depot = null;
   for (const p of humans) if (p.mg != null) dismount(p, true);
   for (const n of NESTS) { n.belt = 150; n.heat = 0; n.over = false; n.occ = null; if (n.bot) leaveFortNest(n.bot); }
   for (const e of ents.values()) { e.died = false; e.oob = 0; e.alive = false; e.down = 0; e.rt = .5 + rnd(); e.placed = false; e.para = false; e.hold = null; e.climb = null; e.cov = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; }
@@ -1800,16 +1828,17 @@ function sightAt(team, x, z) {
   if (T.WX.k === 'night') return Math.max(s, T.litAt(x, z));   // v0.35: lamps and fires light the men standing near them
   return s;
 }
-function flareAt(x, z, team) {
+function flareAt(x, z, team, dur) {   // dur: seconds (25; 31 with Flare Hand)
+  dur = dur || 25;
   x = clamp(x, -T.W + 2, T.W - 2); z = clamp(z, -T.W + 2, T.W - 2);
-  flares.push({ x, z, team, until: tickNo + 25 * TICK }); if (flares.length > 30) flares.shift();
-  bcast({ t: 'flr', x: +x.toFixed(1), z: +z.toFixed(1), s: 25, tm: team });
+  flares.push({ x, z, team, until: tickNo + dur * TICK }); if (flares.length > 30) flares.shift();
+  bcast({ t: 'flr', x: +x.toFixed(1), z: +z.toFixed(1), s: dur, tm: team });
   if (T.WX.k === 'night' || T.WX.k === 'fog') for (const e of ents.values()) if (e.team !== team && e.alive && !e.cmd && Math.hypot(e.x - x, e.z - z) < FLARE_R * .6) e.sp[team] = tickNo + 6 * TICK;
 }
 function fireFlare(p) {
   if (!(p.bd > 0)) { if ((p.msgCd || 0) <= tickNo) { tell(p, 'No flares left'); p.msgCd = tickNo + 2 * TICK; } return; }
   if ((p.gCd || 0) > tickNo) return; p.bd--; p.gCd = tickNo + TICK;
-  const d = clamp(35 + p.pitch * 50, 18, 75); flareAt(p.x - Math.sin(p.yaw) * d, p.z - Math.cos(p.yaw) * d, p.team);
+  const d = clamp(35 + p.pitch * 50, 18, 75); flareAt(p.x - Math.sin(p.yaw) * d, p.z - Math.cos(p.yaw) * d, p.team, T.hasPk(p, 'flarehand') ? 31 : 25);
 }
 function nightFlares() {   // once a second at night: each side's sentries put up a flare now and then over enemies near their lines
   for (let i = flares.length - 1; i >= 0; i--) if (flares[i].until < tickNo) flares.splice(i, 1);
@@ -2193,6 +2222,7 @@ function onText(c, txt) {
     Object.assign(e, { ws: c, name, acct, xp: acct ? acct.xp || 0 : CFG.accounts === 'required' ? 0 : xpdb[name.toLowerCase()] || 0, deployed: false, q: [], ack: 0, sq: -1, cls: 'rifleman', w: 'bolt', u: 'bandage', hold: false, pend: null });
     c.player = e; humans.add(e);
     send(e, { t: 'prof', id: e.id, team, xp: e.xp, rank: T.rankOf(e.xp), sq: sqSizes(team), max: SQ_MAX, acct: acct ? 1 : 0, name: e.name, server: CFG.name, map: mapSeed, back: back ? back.sq : null });
+    send(e, perkState(e));   // v0.47
   } else if (!p) return;
   else if (m.t === 'join' || m.t === 'loadout') {
     let l = T.fixLoadout(p.xp, m); let sq = m.sq | 0; const sz = sqSizes(p.team);
@@ -2216,12 +2246,14 @@ function onText(c, txt) {
     for (const c2 of m.c.slice(0, 20)) if (Array.isArray(c2) && c2.length >= 7) p.q.push(c2);
     if (Number.isFinite(m.rt)) p.rw = clamp(tickNo - (m.rt | 0), 0, LAGC_MAX);   // how far behind the server this player's view is
     if (p.q.length > 60) p.q.splice(0, p.q.length - 60);
+  } else if (m.t === 'txp' && process.env.T128_TEST && Number.isFinite(+m.n)) { addXp(p, +m.n); send(p, perkState(p));   // test hook: grant XP
   } else if (m.t === 'tp' && process.env.T128_TEST && Number.isFinite(+m.x) && Number.isFinite(+m.z)) { p.x = +m.x; p.z = +m.z; p.y = T.hAt(terr.H, p.x, p.z); p.vy = 0; p.cl = null;
   } else if (m.t === 'dmg' && process.env.T128_TEST && Number.isFinite(+m.n)) { damage(p, +m.n, null, !!m.head);
   } else if (m.t === 'tk' && process.env.T128_TEST) { const v = VEHM.spawnTank(p.team, 'test'); if (v) { v.x = p.x + 8; v.z = p.z; v.yaw = p.yaw; v.order = { x: v.x, z: v.z }; }
   } else if (m.t === 'tround' && process.env.T128_TEST && round.state === 'play') { endRound(m.win === 1 ? 1 : 0); round.t = 3;   // test: end the round now, reset 3 s later
   } else if (m.t === 'wxs' && process.env.T128_TEST && T.WXS[m.k]) { setWx(m.k);
   } else if (m.t === 'act') onAct(p, String(m.a), m);
+  else if (m.t === 'perk') perkMsg(p, m);
   else if (m.t === 'cmd') { if (p.deployed && p.cmd && p.alive) { if (m.k === 'order') issueOrder(p, m); else if (m.k === 'sup') callSupport(p, m); } }
   else if (m.t === 'ping') { if (Number.isFinite(m.p)) p.ping = clamp(Math.round(m.p), 0, 9999); const ld = loadNow(); send(p, { t: 'pong', c: m.c, s: ld[0], g: ld[1] }); }   // the client reports the round trip it last measured (for the scoreboard)
   else if (m.t === 'chat') chatMsg(p, m);
@@ -2428,4 +2460,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { pkt: { perkMsg, perkState, startReload, downEnt, damage, maskAct, psMag, kits: () => kits, buildPost, reconSpot, fireWeapon, posts: () => posts }, domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

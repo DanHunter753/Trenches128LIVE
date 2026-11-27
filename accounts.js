@@ -54,5 +54,5 @@ module.exports = function makeAccounts(dir) {
   const isRegistered = name => !!db.users[key(name)];
   function addXp(u, n) { u.xp = (u.xp || 0) + n; save(); return u.xp; }
   function ban(name, on) { const u = db.users[key(name)]; if (!u) return false; u.banned = !!on; if (on) for (const [t, s] of Object.entries(db.sessions)) if (s.u === key(name)) delete db.sessions[t]; save(true); return true; }
-  return { register, login, session, logout, isRegistered, addXp, ban, flush: () => save(true), count: () => Object.keys(db.users).length, _db: () => db };
+  return { register, login, session, logout, isRegistered, addXp, ban, touch: () => save(), flush: () => save(true), count: () => Object.keys(db.users).length, _db: () => db };
 };

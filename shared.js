@@ -527,7 +527,7 @@ function step(p, cmd, H, spdMul) {
   if (sliding) { mx = p.sdx; mz = p.sdz; p.sld = Math.max(0, p.sld - dt); if (p.sld <= 0) { p.sldCd = SLIDE.cd; p.sldX = 0; } }
   const sp = (sliding ? SLIDE.v1 + (SLIDE.v0 - SLIDE.v1) * su : chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul * WET_SPD[wetAt(H, p.x, p.z)] * (MP.kind === 'wake' && p.y < 0 ? Math.max(.35, 1 + p.y * .55) : 1);   // v0.43 wading: knee-deep 0.8, chest-deep 0.35
   const nx = p.x + mx * sp * dt, nz = p.z + mz * sp * dt, sl = (groundAt(H, nx, nz, p.y) - groundAt(H, p.x, p.z, p.y)) / Math.max(.01, sp * dt);
-  const k = (sl > 0 ? Math.max(.35, 1 - sl * .5) : 1) * wireK(p.x, p.z);
+  const wk = wireK(p.x, p.z), k = (sl > 0 ? Math.max(.35, 1 - sl * .5) : 1) * (wk < 1 && hasPk(p, 'cutter') ? 1 - (1 - wk) * .75 : wk);
   // walls: moving is refused where the ground half a metre ahead is more than 0.62 m above the feet (steep trench walls, pit walls)
   const dx = mx * sp * dt * k, dz = mz * sp * dt * k, sea = MP.kind === 'wake', blocked = (ax, az) => { const L = Math.hypot(ax, az); if (L < 1e-6) return false; const g = groundAt(H, p.x + ax / L * .5, p.z + az / L * .5, p.y); return g - p.y > .62 || (sea && g < SEA_WADE); };
   let ox = dx, oz = dz;
@@ -800,12 +800,12 @@ function adoptTerrain(H, F) { if (!(H instanceof Float32Array) || !(F instanceof
 // the page that loads this file picks up the map it was told to build (a reload after the server changed maps)
 setMap(typeof sessionStorage !== 'undefined' ? (() => { try { return +sessionStorage.getItem('t128map') || +root.T128_MAPSEED || 0; } catch (e) { return +root.T128_MAPSEED || 0; } })() : 0);
 const CHG_MAX = 3, GRAV = 9.8;
-const chgMax = p => CHG_MAX * (p && p.cls === 'rifleman' && !p.elite ? 1.5 : 1);   // v0.37: riflemen charge for longer
+const chgMax = p => CHG_MAX * (p && p.cls === 'rifleman' && !p.elite ? 1.5 : 1) * (hasPk(p, 'bayonet') ? 1.15 : 1);   // v0.37: riflemen charge for longer
 // v0.37 rifle grenades: a grenade fired from a cup on the rifle's muzzle. Same flight on server and client (the client draws
 // the predicted impact while one is fitted). Returns the impact point and the flight time.
 const RG = { v: 40, g: 14, pow: .85, fit: 1, cd: 1.2, maxT: 7 };
-function rgPath(H, x, y, z, yaw, pitch) {
-  const cp = Math.cos(pitch), vx = -Math.sin(yaw) * cp * RG.v, vy = Math.sin(pitch) * RG.v, vz = -Math.cos(yaw) * cp * RG.v, dt = .025;
+function rgPath(H, x, y, z, yaw, pitch, vm) {   // vm: muzzle-speed factor (Rifle Grenadier perk: sqrt(1.15) for 15% more range)
+  const V = RG.v * (vm || 1), cp = Math.cos(pitch), vx = -Math.sin(yaw) * cp * V, vy = Math.sin(pitch) * V, vz = -Math.cos(yaw) * cp * V, dt = .025;
   let px = x, py = y, pz = z, t = 0, wy = vy;
   for (; t < RG.maxT; t += dt) {
     const nx = px + vx * dt, ny = py + wy * dt - .5 * RG.g * dt * dt, nz = pz + vz * dt; wy -= RG.g * dt;
@@ -844,7 +844,74 @@ UT.flare = { n: 'Flare Pistol', d: 'H · fire a flare (3 per life). Lights 55 m 
 const ELITE = { flame: { n: 'Flamethrower', hp: 220, sp: .82, w: 'flame', d: 'Clears trenches: burns men and the ground, armoured' },
   atr: { n: 'Tank Hunter', hp: 200, sp: .9, w: 'atr', d: 'Anti-tank rifle and bundle charges' },
   hmg: { n: 'Sentry', hp: 300, sp: .72, w: 'hmg', d: 'Armoured heavy machine gunner. Cannot sprint', nosprint: 1 } };
-const spOf = p => (p.elite && ELITE[p.elite] ? ELITE[p.elite].sp : CLS[p.cls] ? CLS[p.cls].sp : 1) * (p.mph ? 1.2 : 1);   // v0.36: morphine
+// ---- v0.47 perk tree. Points: one per account level. Perks are unlocked for good with points (1-3 each; the first starter
+// perk is free) and up to three are equipped per class; slots open at levels 2, 8 and 20. Accounts only. Respec: 500 XP, and only
+// when the account keeps its level. The server applies every effect; speed, charge, wire and rifle-grenade effects are also
+// applied on the client (prediction), from the active list the server sends on spawn (p.pk, an array of ids).
+const PERKS = {
+  quick: { n: 'Quick Hands', c: '*', cost: 1, st: 1, d: 'Reload 8% faster' },
+  dress: { n: 'Field Dressing', c: '*', cost: 1, st: 1, d: 'Your bandages heal 10 HP more' },
+  light: { n: 'Light Pack', c: '*', cost: 1, st: 1, d: '4% faster on your feet', t: 'One grenade fewer' },
+  pockets: { n: 'Deep Pockets', c: '*', cost: 2, d: 'Every third reload costs no supply', t: '3% slower' },
+  steady: { n: 'Steady Hands', c: '*', cost: 2, d: '10% tighter aim-down-sights spread', t: 'Aiming in takes 10% longer' },
+  gasdrill: { n: 'Gas Drill', c: '*', cost: 1, d: 'Gas mask on in 0.9 s instead of 1.5 s' },
+  lastwords: { n: 'Last Words', c: '*', cost: 2, d: 'Last stand: 2 more revolver rounds and 15 more health', t: 'You bleed out 20% sooner' },
+  thick: { n: 'Thick Skin', c: '*', cost: 3, d: '8% less damage from grenades, shells and bombs', t: '3% slower' },
+  scrounger: { n: 'Scrounger', c: '*', cost: 2, d: 'Walk over a fallen soldier to refill your magazine (once per body)' },
+  flarehand: { n: 'Flare Hand', c: '*', cost: 2, d: 'One more flare, and your flares burn 25% longer', t: 'Only with the flare pistol' },
+  breath: { n: "Marksman's Breath", c: 'rifleman', cost: 2, d: '15% tighter aim-down-sights spread' },
+  bayonet: { n: 'Bayonet Drill', c: 'rifleman', cost: 2, d: 'Bayonet charge lasts 15% longer' },
+  riflegren: { n: 'Rifle Grenadier', c: 'rifleman', cost: 3, d: 'Rifle grenades fly 15% further', t: '10% slower reload' },
+  bomber: { n: 'Bomber', c: 'assault', cost: 2, d: 'One more grenade' },
+  raider: { n: 'Trench Raider', c: 'assault', cost: 3, d: '8% faster inside trenches', t: '10% slower outside them' },
+  secondwind: { n: 'Second Wind', c: 'assault', cost: 2, d: 'Morphine lasts 3 s longer' },
+  belt: { n: 'Belt Feeder', c: 'gunner', cost: 2, d: 'Light machine gun reloads 15% faster' },
+  cool: { n: 'Cool Barrel', c: 'gunner', cost: 3, d: 'Spread grows 15% slower in long bursts' },
+  dugin: { n: 'Dug In', c: 'gunner', cost: 2, d: 'Braced fire 10% tighter', t: 'Bracing takes half a second of kneeling' },
+  triage: { n: 'Triage', c: 'medic', cost: 2, d: 'Revive 20% faster' },
+  fieldkit: { n: 'Field Kit', c: 'medic', cost: 2, d: 'Two more bandages' },
+  stretcher: { n: 'Stretcher Bearer', c: 'medic', cost: 3, d: '10% faster while a downed teammate is within 10 m' },
+  spade: { n: 'Quick Spade', c: 'sapper', cost: 2, d: 'Dig again 20% sooner' },
+  cutter: { n: 'Wire Cutter', c: 'sapper', cost: 2, d: 'Barbed wire slows you 25% less' },
+  fpost: { n: 'Forward Post', c: 'sapper', cost: 3, d: 'Field posts cost 1 supply less', t: 'They have 10% less health' },
+  spotter: { n: 'Spotter', c: 'recon', cost: 2, d: 'Enemies you spot stay marked 3 s longer' },
+  still: { n: 'Still Hunter', c: 'recon', cost: 3, d: '20% tighter scoped spread when crouched and still' },
+  range: { n: 'Range Card', c: 'recon', cost: 1, d: 'Shows the range to the spotted enemy nearest your sights' },
+};
+const PERK_SLOTS = [2, 8, 20], RESPEC_XP = 500;
+const perkSlots = lv => PERK_SLOTS.filter(l => lv >= l).length;
+function perkNorm(pk) {   // a stored perk record, cleaned: { own: [ids], eq: { cls: [ids] }, st: starter id or null }
+  const o = { own: [], eq: {}, st: null }; if (!pk || typeof pk !== 'object') return o;
+  if (Array.isArray(pk.own)) for (const id of pk.own) if (PERKS[id] && !o.own.includes(id)) o.own.push(id);
+  if (pk.st && o.own.includes(pk.st) && PERKS[pk.st].st) o.st = pk.st;
+  if (pk.eq && typeof pk.eq === 'object') for (const c in pk.eq) if (CLS[c] && Array.isArray(pk.eq[c])) o.eq[c] = pk.eq[c].filter((id, i, a) => o.own.includes(id) && (PERKS[id].c === '*' || PERKS[id].c === c) && a.indexOf(id) === i).slice(0, 3);
+  return o;
+}
+const perkSpent = pk => pk.own.reduce((s, id) => s + (id === pk.st ? 0 : PERKS[id].cost), 0);
+const perkPts = (pk, lv) => lv - perkSpent(pk);
+function perkBuy(pk, id, lv) {   // -> null on success (pk changed), or the reason it can't be bought
+  const P = PERKS[id]; if (!P) return 'No such perk.'; if (pk.own.includes(id)) return 'Already unlocked.';
+  if (P.st && !pk.st) { pk.own.push(id); pk.st = id; return null; }   // the first starter perk is on the house
+  if (perkPts(pk, lv) < P.cost) return 'Not enough perk points (' + perkPts(pk, lv) + ' left, ' + P.cost + ' needed).';
+  pk.own.push(id); return null;
+}
+function perkEquip(pk, cls, ids, lv) {
+  if (!CLS[cls] || cls === 'officer') return 'Officers have no perks.'; if (!Array.isArray(ids)) return 'Bad list.';
+  ids = ids.filter((id, i, a) => a.indexOf(id) === i);
+  for (const id of ids) { if (!PERKS[id] || !pk.own.includes(id)) return 'Unlock it first.'; if (PERKS[id].c !== '*' && PERKS[id].c !== cls) return PERKS[id].n + ' is for the ' + CLS[PERKS[id].c].n + '.'; }
+  if (ids.length > perkSlots(lv)) return perkSlots(lv) ? 'Only ' + perkSlots(lv) + ' slot' + (perkSlots(lv) > 1 ? 's' : '') + ' open at your level.' : 'The first slot opens at level 2.';
+  pk.eq[cls] = ids; return null;
+}
+const perkActive = (pk, cls, lv) => (pk && pk.eq && pk.eq[cls] || []).filter(id => PERKS[id] && pk.own.includes(id) && (PERKS[id].c === '*' || PERKS[id].c === cls)).slice(0, perkSlots(lv));
+const respecOk = (xp, lv) => xp - RESPEC_XP >= lvXp(lv);
+const hasPk = (p, id) => !!(p && p.pk && p.pk.indexOf(id) >= 0);
+function inTrench(x, z) { const i = Math.round((x + W) / ST), j = Math.round((z + W) / ST); if (i < 0 || j < 0 || i > N || j > N) return false; const k = j * (N + 1) + i; return FLOOR ? !!FLOOR[k] : TRM.get(k) === 1; }
+function perkSpeed(p) {   // speed factor from perks (not for elite kits)
+  if (!p || !p.pk || !p.pk.length || p.elite) return 1;
+  let f = 1; if (hasPk(p, 'light')) f *= 1.04; if (hasPk(p, 'pockets')) f *= .97; if (hasPk(p, 'thick')) f *= .97;
+  if (hasPk(p, 'raider')) f *= inTrench(p.x, p.z) ? 1.08 : .9; if (hasPk(p, 'stretcher') && p.sbB) f *= 1.1; return f;
+}
+const spOf = p => (p.elite && ELITE[p.elite] ? ELITE[p.elite].sp : CLS[p.cls] ? CLS[p.cls].sp : 1) * (p.mph ? 1.2 : 1) * perkSpeed(p);   // v0.36: morphine; v0.47 perks
 // v0.26 vehicles and crewed guns (server simulates them; the client draws and drives them)
 const VEH = { plane: { n: 'Biplane', hp: 300 }, tank: { n: 'Tank', hp: 2000, len: 8.2, wid: 4.1, hgt: 2.6, spd: 2.6, rev: 1.2, turn: .36, rl: 4.5, v: 130 },
   fgun: { n: 'Field gun', hp: 450, rl: 5, v: 85, arc: .6, pmin: -.08, pmax: .45 },
@@ -875,7 +942,7 @@ function fixLoadout(xp, l) {
   return { cls, w, u };
 }
 
-const API = { WWIRE, WTR, TRM, carveTrench, setWorld, WAKE_SEED, isSea, SEA_WADE, hmSample: (x, z) => HM ? hmSample(x, z) : 0, crawl, CRAWL, RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { PERKS, PERK_SLOTS, RESPEC_XP, perkSlots, perkNorm, perkSpent, perkPts, perkBuy, perkEquip, perkActive, respecOk, hasPk, inTrench, perkSpeed, WWIRE, WTR, TRM, carveTrench, setWorld, WAKE_SEED, isSea, SEA_WADE, hmSample: (x, z) => HM ? hmSample(x, z) : 0, crawl, CRAWL, RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 for (const [k, g] of [['S', () => S], ['N', () => N], ['ST', () => ST], ['W', () => W], ['NV', () => NV]]) Object.defineProperty(API, k, { get: g, enumerable: true });   // world size can change with the map
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;

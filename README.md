@@ -74,6 +74,22 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.47 — Perk tree
+
+- **Perks for registered players.** Every account level gives one perk point (level 1 = 1 point, level 100 = 100). Spend points on the Customize tab under **PERKS** to unlock perks for good (1–3 points each, 58 for all 28). Your first starter perk (Quick Hands, Field Dressing or Light Pack) is free.
+- **Three slots per class**, opening at levels 2, 8 and 20. Equip any unlocked general perk or one of the class's own (◆); changes take effect on your next spawn. Guests can browse the list but need an account to unlock.
+- **Refund:** all points back for 500 XP, as long as you keep your level.
+- **Small edges, mostly with a cost:** about 10% on one thing, or one extra item.
+  - General: Quick Hands (reload 8% faster), Field Dressing (+10 HP per bandage), Light Pack (+4% speed, one grenade fewer), Deep Pockets (every third reload free of supply, 3% slower), Steady Hands (10% tighter aimed spread, slower to aim in), Gas Drill (mask on in 0.9 s), Last Words (last stand: +2 revolver rounds, +15 health, bleeds out sooner), Thick Skin (8% less blast damage, 3% slower), Scrounger (a fallen soldier refills your magazine, once per body), Flare Hand (+1 flare, 25% longer).
+  - Rifleman: Marksman's Breath, Bayonet Drill, Rifle Grenadier.
+  - Assault: Bomber, Trench Raider, Second Wind.
+  - Gunner: Belt Feeder, Cool Barrel, Dug In.
+  - Medic: Triage, Field Kit, Stretcher Bearer.
+  - Sapper: Quick Spade, Wire Cutter, Forward Post.
+  - Recon: Spotter, Still Hunter, Range Card.
+- The server applies every effect. Speed, bayonet charge, wire and rifle-grenade perks are also applied in your own movement prediction, so they don't rubber-band.
+- Level-up messages say when a new perk slot opens.
+
 ## v0.46 — Server performance: half the tick time under load
 
 Measured with 64 simulated players plus bots (266 soldiers) on a trench map, the server and the load generator each on its own CPU core:

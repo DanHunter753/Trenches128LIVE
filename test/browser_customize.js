@@ -19,7 +19,7 @@ const STUB = fs.readFileSync(__dirname + '/browser.js', 'utf8').match(/const STU
   ck('gadgetPicked', await p.evaluate(() => L.u === 'smokenade' && L.by.assault.u === 'smokenade' && L.by.assault.w === 'smg'));
   await p.click('[data-cz="prev"]'); ck('eachClassKeepsItsOwn', await p.evaluate(() => L.cls === 'rifleman' && L.w === 'carbine' && L.u === 'bandage'));
   await p.click('[data-cz="next"]'); ck('andComesBack', await p.evaluate(() => L.cls === 'assault' && L.w === 'smg' && L.u === 'smokenade'));
-  for (const sl of ['gr', 'ml', 'ab', 'sp']) await p.click(`[data-cz="slot"][data-v="${sl}"]`); ck('specializationsLater', await p.evaluate(() => /Not in the game yet/.test($('czi').textContent) && /perk point/i.test($('czi').textContent)));
+  for (const sl of ['gr', 'ml', 'ab', 'sp']) await p.click(`[data-cz="slot"][data-v="${sl}"]`); ck('perksPanel', await p.evaluate(() => /Small edges you choose/.test($('czi').textContent) && /perk point/i.test($('czi').textContent) && document.querySelectorAll('#czl .czo[data-k="pk"]').length >= 13));   // v0.47: the perk tree replaced the 'coming later' panel
   await p.click('[data-t="class"]'); await p.click('.card[data-k="cls"][data-v="medic"]'); ck('classTabUsesSaved', await p.evaluate(() => L.cls === 'medic' && CLS.medic.w.includes(L.w)));
   await p.click('.card[data-k="cls"][data-v="assault"]'); await p.click('#go'); await p.waitForFunction(() => me.alive === true, null, { timeout: 15000 });
   ck('deploysWhatYouSet', await p.evaluate(() => me.cls === 'assault' && me.w === 'smg' && me.u === 'smokenade')); ck('savedForNextTime', await p.evaluate(() => { const s = JSON.parse(localStorage.getItem('t128mp')); return s.by.assault.w === 'smg' && s.by.rifleman.w === 'carbine'; }));
