@@ -212,6 +212,8 @@ function spawnEnt(e) {
     applyLoadout(e); e.cmd = e.cls === 'officer';
     if (e.cmd) { x = 0; z = e.team === 0 ? 104 : -104; }
     else if (e.spawnPick === 0) { /* chose home base */ }
+    else if (e.spawnPick === -99 && isWake() && e.team === 0) { /* the landing force has no airfield yet: home */ }
+    else if (e.spawnPick < 0 && isWake() && flagSpawnOk(e.team, -e.spawnPick - 1)) { const o = OB[-e.spawnPick - 1]; x = o.x; z = o.z; for (let k = 0; k < 24; k++) { const a = rnd() * 6.283, r = 4 + rnd() * 8, x2 = o.x + Math.cos(a) * r, z2 = o.z + Math.sin(a) * r; if (hAt(terr.H, x2, z2) > .4 && NAV.passable(x2, z2)) { x = x2; z = z2; break; } } }   // v0.44: around a held flag on the island
     else if (e.spawnPick === -99) { const a = T.AIRF[e.team]; x = a.x - Math.sign(a.x) * 3; z = a.z + (e.team ? -6 : 6); }   // v0.33: the airfield
     else if (e.spawnPick < 0 && flagSpawnOk(e.team, -e.spawnPick - 1)) { const o = OB[-e.spawnPick - 1]; x = o.x + (rnd() - .5) * 14; z = lineZ(o, x) + (e.team === 0 ? .4 : -.4); }   // v0.31.1: a flag your side holds
     else {
@@ -1298,7 +1300,7 @@ const DOM = { r: 14, win: 100, every: 8, cap: .05, marks: [25, 50, 75, 90], nfla
 let dom = null;
 const domFlags = () => OB.slice(0, DOM.nflags);
 function domReset() {
-  dom = { score: [0, 0], t: 0, mk: [0, 0], rallyAt: [0, 0] };
+  dom = { score: [0, 0], t: 0, mk: [0, 0], rallyAt: [0, 0], caps: [0, 0], rl: [0, 0], held: domFlags().map(() => [0, 0]), fc: domFlags().map(() => 0), plan: [null, null], rally: [null, null] };
   OB.forEach(o => { o.owner = -1; o.p = 0; o.lock = 0; });
   const st = T.MP.meta.start; for (const sz of st) { let best = null, bd = 1e9; for (const o of domFlags()) { const d = Math.hypot(o.x - sz.x, o.z - sz.z); if (d < bd) { bd = d; best = o; } } if (best) { best.owner = sz.team; best.p = sz.team === 0 ? 1 : -1; } }   // each side starts holding the flag at its start zone
 }
@@ -1307,10 +1309,15 @@ function domRally(t, mark) {
   for (const e of ents.values()) if (e.team === t && !e.alive && !(e.down > 0)) e.rt = Math.min(e.rt, 1);
   // a free paratroop drop beside the trailing side's nearest flag that is not theirs
   let best = null, bd = 1e9; const sz = T.MP.meta.start.find(q => q.team === t); for (const o of domFlags()) if (o.owner !== t) { const d = sz ? Math.hypot(o.x - sz.x, o.z - sz.z) : 0; if (d < bd) { bd = d; best = o; } }
-  if (best) later(2500, () => { if (round.state === 'play') dropPara(t, best.x, best.z); });
-  teamTell(t, 'RALLY! The enemy has ' + mark + ' points. Reinforcements are jumping in' + (best ? ' at ' + best.n : '') + '. Everyone forward!');
+  dom.rl[t]++;
+  if (best) {   // v0.44: a short barrage walks onto the flag first, then the paratroopers jump; for a minute every trailing bot goes for that flag
+    const fx = best.x, fz = best.z; raiseAlarm(fx, fz, 30, 11, null); dom.rally[t] = { o: best, until: tickNo + 60 * TICK };
+    for (let i = 0; i < 10; i++) later(1200 + i * 450, () => { if (round.state === 'play') explode(fx + (rnd() - .5) * 26, fz + (rnd() - .5) * 26, null); });
+    later(6500, () => { if (round.state === 'play') dropPara(t, fx, fz); });
+  }
+  teamTell(t, 'RALLY! The enemy has ' + mark + ' points. Artillery, then paratroopers' + (best ? ' on ' + best.n : '') + '. Everyone forward!');
   teamTell(1 - t, 'The enemy is rallying: expect a counterattack' + (best ? ' at ' + best.n : '') + '.');
-  bcast({ t: 'opn', k: 'rally', att: t, mark });
+  bcast({ t: 'opn', k: 'rally', att: t, mark, n: best ? best.n : '' });
 }
 function domTick() {
   if (!dom) domReset();
@@ -1323,23 +1330,47 @@ function domTick() {
     if (o.owner === 0 && o.p <= 0 || o.owner === 1 && o.p >= 0) { const was = o.owner; o.owner = -1; teamTell(was, o.n + ' is being taken!'); teamTell(1 - was, o.n + ' neutralised. Hold it to raise the flag.'); }
     if (o.owner < 0 && (o.p >= 1 || o.p <= -1)) {
       const to = o.p >= 1 ? 0 : 1; o.owner = to; teamTell(to, 'Captured ' + o.n + '.'); teamTell(1 - to, 'The enemy holds ' + o.n + '.');
+      dom.caps[to]++; dom.fc[i]++; bcast({ t: 'opn', k: 'flag', att: to, n: o.n, id: (T.OBJ[i] && T.OBJ[i].id) || '' });
       for (const p of humans) if (p.deployed && p.alive && p.team === to && (p.cmd || nearO(p, o))) { if (!p.cmd) st(p).cap++; addXp(p, p.cmd ? 40 : 60); }
       for (const e of ents.values()) if (e.team === 1 - to && !e.alive && !(e.down > 0)) e.rt = Math.min(e.rt, 1.5);
     }
   });
+  F.forEach((o, i) => { if (o.owner >= 0 && dom.held[i]) dom.held[i][o.owner] += DT; });
+  if (tickNo % 10 === 0) for (const t of [0, 1]) dom.plan[t] = domPlan(t, F, cnt);
   dom.t += DT; if (dom.t >= DOM.every) { dom.t = 0; for (const t of [0, 1]) dom.score[t] += F.filter(o => o.owner === t).length; }
   for (const t of [0, 1]) { const lead = dom.score[t], u = 1 - t; while (dom.mk[u] < DOM.marks.length && lead >= DOM.marks[dom.mk[u]]) { const mark = DOM.marks[dom.mk[u]++]; if (lead > dom.score[u]) domRally(u, mark); } }
   sT += DT; if (sT > 4) { sT = 0; for (const t of [0, 1]) supply[t] = Math.min(400, supply[t] + 2 + 2 * F.filter(o => o.owner === t).length); }
   commandTick();
   if (dom.score[0] >= DOM.win || dom.score[1] >= DOM.win) endRound(dom.score[0] >= dom.score[1] ? 0 : 1);
 }
-function domGoal(b) {   // bots: AI squads 0 and 1 go for the nearest flag that is not theirs (spreading over two when both are near); squad 2 holds the nearest own flag
-  const F = domFlags(); if (!F.length) return null; const sq = b.squad | 0;
-  const sz = T.MP.meta.start.find(q => q.team === b.team) || { x: 0, z: 0 };
-  const dist = o => Math.hypot(o.x - sz.x, o.z - sz.z);
-  const take = F.filter(o => o.owner !== b.team).sort((a, c) => dist(a) - dist(c)), own = F.filter(o => o.owner === b.team).sort((a, c) => dist(c) - dist(a));
-  const o = sq === 2 ? (own[0] || take[0]) : (take[Math.min(sq, take.length - 1)] || own[0]);
-  if (!o) return null; return { x: o.x + b.ox * .4, z: o.z + b.oz * .4, line: o };
+// v0.44 bot plan, rebuilt twice a second per side: the flags to take ordered by how close they are to what we already hold
+// (the front), our flags ordered the same way, and the flag of ours under the heaviest attack.
+function domPlan(t, F, cnt) {
+  const own = F.filter(o => o.owner === t), sz = T.MP.meta.start.find(q => q.team === t) || { x: 0, z: 0 };
+  const front = o => own.length ? Math.min(...own.map(q => Math.hypot(q.x - o.x, q.z - o.z))) : Math.hypot(o.x - sz.x, o.z - sz.z);
+  const take = F.filter(o => o.owner !== t).sort((a, c) => front(a) - front(c));
+  const enemyNear = o => { let d = 1e9; for (const q of F) if (q.owner !== t) d = Math.min(d, Math.hypot(q.x - o.x, q.z - o.z)); return d; };
+  const hold = own.slice().sort((a, c) => enemyNear(a) - enemyNear(c));
+  let threat = null, tw = 0;
+  F.forEach((o, i) => { if (o.owner !== t) return; const w = cnt[i][1 - t] * 2 + (Math.abs(o.p) < .99 ? 1 : 0); if (w > tw) { tw = w; threat = o; } });
+  return { take, hold, threat };
+}
+function domSpot(b, o) {   // a spot inside the flag circle, different for each soldier, on dry passable ground
+  const id = b.id | 0, a = (id * 2.39996) % (Math.PI * 2), r = 2 + (id * 7 % 10);
+  const x = o.x + Math.cos(a) * r, z = o.z + Math.sin(a) * r;
+  return hAt(terr.H, x, z) > .2 && NAV.passable(x, z) ? { x, z, line: o } : { x: o.x, z: o.z, line: o };
+}
+function domGoal(b) {   // AI squads 0 and 1 take flags at the front (two different ones when there are two), squad 2 holds the front flag;
+  // whoever is near a flag of ours under attack (and the whole garrison squad) goes to defend it; during a rally everyone goes for the rally flag
+  const F = domFlags(); if (!F.length) return null; const sq = b.squad | 0, t = b.team;
+  const pl = (dom && dom.plan[t]) || domPlan(t, F, F.map(() => [0, 0]));
+  const rl = dom && dom.rally[t]; if (rl && tickNo < rl.until && rl.o.owner !== t) return domSpot(b, rl.o);
+  const th = pl.threat; if (th && (sq === 2 || ((b.id | 0) % 3 === 0 && Math.hypot(b.x - th.x, b.z - th.z) < 90))) return domSpot(b, th);
+  let o;
+  if (sq === 2) o = pl.hold[0] || pl.take[0];
+  else if (pl.take.length) o = pl.take[Math.min(sq, pl.take.length - 1)];
+  else o = pl.hold[sq % Math.max(1, pl.hold.length)];
+  return o ? domSpot(b, o) : null;
 }
 function objectivesTick() {
   if (isWake()) return domTick();
@@ -1612,7 +1643,8 @@ function report(win) {   // after-action report
   const bs = [...squads].sort((a, b) => b[1] - a[1])[0];
   const offs = [...humans].filter(p => p.cmd && p.st).map(p => [p.name, p.team, p.st.ci, p.st.k, p.st.ord]);
   return { mvp: card('MVP', mvp, mvp && sc(mvp) + ' points'), cards: [card('Most kills', killer, killer && killer.st.k + ' kills'), card('Sharpshooter', sniper, sniper && sniper.st.hs + ' headshots'), card('Lifesaver', medic, medic && medic.st.rev + ' revives'), card('Eyes', spotter, spotter && spotter.st.spot + ' spotted'), card('Objective', cap, cap && cap.st.cap + ' captures')].filter(Boolean),
-    squad: bs ? [bs[0].split(':')[1], +bs[0].split(':')[0], bs[1]] : null, officers: offs, teams: [0, 1].map(t => scoreRows(t, null)), op: op ? [op.att, op.sector, OPS.nsec, op.bat] : null };
+    squad: bs ? [bs[0].split(':')[1], +bs[0].split(':')[0], bs[1]] : null, officers: offs, teams: [0, 1].map(t => scoreRows(t, null)), op: op ? [op.att, op.sector, OPS.nsec, op.bat] : null,
+    dom: dom ? { s: dom.score.slice(), win: DOM.win, caps: dom.caps.slice(), rl: dom.rl.slice(), f: domFlags().map((o, i) => [(T.OBJ[i] && T.OBJ[i].id) || '', o.n, Math.round(dom.held[i][0]), Math.round(dom.held[i][1]), dom.fc[i]]) } : null };
 }
 function endRound(win) {
   round = { state: 'ended', t: 15, win }; const rep = report(win); prepareNextMap();
@@ -2379,4 +2411,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
