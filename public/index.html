@@ -1142,7 +1142,7 @@ function stepSnd(f,s,bits){if(me.sld>0||!me.alive||me.cl||me.y>T.groundAt(terr.H
    later. predTick mirrors the server's own rules (rate of fire, sprint-to-fire delay, semi-automatic trigger); each shot the
    server then confirms is matched against a shown one, and a shown shot that is never confirmed is simply forgotten. */
 const predAt=[];let pCd=0,pSpr=0,pHold=false,netGap=0,netGapAt=0,lastSnapAt=0,pingAt=0,srvMs=0,srvGap=0,nfN=0,nfT=0,nfMax=0,nfFps=0,nfWorst=0,nfLast=0;
-function shotFx(){const W=WPN[me.w]||{},cp=Math.cos(me.pitch),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(me.pitch),dz=-Math.cos(me.yaw)*cp;TUT.shot=1;gunKick=W.flame?.25:1;gFire=0;recoil();if(!(W.flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(W.pel===1&&!W.flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:W.rng,true,me.mg?420:W.vel)}
+function shotFx(){const W=WPN[me.w]||{},zv=me.mg?420:W.vel||400,pz=me.pitch+(zv>=360&&!W.flame?T.GRAV*(W.scope&&!me.mg?150:100)/(2*zv*zv):0),cp=Math.cos(pz),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(pz),dz=-Math.cos(me.yaw)*cp;   /* v0.42 sights zeroed at 100 m, as on the server */TUT.shot=1;gunKick=W.flame?.25:1;gFire=0;recoil();if(!(W.flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(W.pel===1&&!W.flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:W.rng,true,me.mg?420:W.vel)}
 function predTick(dt,bits,f,s){pCd-=dt;pSpr=(bits&1)&&(f||s)&&!me.mg?.18:pSpr-dt;const want=!!(bits&8),W=WPN[me.w],now=performance.now();
  while(predAt.length&&now-predAt[0]>ping*1.5+700)predAt.shift();
  if(want&&W&&!W.flame&&me.alive&&!me.mg&&!myVeh&&!me.elite&&!me.rel&&!me.charging&&!me.cl&&!me.rg&&pSpr<=0&&pCd<=0&&(W.auto||!pHold)&&(me.ammo|0)-predAt.length>0&&!(maskAt>now)){pCd=W.cd*(me.cls==='rifleman'&&me.w==='bolt'?.8:1);predAt.push(now);shotFx()}
