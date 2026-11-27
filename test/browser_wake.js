@@ -16,7 +16,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const st = await page.evaluate(() => ({ x: me.x, z: me.z, h: hAt(me.x, me.z), team: me.team, stat: $('stat').textContent }));
   await page.evaluate(() => sendJ({ t: 'tp', x: 236, z: 206 })); await page.waitForFunction(() => ents.size >= 3, null, { timeout: 8000 }).catch(() => {}); st.n = await page.evaluate(() => ents.size);
   R.st = st; ck('spawnOnLand', st.h > .3 && Math.abs(st.x) < 399 && Math.abs(st.z) < 399);
-  ck('scoreLine', /HOLD THE ATOLL · (YOU|ENEMY) \d+ – \d+ (YOU|ENEMY) · FIRST TO 100\nA[●○✕]  B[●○✕]  C[●○✕]  D[●○✕]  E[●○✕]/.test(st.stat));
+  // v0.44 Domination HUD: the race bar and badges are drawn, the spawn picker uses the start zone and flag letters
+  const hud = await page.evaluate(() => { const c = $('domh'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+    const L = spawnList(), s = T.MP.meta.start.find(q => q.team === me.team); return { vis: getComputedStyle(c).display, px: n, win: domS && domS[2], home: [Math.round(L[0].x), Math.round(L[0].z)], start: [s.x, s.z], air: L.some(it => it.k === 'air'), team: me.team, tags: T.OBJ.slice(0, 5).map((q, i) => flagTag(i)).join('') }; });
+  R.hud = hud; ck('domHudDrawn', hud.vis === 'block' && hud.px > 2000 && hud.win === 100);
+  ck('spawnHomeAtStart', Math.hypot(hud.home[0] - hud.start[0], hud.home[1] - hud.start[1]) < 40 && (hud.team === 1 || !hud.air) && hud.tags === 'ABCDE');
+  ck('rallyBanner', await page.evaluate(() => { opBanner({ k: 'rally', att: me.team, n: 'Airfield' }); return /RALLY!/.test($('banner').textContent) && /Airfield/.test($('banner').textContent); }));
   ck('seesSoldiers', st.n >= 3);
   // positions of others agree with the server's world (a 2 cm quantum puts nobody in the sea or past the edge)
   const far = await page.evaluate(() => { let bad = 0, n = 0; for (const e of ents.values()) { n++; const p = e.b; if (Math.abs(p.x) > 400 || Math.abs(p.z) > 400 || hAt(p.x, p.z) < -1.6) bad++; } return [bad, n]; });

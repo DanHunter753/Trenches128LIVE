@@ -74,6 +74,16 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.44 — Wake Atoll stage 2: Domination HUD, flag respawns, smarter bots
+
+- **Domination HUD.** At the top of the screen: a race bar (your points grow from the left, the enemy's from the right; first to the middle at 100 wins) and five flag badges A–E in the holder's colour, with a ring showing how far each flag has been pushed and a pulse while it is changing hands. Standing in a flag shows what is happening there: CAPTURING C 29%, NEUTRALISING, LOSING, CONTESTED or HOLDING, and how many of each side are inside it.
+- **Flag letters over the world** with the distance, and letters on the minimap (white = neutral). A banner shows each flag taken or lost.
+- **Respawn at a held flag.** The respawn map on the island shows your start zone and every flag your side fully holds (greyed while enemies are within 25 m); you land somewhere dry inside the flag's circle. The landing force has no airfield yet, so it isn't offered.
+- **Rallies hit harder.** A short barrage walks onto the flag first, then the paratroopers jump; for a minute every bot on the trailing side goes for that flag. The banner now reads RALLY! (it said "undefined" before).
+- **Bots spread out and defend.** The two assault squads go for two different flags at the front (nearest to what the side already holds), the garrison squad holds the front flag, and when a flag of ours is attacked the garrison and a third of the bots nearby go back to defend it. Each bot picks its own spot inside the flag circle instead of a line across it.
+- **After-action report for Domination:** final score, flags taken by each side, rallies, and how long each side held each flag. The end screen says who holds the atoll.
+- **Blood on the lens** at low health is now a few soft stains round the edge of the view, not big red square blocks across it.
+
 ## v0.43 — Wake Atoll and Domination (stage 1)
 
 - **New map: Wake Atoll** (`--maps wake`, or `T128_MAPS=wake`). An 800 m world imported from the owner's Wake Island map: the three islets with the lagoon between them, fords where the original had its bridges, 5 flags (Airfield, South Battery, North Camp, Wilkes Landing, Peale Point), palms, scrub and grass from the supplied art. The sea is wadeable to chest depth; deeper water is a wall for men and bots.
