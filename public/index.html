@@ -68,7 +68,7 @@ body.menu #chat{display:none}
 body.menu #item,body.menu #fx,body.menu #mud,body.menu #supv,body.menu #chgv,body.menu #chg,body.menu #kf,body.menu #wheel,body.menu #maskv,body.menu #kn,body.menu #dpb,body.menu #gasv,body.menu #swt,body.menu #brt,body.menu #alf{display:none}
 #hurt{position:fixed;inset:0;background:radial-gradient(transparent 40%,#a00 100%);opacity:0;pointer-events:none}
 #vv{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated;pointer-events:none;display:none}body.menu #vv{display:none!important}
-#item{display:none}#gun,#item{--gw:max(150vh,100vw);position:fixed;top:50%;left:50%;width:var(--gw);height:calc(var(--gw) / 1.5);margin-left:calc(var(--gw) / -2);margin-top:calc(var(--gw) / -3);image-rendering:pixelated;pointer-events:none}   /* v0.29: always as wide as the screen (hands and stocks reach the edges), centre on the screen centre */
+#item{display:none}#gun,#item{will-change:transform;--gw:max(150vh,100vw);position:fixed;top:50%;left:50%;width:var(--gw);height:calc(var(--gw) / 1.5);margin-left:calc(var(--gw) / -2);margin-top:calc(var(--gw) / -3);image-rendering:pixelated;pointer-events:none}   /* v0.29: always as wide as the screen (hands and stocks reach the edges), centre on the screen centre */
 #tut{pointer-events:auto;position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:15;display:none;max-width:min(560px,92vw);background:#1b1a14e8;border:1px solid #8a7a4a;border-radius:4px;padding:8px 12px 8px 14px;color:#eee;font:14px 'Courier New',monospace;box-shadow:0 2px 10px #0008}#tut b{color:#e9c46a}#tut small{display:block;color:#aaa;margin-top:3px}#tut button{float:right;margin:0 0 4px 10px;background:#3a3526;color:#ddd;border:1px solid #776;font:12px monospace;padding:2px 7px;cursor:pointer}#tut i{display:block;height:3px;background:#333;margin-top:6px}#tut i b{display:block;height:3px;background:#e9c46a}
 #tc{position:fixed;inset:0;display:none;z-index:14;pointer-events:none;touch-action:none;user-select:none;-webkit-user-select:none}
 #tc button{pointer-events:auto;position:absolute;border-radius:50%;background:rgba(20,18,14,.42);border:2px solid rgba(222,204,150,.55);color:#efe3c0;font:bold 11px monospace;letter-spacing:.04em;padding:0;touch-action:none}
@@ -694,7 +694,7 @@ function onMsg(m){
   case'wh':whistleSnd();$('banner').innerHTML='OVER THE TOP!<small>All squads attack '+String(m.n).replace(/[<>&]/g,'')+'</small>';$('banner').style.opacity=1;bannerT=performance.now()+4000;break;
   case'dr':addCrate(m);break;
   case'drx':{const c=crateM.get(m.id);if(c){scene.remove(c.m);crateM.delete(m.id)}break}
-  case'pong':ping=Math.round(performance.now()-m.c);pingAt=performance.now();break;
+  case'pong':ping=Math.round(performance.now()-m.c);pingAt=performance.now();srvMs=m.s|0;srvGap=m.g|0;break;
   case'opn':opBanner(m);break;
   case'oob':oobUntil=m.s?performance.now()+m.s*1000:0;break;
   case'end':roundState='ended';overlay('<h1>'+(m.win===0?'BLUE':'GREEN')+' WINS THE TERRITORY</h1>'+(opS?(opS[0]===me.team?(m.win===me.team?'Your attack broke through every line.':'Your attack ran out of men.'):(m.win===me.team?'Your line held. The enemy is spent.':'The enemy broke through your last line.')):(m.win===me.team?'Your side broke the line.':'Your side was overrun.'))+'<br>Next round the sides swap: attackers defend.'+'<br>New round starting shortly…'+aarHtml(m),'');document.exitPointerLock();break;
@@ -953,7 +953,7 @@ function connectScreen(){let nm='';try{nm=localStorage.getItem('t128name')||''}c
  <b>Wrecked guns.</b> Shells knock out MG nests, field guns and AA guns; hold E beside one to repair it (sappers are fastest).<br>
  <b>Phones.</b> Touch controls turn on by themselves; play in landscape. The ✎ button lets you move the buttons where you like.<br>
  <b>Your career.</b> Every game earns XP toward 100 levels and the ranks up to General. Your service record is on this screen.
- </div></details><div class="ver">v0.39</div>`,'');
+ </div></details><div class="ver">v0.39.1</div>`,'');
  $('cn').onclick=()=>{const n=$('nm').value.trim();const hv=$('host').value.trim();if(!hv){$('ovb').querySelector('.err').textContent='Enter the server address';return}try{localStorage.setItem('t128name',n);localStorage.setItem('t128host',hv)}catch(e){}AC=AC||new (window.AudioContext||window.webkitAudioContext)();sfxLoad();connect(n,$('host').value.trim())};
  $('nm').onkeydown=e=>{if(e.key==='Enter')$('cn').click()};$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
  if(LNCH&&typeof LNCH.back==='function'){const b=document.createElement('button');b.id='lnb';b.textContent='Back to launcher';b.onclick=()=>LNCH.back();$('rg').after(' ',b)}if(autoJoin&&$('nm').value.trim()){autoJoin=false;setTimeout(()=>{if($('cn'))$('cn').click()},60)}
@@ -1110,14 +1110,19 @@ function stepSnd(f,s,bits){if(me.sld>0||!me.alive||me.cl||me.y>T.groundAt(terr.H
 /* v0.38: your own shot (kick, sound, tracer) is shown the instant you fire, not when the server's answer comes back a ping
    later. predTick mirrors the server's own rules (rate of fire, sprint-to-fire delay, semi-automatic trigger); each shot the
    server then confirms is matched against a shown one, and a shown shot that is never confirmed is simply forgotten. */
-const predAt=[];let pCd=0,pSpr=0,pHold=false,netGap=0,netGapAt=0,lastSnapAt=0,pingAt=0;
+const predAt=[];let pCd=0,pSpr=0,pHold=false,netGap=0,netGapAt=0,lastSnapAt=0,pingAt=0,srvMs=0,srvGap=0,nfN=0,nfT=0,nfMax=0,nfFps=0,nfWorst=0,nfLast=0;
 function shotFx(){const W=WPN[me.w]||{},cp=Math.cos(me.pitch),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(me.pitch),dz=-Math.cos(me.yaw)*cp;TUT.shot=1;gunKick=W.flame?.25:1;gFire=0;recoil();if(!(W.flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(W.pel===1&&!W.flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:W.rng,true,me.mg?420:W.vel)}
 function predTick(dt,bits,f,s){pCd-=dt;pSpr=(bits&1)&&(f||s)&&!me.mg?.18:pSpr-dt;const want=!!(bits&8),W=WPN[me.w],now=performance.now();
  while(predAt.length&&now-predAt[0]>ping*1.5+700)predAt.shift();
  if(want&&W&&!W.flame&&me.alive&&!me.mg&&!myVeh&&!me.elite&&!me.rel&&!me.charging&&!me.cl&&!me.rg&&pSpr<=0&&pCd<=0&&(W.auto||!pHold)&&(me.ammo|0)-predAt.length>0&&!(maskAt>now)){pCd=W.cd*(me.cls==='rifleman'&&me.w==='bolt'?.8:1);predAt.push(now);shotFx()}
  pHold=want}
-function netTick(now){const el=$('net');if(!deployed){if(el.textContent)el.textContent='';return}if(now-netGapAt>2500){netGap=0;netGapAt=now}
- const lost=lastSnapAt&&now-lastSnapAt>1500,rough=netGap>260,c=lost||ping>=180?'#e04030':ping>=90||rough?'#e0b040':'#8fbf6a',t=lost?'NO SIGNAL':'PING '+ping+' ms'+(rough?' · unsteady':'');if(el.textContent!==t)el.textContent=t;if(el.style.color!==c)el.style.color=c}
+/* v0.39 the corner readout says where a hitch comes from: PING = the round trip (it also rises when this PC is too busy to
+   read the answer in time), SERVER = its slowest tick in the last 2 s (over 50 ms it is falling behind), FPS = this PC, with the
+   slowest frame when one took over 50 ms. No data at all for 1.5 s: NO DATA and for how long. */
+function netTick(now){const el=$('net');if(nfLast){const d=now-nfLast;nfN++;nfT+=d;if(d>nfMax)nfMax=d}nfLast=now;if(nfT>1000){nfFps=Math.round(nfN*1000/nfT);nfWorst=Math.round(nfMax);nfN=nfT=nfMax=0}
+ if(!deployed){if(el.textContent)el.textContent='';return}if(now-netGapAt>2500){netGap=0;netGapAt=now}
+ const quiet=lastSnapAt?now-lastSnapAt:0,lost=quiet>1500,rough=netGap>260,busy=srvMs>=50||srvGap>=120,slow=nfWorst>50,c=lost||ping>=180?'#e04030':ping>=90||rough||busy||slow?'#e0b040':'#8fbf6a';
+ const t=lost?'NO DATA FROM SERVER '+(quiet/1000).toFixed(1)+' s':'PING '+ping+' ms'+(rough?' · unsteady':'')+' · SERVER '+srvMs+' ms'+(busy?' (busy)':'')+' · '+nfFps+' FPS'+(slow?' (worst frame '+nfWorst+' ms)':'');if(el.textContent!==t)el.textContent=t;if(el.style.color!==c)el.style.color=c}
 function recoil(){const w=me.mg?{rcl:.012}:WPN[me.w]||{},k=(w.rcl||.02)*(adsNow?.75:1)*(.85+Math.random()*.3);me.pitch=Math.min(1.45,me.pitch+k);me.yaw+=(Math.random()-.5)*k*.6;recPend+=k*.6;punch+=k*1.1}   /* muzzle climbs; about 60% settles back on its own */
 function feelTick(dt){
  if(recPend>0){const r=Math.min(recPend,recPend*dt*7+dt*.01);me.pitch-=r;recPend-=r}
@@ -1126,7 +1131,7 @@ function feelTick(dt){
  const ch=!!(me.charging&&me.alive&&deployed);$('chgv').style.opacity=ch?.9:Math.max(0,+$('chgv').style.opacity-dt*3)||0;
  const cb=$('chg'),wb=WPN[me.w];if(deployed&&me.alive&&!me.mg&&wb&&wb.bay&&me.chg!=null&&(me.chg<T.chgMax(me)-.01||ch)){cb.style.display='block';cb.firstChild.style.width=(me.chg/T.chgMax(me)*100)+'%'}else cb.style.display='none'}
 const fxc=$('fx').getContext('2d'),mdc=$('mud').getContext('2d');
-function fxDraw(dt){fxc.clearRect(0,0,360,240);if(!deployed||!me.alive)ddL.length=0;
+let fxDirty=false;function fxDraw(dt){if(fxDirty||ddL.length){fxc.clearRect(0,0,360,240);fxDirty=ddL.length>0}if(!deployed||!me.alive)ddL.length=0;
  for(let i=ddL.length-1;i>=0;i--){const d=ddL[i];d.t-=dt;if(d.t<=0){ddL.splice(i,1);continue}const ca=-Math.PI/2-(Math.atan2(-(d.x-me.x),-(d.z-me.z))-me.yaw),al=Math.min(1,d.t);
   fxc.lineWidth=5;fxc.strokeStyle='rgba(150,14,6,'+al*.85+')';fxc.beginPath();fxc.arc(180,120,46,ca-.38,ca+.38);fxc.stroke();fxc.lineWidth=2;fxc.strokeStyle='rgba(235,70,40,'+al*.8+')';fxc.beginPath();fxc.arc(180,120,51,ca-.2,ca+.2);fxc.stroke()}   /* red arc toward whoever hit you */
  if(mudA>0){mudA=Math.max(0,mudA-dt*.3);$('mud').style.opacity=Math.min(1,mudA)}}

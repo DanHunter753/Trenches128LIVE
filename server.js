@@ -1978,6 +1978,18 @@ const PROF = new Map(); let profOn = true;
 const hr = () => Number(process.hrtime.bigint()) / 1e6;
 function prof(name, ms) { PROF.set(name, (PROF.get(name) || 0) + ms); }
 function guard(name, fn, a) { const t = profOn ? hr() : 0; try { fn(a); } catch (e) { const n = guardAt.get(name) || 0; if (Date.now() - n > 60000) { guardAt.set(name, Date.now()); console.error('[' + name + '] error (game keeps running):', e && e.stack || e); } } finally { if (profOn) prof(name, hr() - t); } }
+// v0.39 load shown to players: the worst tick and the worst wait between ticks over the last ~2 s ride on every pong, so a
+// player's own screen can tell a busy server from a bad connection or a slow PC. Long stalls are also logged.
+const LOADW = [[0, 0], [0, 0]]; let loadAt = 0, loadPrev = 0, netLogAt = 0;
+function loadNote(ms) {
+  const now = hr(), gap = loadPrev ? now - loadPrev : 0; loadPrev = now;
+  if (now - loadAt > 1000) { loadAt = now; LOADW[1] = LOADW[0]; LOADW[0] = [0, 0]; }
+  if (ms > LOADW[0][0]) LOADW[0][0] = ms; if (gap > LOADW[0][1]) LOADW[0][1] = gap;
+  if (gap > 400) console.log(`[stall] ${Math.round(gap)} ms between ticks (this tick ${ms.toFixed(1)} ms): the server process was held up (CPU taken by another program, or memory swapping)`);
+  if (now - netLogAt > 5000) { netLogAt = now; for (const p of humans) { if (!p.ws || !p.ws.open || !p.deployed) continue; const w = p.ws.socket.writableLength, idle = p.inAt ? now - p.inAt : 0;
+    if (w > 60000 || idle > 2500) console.log(`[net] ${p.name}: ${Math.round(w / 1024)} KB waiting to be sent, last input ${Math.round(idle)} ms ago, ping ${p.ping == null ? '?' : p.ping} ms (their connection is not keeping up)`); } }
+}
+const loadNow = () => [Math.round(Math.max(LOADW[0][0], LOADW[1][0])), Math.round(Math.max(LOADW[0][1], LOADW[1][1]))];
 function tickBody() {
   const t0 = process.hrtime.bigint(); tickNo++; PROF.clear();
   { const now = hr(); if (lastTickAt) { const gap = now - lastTickAt; if (gap > gapMax) gapMax = gap; } lastTickAt = now; }
@@ -2003,7 +2015,7 @@ function tickBody() {
   { const t = hr(); broadcastState(); prof('send', hr() - t); }
   if (bodies.length) { bcast({ t: 'bd', b: bodies.splice(0) }); }
   shots.length = 0; for (const e of ents.values()) if (e.flash > 0) e.flash--;
-  const ms = Number(process.hrtime.bigint() - t0) / 1e6; tickMs += ms; tickMax = Math.max(tickMax, ms);
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6; tickMs += ms; tickMax = Math.max(tickMax, ms); loadNote(ms);
   if (ms > SLOW_MS) { slowN++; const top = [...PROF].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => k + ' ' + v.toFixed(1)).join(', ');
     if (Date.now() - slowLogAt > 5000) { slowLogAt = Date.now(); console.log(`[slow tick ${tickNo}] ${ms.toFixed(1)} ms: ${top} (${humans.size} humans, ${ents.size} soldiers)`); } }
   if (xpDirty && tickNo % 200 === 0) saveXp();
@@ -2060,7 +2072,7 @@ function onText(c, txt) {
       else tell(p, 'Loadout will apply when you next respawn.');
     }
   } else if (m.t === 'in') {
-    if (!p.deployed || !Array.isArray(m.c)) return;
+    if (!p.deployed || !Array.isArray(m.c)) return; p.inAt = hr();
     for (const c2 of m.c.slice(0, 20)) if (Array.isArray(c2) && c2.length >= 7) p.q.push(c2);
     if (Number.isFinite(m.rt)) p.rw = clamp(tickNo - (m.rt | 0), 0, LAGC_MAX);   // how far behind the server this player's view is
     if (p.q.length > 60) p.q.splice(0, p.q.length - 60);
@@ -2071,7 +2083,7 @@ function onText(c, txt) {
   } else if (m.t === 'wxs' && process.env.T128_TEST && T.WXS[m.k]) { setWx(m.k);
   } else if (m.t === 'act') onAct(p, String(m.a), m);
   else if (m.t === 'cmd') { if (p.deployed && p.cmd && p.alive) { if (m.k === 'order') issueOrder(p, m); else if (m.k === 'sup') callSupport(p, m); } }
-  else if (m.t === 'ping') { if (Number.isFinite(m.p)) p.ping = clamp(Math.round(m.p), 0, 9999); send(p, { t: 'pong', c: m.c }); }   // the client reports the round trip it last measured (for the scoreboard)
+  else if (m.t === 'ping') { if (Number.isFinite(m.p)) p.ping = clamp(Math.round(m.p), 0, 9999); const ld = loadNow(); send(p, { t: 'pong', c: m.c, s: ld[0], g: ld[1] }); }   // the client reports the round trip it last measured (for the scoreboard)
   else if (m.t === 'chat') chatMsg(p, m);
   else if (m.t === 'sbq' && p.deployed && (p.sbAt || 0) <= tickNo) { p.sbAt = tickNo + TICK; send(p, { t: 'sb', s: [scoreRows(0, p), scoreRows(1, p)] }); }
 }

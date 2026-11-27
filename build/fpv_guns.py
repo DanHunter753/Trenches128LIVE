@@ -121,13 +121,19 @@ def build(kind, out=None, m=1.0):
     hip, aim = body_off(hip_n, cut(hip_src)), cut(aim_src)
     # aim view: the whole width, the sight tip on row 121 (just under the centre dot)
     tip = top_y(aim, 492, 532); k = AIM_K * m; AIM = View(k, FW / 2 - 512 * k, 121 - tip * k)
-    HIP = hip_view(hip, HIP_H * m); muz = (470, 350) if kind == 'bolt' else (190, 300)
+    # v0.39: the rifle's hip picture was drawn from further back than the trench gun's, so at the same height it showed a small
+    # rifle on the end of a long thin sleeve. It is now 1.32x larger and set lower, so the forearm leaves the frame at the bottom
+    # as the trench gun's does (the far end of the sleeve is simply below the screen).
+    HZ, DROP = (1.32, 30) if kind == 'bolt' else (1, 0)
+    HIP = hip_view(hip, HIP_H * m * HZ); HIP.oy += DROP * m; muz = (470, 350) if kind == 'bolt' else (190, 300)
     flash, smoke = flash_and_smoke(); frames = [None] * SLOTS
     base_hip = [(extend_left(hip), (-EXT, 0))]; base_aim = [(aim, (0, 0))]
     frames[0] = HIP.frame(base_hip)
     fl = flash.resize((int(flash.size[0] * 1.1), int(flash.size[1] * 1.1)))
     fpos = (muz[0] - fl.size[0] // 2, muz[1] - fl.size[1] // 2)
-    kick = [(6, -10, 2.5), (9, -7, 2), (5, -3, 1), (2, -1, .4)]
+    # recoil: the trench gun jumps up; the rifle comes straight back into the shoulder (down and right, muzzle lifting a little).
+    # The old upward jump pulled 10 rows of extra sleeve into view for two frames, which read as the arm stretching.
+    kick = [(6, 6, 1.4), (9, 8, 1.1), (5, 4, .6), (2, 1, .2)] if kind == 'bolt' else [(6, -10, 2.5), (9, -7, 2), (5, -3, 1), (2, -1, .4)]
     for i, (dx, dy, r) in enumerate(kick): frames[1 + i] = HIP.frame(base_hip + ([(fl, fpos)] if i < 2 else []), dx=dx, dy=dy, rot=-r)
     frames[21] = AIM.frame(base_aim)
     atip = (512, tip)
@@ -141,7 +147,29 @@ def build(kind, out=None, m=1.0):
         frames[22], frames[23], frames[24], frames[25] = AIM.frame(fire_layer(1)), AIM.frame(fire_layer(2)), AIM.frame(fire_layer(2), dy=-1), AIM.frame(fire_layer(3))
         rl = img('e6cff9ba'); rb = [(0, 206, 255, 535), (260, 206, 510, 535), (515, 206, 766, 535), (770, 206, 1021, 535), (1026, 206, 1280, 535)]
         r0 = register(aim_src, rl.crop(rb[0])); rs, rx, ry = r0[1], r0[2], r0[3]
-        rp = [feather(cut(rl.crop(b))).resize((int((b[2] - b[0]) * rs), int((b[3] - b[1]) * rs)), Image.LANCZOS) for b in rb]
+        # v0.39: the loading hand runs off the right edge of its panel in the reference art, which showed as a straight vertical
+        # cut in mid-air. The wrist is now continued to the right along its own slope and off the screen: 50 px of skin, a cuff,
+        # then sleeve cloth in the uniform's colour (shaded like the wrist, so it keeps some form).
+        def arm_right(p_, px=760, skin=50):
+            w_, h_ = p_.size; a_ = np.asarray(p_).astype(np.float32); out = np.zeros((h_, w_ + px, 4), np.float32); out[:, :w_] = a_
+            def span(x):
+                ys = np.where(a_[:, x, 3] > 128)[0]; return (ys.min(), ys.max()) if len(ys) else None
+            s0, s1 = span(w_ - 3), span(w_ - 43)
+            if not s0: return p_
+            slope = 0 if not s1 else float(np.clip(((s0[0] - s1[0]) + (s0[1] - s1[1])) / 2 / 40, -.3, .12))   # rows per column, going right
+            col = a_[:, w_ - 3]; cloth = np.array([80, 71, 46], np.float32); lum = np.clip(col[:, :3].mean(1) / 150, .5, 1.1); ys0 = np.where(col[:, 3] > 128)[0]; cy = (ys0.min() + ys0.max()) / 2; rows = np.arange(h_)
+            for d in range(1, px + 1):
+                sh = int(round(slope * d)); src = np.zeros_like(col); sl = np.zeros_like(lum)
+                t = 1 - .2 * min(1, d / 70); idx = np.clip(np.round(cy + (rows - cy) / t).astype(int), -1, h_); ok = (idx >= 0) & (idx < h_); colT = np.zeros_like(col); colT[ok] = col[idx[ok]]; lumT = np.zeros_like(lum); lumT[ok] = lum[idx[ok]]   # the wrist narrows into the forearm
+                if abs(sh) >= h_: break
+                if sh >= 0: src[sh:] = colT[:h_ - sh]; sl[sh:] = lumT[:h_ - sh]
+                else: src[:h_ + sh] = colT[-sh:]; sl[:h_ + sh] = lumT[-sh:]
+                m_ = src[:, 3] > 128; x = w_ - 1 + d
+                rgb = src[:, :3] if d <= skin else (cloth * .55)[None, :].repeat(h_, 0) if d <= skin + 12 else cloth[None, :] * sl[:, None] * (1 - .07 * ((d // 9) % 2))
+                out[m_, x, :3] = rgb[m_]; out[m_, x, 3] = 255
+            return Image.fromarray(out.astype(np.uint8))
+        rp = [feather(arm_right(cut(rl.crop(b))) if 1 <= i <= 3 else cut(rl.crop(b))) for i, b in enumerate(rb)]
+        rp = [q.resize((int(q.size[0] * rs), int(q.size[1] * rs)), Image.LANCZOS) for q in rp]
         seq = [0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 0, 0]   # raise, open bolt, clip in, strip / case out, close, lower
         for i, p in enumerate(seq): frames[5 + i] = AIM.frame(base_aim + [(rp[p], (rx, ry))], dy=[6, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 6][i])
     else:

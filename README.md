@@ -73,6 +73,24 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - At the full 128 v 128 (`--fill 128`, 270 soldiers) the server averages 13–14 ms a tick but its worst ticks reach 50–58 ms (one 20 Hz tick is 50 ms): a rare small hitch. At the default fill of 40 with 64 players: 5 ms average, 35 ms worst.
 
 # Changelog
+## v0.39.1 - rifle animation, and a readout that says where lag comes from
+- **Rifle in the hands** (also the carbine and anti-tank rifle, which share its art):
+  - The hip view is 1.3x larger and set lower, so the forearm leaves the screen at the bottom like the trench gun's instead of
+    a small rifle on the end of a long thin sleeve.
+  - Firing from the hip recoils straight back. The old upward jump dragged extra sleeve into view for two frames, which
+    looked like the arm stretching and snapping back.
+  - Reloading: the hand that feeds the clip ended in a straight vertical cut in mid-air (the reference picture stops there).
+    It now continues as a wrist and sleeve off the right of the screen.
+  - `build/fpv_guns.py` holds the changes; the three sheets were rebuilt with it.
+- **The corner readout now reads `PING 52 ms · SERVER 9 ms · 144 FPS`.** SERVER is the server's slowest tick in the last two
+  seconds (over 50 ms it is marked busy); a frame slower than 50 ms on your own PC is shown too; and when nothing arrives
+  for 1.5 s it says `NO DATA FROM SERVER 3.2 s`. PING also rises when the PC is too busy to read the reply, so the three
+  numbers together say whether a hitch is the server, the connection or the PC.
+- The server log now records a stall (`[stall] 900 ms between ticks ...`) and a player whose connection is not keeping up
+  (`[net] Name: 120 KB waiting to be sent, last input 3100 ms ago ...`).
+- Lighter HUD: the gun picture is on its own layer (moving it for the sprint bob and recoil no longer repaints it), and the
+  hit-direction overlay is only redrawn when it has something to show.
+
 ## v0.39 - customize your soldier
 - The **Customize** tab (before you deploy, and from Pause > Change loadout) is now a page per class:
   - **Slots** down the left: primary weapon, gadget, grenades, melee, class ability, and specializations (locked until the
