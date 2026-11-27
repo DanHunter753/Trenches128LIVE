@@ -83,6 +83,7 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - **The airstrip and sand roads** are laid on the ground, and the scrub inland is patchy now.
 - **AA guns:** the garrison's five flak stands are working AA guns.
 - **Night:** lanterns at hut doors, pillbox doors, every flag, and lamps on the watch towers.
+- **Map rotation:** `--maps rotate` (or `T128_MAPS=rotate`) plays two random trench maps, then Wake Atoll, and round again; pages follow the server onto each map by themselves. The default is still random trench maps. (Switching fixed: a server that started on Wake had no supply depots for the trench maps, and leaving Wake crashed on the missing depots.)
 - **Bolt-action aim view** redrawn from the supplied art: gloved hands, bolt handle on the right, a fresh smoke puff after the shot. The other bolt frames are unchanged.
 
 ## v0.44 — Wake Atoll stage 2: Domination HUD, flag respawns, smarter bots
@@ -420,7 +421,7 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 - **Players:** the page is built for one map, so at the round change it saves the player's seat, reloads onto the new
   map (a second or two, everything cached) and rejoins by itself: same name, side and squad (a single-use rejoin ticket
   from the server), same loadout, deployed again. A page never reloads in a loop (at most 4 map reloads a minute).
-- **Settings:** `--maps random` (default), `--maps classic`, or `--maps <number>` for one fixed map. `/health` shows the
+- **Settings:** `--maps random` (default), `--maps classic`, `--maps wake` (Wake Atoll only), `--maps rotate` (two trench maps, then Wake Atoll), or `--maps <number>` for one fixed map. `/health` shows the
   current map number. Tests run on the classic map.
 - **Fairness check:** `node tools/mapcheck.js 60` builds 60 maps and walks the bots' pathfinding from both home lines to
   every objective, depot, nest and gun, and compares the two sides' attack distances: 60 of 60 passed, sides within 5%.
