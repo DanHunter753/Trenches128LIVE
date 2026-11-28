@@ -35,7 +35,7 @@ module.exports = function makeAccounts(dir) {
     const salt = crypto.randomBytes(16).toString('hex'), hash = (await scrypt(pass, salt)).toString('hex');
     if (db.users[key(name)]) return { err: 'That name is taken.' };
     const u = db.users[key(name)] = { name, salt, hash, xp: Math.max(0, carryXp | 0), created: Date.now(), last: Date.now() };
-    save(); return newSession(u);
+    const rc = await setRecovery(u); save(); return Object.assign(newSession(u), { rc });
   }
   async function login(name, pass, ip) {
     name = String(name || '').trim(); pass = String(pass || '');
@@ -46,6 +46,33 @@ module.exports = function makeAccounts(dir) {
     if (u.banned) return { err: 'This account is banned.' };
     u.last = Date.now(); return newSession(u);
   }
+  // v0.47.1 password recovery without e-mail: every account has a one-time recovery code (shown once at registration, or made
+  // again while logged in, or handed out by the server operator from the server's own machine). The code resets the password,
+  // logs out every session and is replaced by a new one.
+  const RC_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', rcNorm = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  async function setRecovery(u) {
+    const b = crypto.randomBytes(16); let c = ''; for (let i = 0; i < 16; i++) c += RC_ABC[b[i] % RC_ABC.length];
+    u.rs = crypto.randomBytes(16).toString('hex'); u.rh = (await scrypt(c, u.rs)).toString('hex'); save(true);
+    return c.match(/.{4}/g).join('-');
+  }
+  async function setPass(u, pass) { u.salt = crypto.randomBytes(16).toString('hex'); u.hash = (await scrypt(pass, u.salt)).toString('hex'); for (const [t, s] of Object.entries(db.sessions)) if (s.u === key(u.name)) delete db.sessions[t]; }
+  async function resetWithCode(name, code, pass, ip) {
+    name = String(name || '').trim(); pass = String(pass || '');
+    if (limited('x:' + ip, 6, 600000) || limited('xn:' + key(name), 6, 600000)) return { err: 'Too many attempts. Wait ten minutes and try again.' };
+    if (pass.length < 8 || pass.length > 128) return { err: 'Passwords need 8 to 128 characters.' };
+    const u = db.users[key(name)], c = rcNorm(code);
+    const got = await scrypt(c || 'x', u && u.rs ? u.rs : 'y'.repeat(32)), want = u && u.rh ? Buffer.from(u.rh, 'hex') : Buffer.alloc(KEYLEN);
+    if (!u || !u.rh || c.length !== 16 || !crypto.timingSafeEqual(got, want)) return { err: 'That name and recovery code do not match.' };
+    if (u.banned) return { err: 'This account is banned.' };
+    await setPass(u, pass); const rc = await setRecovery(u); u.last = Date.now(); save(true); return Object.assign(newSession(u), { rc });
+  }
+  async function changePass(u, old, pass) {
+    pass = String(pass || ''); if (pass.length < 8 || pass.length > 128) return { err: 'Passwords need 8 to 128 characters.' };
+    if (limited('cp:' + key(u.name), 6, 600000)) return { err: 'Too many attempts. Wait ten minutes and try again.' };
+    if (!crypto.timingSafeEqual(await scrypt(String(old || ''), u.salt), Buffer.from(u.hash, 'hex'))) return { err: 'Your current password is not right.' };
+    await setPass(u, pass); save(true); return newSession(u);
+  }
+  async function operatorCode(name) { const u = db.users[key(name)]; if (!u) return { err: 'No account called ' + name }; return { name: u.name, rc: await setRecovery(u) }; }
   function session(token) {
     const s = typeof token === 'string' && token.length === 48 ? db.sessions[token] : null; if (!s || s.exp < Date.now()) return null;
     const u = db.users[s.u]; if (!u || u.banned) return null; return u;
@@ -54,5 +81,5 @@ module.exports = function makeAccounts(dir) {
   const isRegistered = name => !!db.users[key(name)];
   function addXp(u, n) { u.xp = (u.xp || 0) + n; save(); return u.xp; }
   function ban(name, on) { const u = db.users[key(name)]; if (!u) return false; u.banned = !!on; if (on) for (const [t, s] of Object.entries(db.sessions)) if (s.u === key(name)) delete db.sessions[t]; save(true); return true; }
-  return { register, login, session, logout, isRegistered, addXp, ban, touch: () => save(), flush: () => save(true), count: () => Object.keys(db.users).length, _db: () => db };
+  return { register, login, session, logout, isRegistered, addXp, ban, touch: () => save(), setRecovery, resetWithCode, changePass, operatorCode, flush: () => save(true), count: () => Object.keys(db.users).length, _db: () => db };
 };

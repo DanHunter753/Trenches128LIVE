@@ -353,7 +353,7 @@ function damage(e, dmg, by, head, src, kind) {
   if (e.charging && kind !== 'melee') dmg *= .6;          // a bayonet charge shrugs off some damage
   if (e.mph && kind !== 'gas') dmg *= MPH_ARM;
   if (Array.isArray(src) && T.hasPk(e, 'thick')) dmg *= .92;   // v0.47 Thick Skin: grenades, shells and bombs (blasts pass their origin as src)              // v0.36: on morphine a man keeps going through wounds that would drop him
-  e.hp -= dmg;
+  e.hp -= dmg; e.hurtAt = tickNo;
   if (by && by !== e && by.team !== e.team) (e.hitBy || (e.hitBy = new Map())).set(by.id, [by, tickNo]);
   e.lastHit = kind || (src ? (by && by.cmd ? 'artillery' : by ? 'grenade' : 'shell') : by ? (by.mg != null && by.mg !== false ? 'mg' : by.w || 'bolt') : 'shell');
   if (!e.bot && by !== e) { const q = src || (by ? [by.x, by.z] : null); if (q) send(e, { t: 'dd', x: +q[0].toFixed(1), z: +q[1].toFixed(1) }); }   // damage-direction arc
@@ -625,6 +625,7 @@ function reviveAct(p) {
 function onAct(p, a, m) {
   if (p.deployed && a === 'postToggle') { p.usePost = p.usePost === false; tell(p, p.usePost === false ? 'Respawn: normal line' : 'Respawn: field posts when available'); return; }
   if (p.deployed && a === 'giveup' && p.down > 0) { finishDown(p, 'your own choice'); return; }
+  if (a === 'stuck') { stuckCmd(p); return; }
   if (p.deployed && a === 'reload' && p.down > 0 && !p.alive && p.ps) { if (p.ps.rel <= 0 && p.ps.ammo < psMag(p)) p.ps.rel = PISTOL.rl; return; }
   if (p.deployed && a === 'revive') { reviveAct(p); return; }
   if (p.deployed && a === 'ping' && p.down > 0) { callMedic(p); return; }
@@ -2210,16 +2211,21 @@ function onText(c, txt) {
     if (ACC && m.token) { acct = ACC.session(String(m.token)); if (!acct) return deny('Your login has expired. Log in again.'); name = acct.name; }
     else if (CFG.accounts === 'required') return deny('This server needs an account: log in or create one.');
     else if (ACC && ACC.isRegistered(name)) return deny('That callsign belongs to an account. Log in to use it.');
-    if (acct && [...humans].some(q => q.acct === acct)) return deny('That account is already playing.');
+    // v0.47.1: coming back after a drop. The old connection may still look open (a lost connection can take minutes to notice),
+    // so the same account, or a guest with the same name from the same browser (cid), takes over its place: same side and squad.
+    const cid = typeof m.cid === 'string' ? m.cid.slice(0, 40) : '';
+    let prev = null; for (const q of humans) if ((acct && q.acct === acct) || (!acct && !q.acct && cid && q.cid === cid && q.name.toLowerCase() === name.toLowerCase())) prev = q;
+    let took = null;
+    if (prev) { took = { team: prev.team, sq: prev.sq }; console.log('[rejoin] ' + prev.name + ' reconnected: the old connection is closed'); try { wsSend(prev.ws, 1, Buffer.from(JSON.stringify({ t: 'kicked', m: 'You joined from another window or device.' }))); } catch (e) { } wsClose(prev.ws); }
     if (name.length < 2) { wsSend(c, 1, Buffer.from(JSON.stringify({ t: 'err', m: 'Pick a name (2-16 letters or digits).' }))); return; }
     for (const q of humans) if (q.name.toLowerCase() === name.toLowerCase()) { wsSend(c, 1, Buffer.from(JSON.stringify({ t: 'err', m: 'That name is in use right now.' }))); return; }
     const c0 = [...humans].filter(q => q.team === 0).length, c1 = humans.size - c0;
     const rjk = typeof m.rj === 'string' ? m.rj : '', rj = rejoins.get(rjk); if (rj) rejoins.delete(rjk);
-    const back = rj && rj.until > Date.now() && rj.name === name.toLowerCase() ? rj : null;   // coming back after a map change
+    const back = took || (rj && rj.until > Date.now() && rj.name === name.toLowerCase() ? rj : null);   // coming back after a drop, or after a map change
     const team = back ? back.team : (process.env.T128_TEST && (m.team === 0 || m.team === 1)) ? m.team : c0 < c1 ? 0 : c1 < c0 ? 1 : (rnd() < .5 ? 0 : 1);   // m.team honoured only in test mode
     if ((team === 0 ? c0 : c1) >= SLOTS) { wsSend(c, 1, Buffer.from(JSON.stringify({ t: 'err', m: 'Server full.' }))); return; }
     const e = newEnt(team, false);
-    Object.assign(e, { ws: c, name, acct, xp: acct ? acct.xp || 0 : CFG.accounts === 'required' ? 0 : xpdb[name.toLowerCase()] || 0, deployed: false, q: [], ack: 0, sq: -1, cls: 'rifleman', w: 'bolt', u: 'bandage', hold: false, pend: null });
+    Object.assign(e, { ws: c, name, acct, cid, xp: acct ? acct.xp || 0 : CFG.accounts === 'required' ? 0 : xpdb[name.toLowerCase()] || 0, deployed: false, q: [], ack: 0, sq: -1, cls: 'rifleman', w: 'bolt', u: 'bandage', hold: false, pend: null });
     c.player = e; humans.add(e);
     send(e, { t: 'prof', id: e.id, team, xp: e.xp, rank: T.rankOf(e.xp), sq: sqSizes(team), max: SQ_MAX, acct: acct ? 1 : 0, name: e.name, server: CFG.name, map: mapSeed, back: back ? back.sq : null });
     send(e, perkState(e));   // v0.47
@@ -2262,10 +2268,28 @@ function onText(c, txt) {
 setInterval(() => { for (const p of humans) p.ws.msgs = 0; }, 1000);
 // v0.29 text chat: to everyone or to your own side. Plain text only (the client shows it as text, never as HTML), 120 characters,
 // a burst of 4 then one message every 1.5 s per player. Lines are also printed in the server window for the host.
+// v0.47.1 stuck? /stuck (or /respawn, /kill) ends this life: no killer, no XP lost, the normal respawn wait. Not while being shot
+// at (10 s since the last hit, so it can't deny an enemy his kill), and once a minute at most.
+function stuckCmd(p) {
+  if (!p.deployed || p.cmd) { tell(p, 'Nothing to do: you are not on the field'); return; }
+  if (!p.alive && p.down > 0) { finishDown(p, 'your own choice'); return; }
+  if (!p.alive) { tell(p, 'You are already waiting to respawn'); return; }
+  if (p.hurtAt && tickNo - p.hurtAt < 10 * TICK) { tell(p, 'Not under fire: wait ' + Math.ceil(10 - (tickNo - p.hurtAt) / TICK) + ' s after your last hit'); return; }
+  if (p.stuckAt && tickNo - p.stuckAt < 60 * TICK) { tell(p, 'Once a minute: try again in ' + Math.ceil(60 - (tickNo - p.stuckAt) / TICK) + ' s'); return; }
+  p.stuckAt = tickNo; if (p.mg != null) dismount(p, true); if (p.veh && VEHM) VEHM.leave(p, true);
+  p.lastHit = 'stuck'; killEnt(p, null); tell(p, 'Respawning: pick a spot on the map');
+  console.log('[stuck] ' + p.name + ' used /stuck at ' + p.x.toFixed(1) + ',' + p.z.toFixed(1));
+}
+function chatCmd(p, c) {
+  if (c === 'stuck' || c === 'respawn' || c === 'kill' || c === 'suicide' || c === 'unstuck') stuckCmd(p);
+  else if (c === 'help' || c === '?') tell(p, 'Chat commands: /stuck (respawn if you are stuck), /help');
+  else tell(p, 'Unknown command /' + c.slice(0, 20) + '. Try /help');
+}
 function chatMsg(p, m) {
   const now = Date.now(); p.chatTok = Math.min(4, (p.chatTok == null ? 4 : p.chatTok) + (now - (p.chatAt || now)) / 1500); p.chatAt = now;
   const txt = String(m.m == null ? '' : m.m).replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
   if (!txt) return;
+  if (txt[0] === '/') { chatCmd(p, txt.slice(1).toLowerCase().split(' ')[0]); return; }   // v0.47.1 commands are never broadcast
   if (p.chatTok < 1) { send(p, { t: 'msg', m: 'Slow down: one chat message every 1.5 s' }); return; }
   p.chatTok -= 1; const team = !!m.team;
   const out = JSON.stringify({ t: 'chat', n: p.name, tm: p.team, rk: T.rankOf(p.xp || 0), m: txt, tc: team ? 1 : 0, off: p.cmd ? 1 : 0 });
@@ -2365,6 +2389,11 @@ async function api(req, res, u) {
     if (u === '/api/login' && req.method === 'POST') { const m = await body(req, 2048), r = await ACC.login(m.name, m.pass, ip); return json(res, r.err ? 401 : 200, r); }
     if (u === '/api/logout' && req.method === 'POST') { const m = await body(req, 2048); ACC.logout(String(m.token || '')); return json(res, 200, { ok: 1 }); }
     if (u === '/api/record') { const n = String(new URL(req.url, 'http://x').searchParams.get('n') || '').slice(0, 16).toLowerCase(); const xp = n && Object.prototype.hasOwnProperty.call(xpdb, n) ? +xpdb[n] || 0 : 0; return json(res, 200, { xp, rank: T.rankOf(xp), lv: T.levelOf(xp).lv }); }   // v0.34: a guest callsign's service record for the start screen
+    // v0.47.1 password recovery (see accounts.js). /api/opcode only answers the server's own machine (docker compose exec game node tools/resetcode.js NAME)
+    if (u === '/api/reset' && req.method === 'POST') { const m = await body(req, 2048), r = await ACC.resetWithCode(m.name, m.code, m.pass, ip); return json(res, r.err ? 400 : 200, r); }
+    if (u === '/api/password' && req.method === 'POST') { const m = await body(req, 2048), a = ACC.session(String(m.token || '')); if (!a) return json(res, 401, { err: 'Log in again first.' }); const r = await ACC.changePass(a, m.old, m.pass); return json(res, r.err ? 400 : 200, r); }
+    if (u === '/api/recovery' && req.method === 'POST') { const m = await body(req, 2048), a = ACC.session(String(m.token || '')); if (!a) return json(res, 401, { err: 'Log in again first.' }); return json(res, 200, { rc: await ACC.setRecovery(a) }); }
+    if (u === '/api/opcode' && req.method === 'POST') { const ra = req.socket.remoteAddress || ''; if (!/^(127\.|::1$|::ffff:127\.)/.test(ra) || req.headers['x-forwarded-for'] || req.headers['cf-connecting-ip']) return json(res, 403, { err: 'only from the server itself' }); const m = await body(req, 2048), r = await ACC.operatorCode(String(m.name || '')); return json(res, r.err ? 404 : 200, r); }
     if (u === '/api/me') { const t = new URL(req.url, 'http://x').searchParams.get('token'), a = ACC.session(t); return a ? json(res, 200, { name: a.name, xp: a.xp || 0, rank: T.rankOf(a.xp || 0) }) : json(res, 401, { err: 'not logged in' }); }
   } catch (e) { return json(res, 400, { err: 'bad request' }); }
   json(res, 404, { err: 'not found' });
@@ -2460,4 +2489,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { pkt: { perkMsg, perkState, startReload, downEnt, damage, maskAct, psMag, kits: () => kits, buildPost, reconSpot, fireWeapon, posts: () => posts }, domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { pkt: { chatMsg, perkMsg, perkState, startReload, downEnt, damage, maskAct, psMag, kits: () => kits, buildPost, reconSpot, fireWeapon, posts: () => posts }, domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

@@ -74,6 +74,13 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.48 — Rejoin after a drop, /stuck, password recovery, 4× lighter art
+
+- **Rejoining after lag-out works.** A dropped player's old connection can look open to the server for minutes, so joining again said "That account is already playing" until the next match. Now the same account takes over its old place at once (same side and squad); the old window, if it is still open somewhere, shows "Playing elsewhere" and stops. Guests get the same, matched by name and browser (another browser still can't take a name in use).
+- **Stuck?** Type `/stuck` (or `/respawn`, `/kill`) in chat, or press **Stuck? Respawn now** on the in-game class page. It ends this life with no killer credited and the normal respawn wait. Not within 10 s of being hit (so it can't rob an enemy of a kill), and once a minute. `/help` lists chat commands; commands are never shown to other players.
+- **Password recovery without e-mail.** New accounts get a recovery code at registration (shown once: write it down). On the first screen, **Forgot password?** takes your name, the code and a new password: it logs out every other session and gives you a fresh code. Logged in, you can **change password** or make a **new recovery code** (existing accounts should do this once). For a player who lost both, the server owner runs `docker compose exec game node tools/resetcode.js NAME` on the server and hands over the code it prints (it only answers the server's own machine).
+- **Art is 4× smaller:** all pictures 7.9 MB → 1.9 MB (soldiers 2.3 MB → 0.7 MB, the gun sheets 3.3 MB → 0.7 MB), by storing them with 256-colour palettes where the difference is invisible (`tools/shrink_assets.py`). Faster first load on phones and slow connections.
+
 ## v0.47 — Perk tree
 
 - **Perks for registered players.** Every account level gives one perk point (level 1 = 1 point, level 100 = 100). Spend points on the Customize tab under **PERKS** to unlock perks for good (1–3 points each, 58 for all 28). Your first starter perk (Quick Hands, Field Dressing or Light Pack) is free.
