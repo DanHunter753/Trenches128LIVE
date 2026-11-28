@@ -74,6 +74,13 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.49 — Map vote, Attrition mode, rifles reach across the map
+
+- **Map vote between rounds.** When a round ends, a vote screen shows three cards: **The Trenches · Operation**, **The Trenches · Attrition** and **Wake Atoll · Domination**. Each card shows the time of day and weather that round will have, plus live vote counts, under an 18-second countdown ring. Click a card to vote; you can change it until the timer runs out. The most votes wins (ties at random). If nobody votes, the map is picked at random between the trenches and Wake (then the mode). Esc shows the after-action report behind the vote. This is the new default (`T128_MAPS=vote`).
+- **Attrition**, a new trench mode: like Operation, but there is no attacker and defender. At the start each side holds only its home line; the four lines between are neutral. Either side can take the line next to its front, and an enemy line goes neutral before it changes hands, so lines can be lost and retaken. The side that takes the other's home line wins. After 40 minutes, the side holding more lines wins. A line strip at the top shows all six lines from your home to theirs, and bots push the next line past their front.
+- **Rifles reach across the map (800 m).** Past their effective range the damage falls off to a floor instead of the bullet vanishing: bolt 50 → 20, carbine 34 → 15, marksman 80 → 35, sniper → 50 at 800 m. Sweet spots are unchanged.
+- **Snipers kill with one body shot out to 260 m** (100 damage; it was 90, which left targets standing on 10 HP and looked like no damage at all). Rifle rounds fly faster (bolt 700 m/s, carbine 620, marksman 780, sniper 850; they were 420–620), so there is less drop and less lead at long range.
+
 ## v0.48 — Rejoin after a drop, /stuck, password recovery, 4× lighter art
 
 - **Rejoining after lag-out works.** A dropped player's old connection can look open to the server for minutes, so joining again said "That account is already playing" until the next match. Now the same account takes over its old place at once (same side and squad); the old window, if it is still open somewhere, shows "Playing elsewhere" and stops. Guests get the same, matched by name and browser (another browser still can't take a name in use).
@@ -458,7 +465,7 @@ Measured with 64 simulated players plus bots (266 soldiers) on a trench map, the
 - **Players:** the page is built for one map, so at the round change it saves the player's seat, reloads onto the new
   map (a second or two, everything cached) and rejoins by itself: same name, side and squad (a single-use rejoin ticket
   from the server), same loadout, deployed again. A page never reloads in a loop (at most 4 map reloads a minute).
-- **Settings:** `--maps random` (default), `--maps classic`, `--maps wake` (Wake Atoll only), `--maps rotate` (two trench maps, then Wake Atoll), or `--maps <number>` for one fixed map. `/health` shows the
+- **Settings:** `--maps vote` (default: players vote between rounds), `--maps random` (a new trench map every round), `--maps classic`, `--maps wake` (Wake Atoll only), `--maps rotate` (two trench maps, then Wake Atoll), or `--maps <number>` for one fixed map. `--mode ops|attrition|mix` sets the trench-map mode when there is no vote (env `T128_MAPS`, `T128_MODE`). `/health` shows the
   current map number. Tests run on the classic map.
 - **Fairness check:** `node tools/mapcheck.js 60` builds 60 maps and walks the bots' pathfinding from both home lines to
   every objective, depot, nest and gun, and compares the two sides' attack distances: 60 of 60 passed, sides within 5%.

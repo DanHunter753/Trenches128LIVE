@@ -36,7 +36,8 @@ const yawTo = (a, b) => Math.atan2(-(b.x - a.x), -(b.z - a.z));
   d.hp = 100; shoot(a, 'sniper', 1.75); await sleep(400);
   ck('scopedHeadshotKills', !d.alive && !(d.down > 0)); ck('headshotMarker', A.got('hm').some(m => m.h === 1 && m.k === 1));
   for (let i = 0; i < 40 && !d.alive; i++) await sleep(250);
-  d.hp = 100; shoot(a, 'sniper', 1.1); await sleep(400); ck('bodyShotNotInstant', d.alive && d.hp === 10);
+  d.hp = 100; shoot(a, 'sniper', 1.1); await sleep(400); ck('bodyShotNotInstant', !d.alive && d.down > 0);   // v0.49: a sniper body shot (100) downs a player: no instant kill, but he's out of the fight
+  d.down = .05; for (let i = 0; i < 40 && !d.alive; i++) await sleep(250);
   d.hp = 100; a.cls = 'rifleman'; shoot(a, 'carbine', 1.75); await sleep(400); a.cls = 'recon'; ck('otherClassHeadshotUnchanged', d.alive && d.hp === 66);
   for (let i = 0; i < 40 && !d.alive; i++) await sleep(250);
   // spotting: look at the enemy and press T
