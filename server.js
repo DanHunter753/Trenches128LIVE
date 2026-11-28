@@ -29,7 +29,10 @@ const CFG = {
   // Default random when run as a server; classic for tests (T128_TEST, or loaded in-process).
   // v0.30.1: where /download sends players when this server holds no installer of its own (public/launcher/latest.yml)
   launcherUrl: (v => /^https:\/\/[^\s"'<>]+$/.test(v) ? v : '')(String(sarg('launcher-url', process.env.T128_LAUNCHER_URL || ''))),
-  maps: (v => v === 'random' || v === 'classic' || v === 'wake' || v === 'rotate' || /^\d{1,10}$/.test(v) ? v : 'random')(String(sarg('maps', process.env.T128_MAPS || (require.main === module && !process.env.T128_TEST ? 'random' : 'classic')))),
+  // v0.49 'vote': players vote between rounds (trenches: Operation or Attrition, or Wake Atoll); the default for a real server.
+  maps: (v => v === 'random' || v === 'classic' || v === 'wake' || v === 'rotate' || v === 'vote' || /^\d{1,10}$/.test(v) ? v : 'vote')(String(sarg('maps', process.env.T128_MAPS || (require.main === module && !process.env.T128_TEST ? 'vote' : 'classic')))),
+  // v0.49 game mode on trench maps when nobody votes for it: 'ops' (Operation), 'attrition', or 'mix' (either, at random)
+  mode: (v => v === 'ops' || v === 'attrition' || v === 'mix' ? v : 'ops')(String(sarg('mode', process.env.T128_MODE || 'ops'))),
 };
 fs.mkdirSync(CFG.data, { recursive: true });
 const ACC = CFG.accounts === 'off' ? null : require('./accounts.js')(CFG.data);
@@ -38,8 +41,9 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = Math.random;
 
 // ------------------------------------------------------------------ world state
-let rotN = 0;   // v0.45 'rotate': two random trench maps, then Wake Atoll, and round again
-const mapPick = () => CFG.maps === 'rotate' ? (rotN++ % 3 === 2 ? T.WAKE_SEED : T.newSeed()) : CFG.maps === 'random' ? T.newSeed() : CFG.maps === 'classic' ? 0 : CFG.maps === 'wake' ? T.WAKE_SEED : +CFG.maps;
+let rotN = 0, attrT = 0; const ATTR_T = 40 * 60;   // v0.45 'rotate': two random trench maps, then Wake Atoll, and round again
+const isVote = () => CFG.maps === 'vote';
+const mapPick = () => isVote() ? T.newSeed() : CFG.maps === 'rotate' ? (rotN++ % 3 === 2 ? T.WAKE_SEED : T.newSeed()) : CFG.maps === 'random' ? T.newSeed() : CFG.maps === 'classic' ? 0 : CFG.maps === 'wake' ? T.WAKE_SEED : +CFG.maps;
 const isWake = () => T.MP.kind === 'wake';   // v0.43 Wake Atoll: an imported island played as Domination (no lines, no Operations)
 let mapSeed = T.setMap(mapPick()), nextMap = null;   // v0.30: this round's layout; the next one is generated in a worker during the end screen
 let terr = T.makeTerrain(), craters = [];
@@ -111,6 +115,9 @@ try { xpdb = JSON.parse(fs.readFileSync(XPFILE, 'utf8')); } catch (e) { }
 // ------------------------------------------------------------------ helpers
 const spawnLine = t => t === 0 ? OB.filter(o => o.owner === 0).pop() : OB.find(o => o.owner === 1);
 const nearO = (u, o) => isWake() ? Math.hypot(u.x - o.x, u.z - o.z) < DOM.r : Math.abs(u.x - o.x) < 34 && Math.abs(u.z - lineZ(o, u.x)) < 12;
+let gameMode = 'ops', nextMode = null, nextWx = null;   // v0.49: 'ops' | 'attr' | 'dom' (Wake)
+const isAttr = () => gameMode === 'attr' && !isWake();
+const attrNext = t => { const f = spawnLine(t); if (!f) return null; const i = OB.indexOf(f); return OB[i + (t === 0 ? 1 : -1)] || null; };
 const canCap = (i, t) => { if (op) return t === op.att && OB[i] === opTarget() && !op.regroup && !(OB[i].lock > 0); const o = OB[i]; if (o.owner === t || o.lock > 0) return false; const n = t === 0 ? OB[i - 1] : OB[i + 1]; return !!n && n.owner === t; };
 const maxHp = e => e.elite && T.ELITE[e.elite] ? T.ELITE[e.elite].hp : e.bot ? 100 : CLS[e.cls].hp;
 const faceYaw = t => t === 0 ? 0 : Math.PI;
@@ -502,7 +509,7 @@ function bulletStep(b, dt) {   // true when the bullet is spent
       if (!e.alive) continue; const P = histAt(e, b.rw, RW), ex = P[0] - x, ez = P[2] - z, ey = P[1], cr = P[3];
       if (Math.abs(ex) < .6 && Math.abs(ez) < .6 && y > ey && y < ey + (cr ? HIT_KNEEL : 1.9)) {
         const head = y >= ey + (cr ? HEAD_KNEEL : HEAD_STAND), scoped = b.by.cls === 'recon' && WPN[b.wk] && WPN[b.wk].scope;
-        const dmg = head && scoped ? 250 : b.sw && b.d >= b.sw[0] && b.d <= b.sw[1] ? b.sw[2] : b.dmg;   // recon scoped headshot kills outright; bolt/marksman/sniper sweet spot
+        const dmg = head && scoped ? 250 : WPN[b.wk] && WPN[b.wk].fo ? T.rangeDmg(WPN[b.wk], b.d, b.dmg) : b.sw && b.d >= b.sw[0] && b.d <= b.sw[1] ? b.sw[2] : b.dmg;   // recon scoped headshot kills outright; v0.49 rifles: sweet spot, then a fall-off to a floor at 800 m
         damage(e, dmg, b.by, head, null, b.wk === 'pistol' ? 'pistol' : undefined); return true;
       }
       if (Math.abs(ex) < 2.6 && Math.abs(ez) < 2.6 && Math.hypot(ex, ez, ey + 1.2 - y) < 2.6 && !(b.sup && b.sup.has(e.id))) { (b.sup || (b.sup = new Set())).add(e.id); suppress(e, b.wk, b.by); }
@@ -995,7 +1002,7 @@ function goal(b) {
   if (b.guard != null && OB[b.guard]) { const o = OB[b.guard]; return { x: o.x + b.ox, z: lineZ(o, o.x + b.ox) + (b.team === 0 ? 4 : -4) + b.oz, line: o }; }
   const od = orders[b.team].get(100 + b.squad);
   if (od && !(od.at > tickNo)) { const k = od.ty === 'defend' ? .5 : od.ty === 'move' ? .3 : 1; return { x: od.x + b.ox * k, z: od.z + b.oz * k }; }
-  const own = spawnLine(b.team), en = spawnLine(1 - b.team), sq = SQS[b.team][b.squad];
+  const own = spawnLine(b.team), en = isAttr() ? attrNext(b.team) : spawnLine(1 - b.team), sq = SQS[b.team][b.squad];   // v0.49 Attrition: push the next line past our front, neutral or enemy
   const o = ((b.squad < 2 || (op && b.team === op.att)) && wave.side === b.team && en && sq && sq.phase === 'push') ? en : own;
   return o ? { x: o.x + b.ox, z: lineZ(o, o.x + b.ox) + b.oz, line: o } : { x: 0, z: b.team === 0 ? HOME_Z : -HOME_Z };
 }
@@ -1411,12 +1418,13 @@ function objectivesTick() {
     const bl = cnt[i][0], rd = cnt[i][1]; if (o.lock > 0) o.lock -= DT;
     if (bl > rd && canCap(i, 0)) o.p = Math.min(1, o.p + DT * .07 * Math.min(3, bl - rd));
     else if (rd > bl && canCap(i, 1)) o.p = Math.max(-1, o.p - DT * .07 * Math.min(3, rd - bl));
-    else o.p = clamp(o.p + (o.owner === 0 ? 1 : -1) * DT * .03, -1, 1);
+    else o.p = o.owner < 0 ? (Math.abs(o.p) < DT * .03 ? 0 : o.p - Math.sign(o.p) * DT * .03) : clamp(o.p + (o.owner === 0 ? 1 : -1) * DT * .03, -1, 1);   // (a neutral line drifts back to the middle)
+    if (isAttr() && o.owner >= 0 && (o.owner === 0 ? o.p <= 0 : o.p >= 0)) { const was = o.owner; o.owner = -1; teamTell(was, o.n + ' has been neutralised. Retake it!'); teamTell(1 - was, o.n + ' is neutral: keep pushing to take it.'); }   // v0.49 Attrition: a line goes neutral before it changes hands
     let to = -1;
     if (o.p >= 1 && o.owner !== 0) to = 0; else if (o.p <= -1 && o.owner !== 1) to = 1;
     if (to >= 0 && op) { o.owner = to; o.p = to === 0 ? 1 : -1; sectorFalls(i); return; }
     if (to >= 0) {
-      o.owner = to; const nx = OB[i + (to === 0 ? 1 : -1)]; if (nx && nx.owner === 1 - to) nx.lock = 90;
+      o.owner = to; const nx = OB[i + (to === 0 ? 1 : -1)]; if (nx && nx.owner === 1 - to) nx.lock = isAttr() ? 30 : 90;
       for (const e of ents.values()) if (e.team === 1 - to && !e.alive) e.rt = Math.min(e.rt, 1.5);
       teamTell(to, 'Captured ' + o.n + '. The enemy is reinforcing the next line.'); teamTell(1 - to, 'Lost ' + o.n + '! Fall back and counterattack.');
       for (const p of humans) if (p.deployed && p.alive && p.team === to && (p.cmd || nearO(p, o))) { if (!p.cmd) st(p).cap++; addXp(p, p.cmd ? 40 : 60); }
@@ -1428,6 +1436,10 @@ function objectivesTick() {
   wave.t += DT; if (wave.t > 45) { wave.t = 0; wave.side = op ? op.att : 1 - wave.side; for (const t of [0, 1]) teamTell(t, wave.side === t ? 'Whistles blow. Your wave goes over the top!' : 'Enemy whistles. A wave is coming. Hold the line!'); }
   const w0 = OB.every(o => o.owner === 0), w1 = OB.every(o => o.owner === 1);
   if (!op && (w0 || w1)) endRound(w0 ? 0 : 1);
+  else if (isAttr()) {   // v0.49 Attrition: taking the enemy's home line wins; after 40 minutes the side holding more lines (then the better-pushed lines) wins
+    if (OB[OB.length - 1].owner === 0) endRound(0); else if (OB[0].owner === 1) endRound(1);
+    else if ((attrT += DT) >= ATTR_T) { const n0 = OB.filter(o => o.owner === 0).length, n1 = OB.filter(o => o.owner === 1).length, ps = OB.reduce((a, o) => a + o.p, 0); endRound(n0 !== n1 ? (n0 > n1 ? 0 : 1) : ps >= 0 ? 0 : 1); }
+  }
 }
 
 // ------------------------------------------------------------------ side objectives (flank depots)
@@ -1678,13 +1690,39 @@ function report(win) {   // after-action report
     dom: dom ? { s: dom.score.slice(), win: DOM.win, caps: dom.caps.slice(), rl: dom.rl.slice(), f: domFlags().map((o, i) => [(T.OBJ[i] && T.OBJ[i].id) || '', o.n, Math.round(dom.held[i][0]), Math.round(dom.held[i][1]), dom.fc[i]]) } : null };
 }
 function endRound(win) {
-  round = { state: 'ended', t: 15, win }; const rep = report(win); prepareNextMap();
+  round = { state: 'ended', t: isVote() ? VOTE_T + 6 : 15, win }; const rep = report(win); prepareNextMap(); if (isVote()) voteStart();
   for (const p of humans) if (p.ws && p.ws.open) send(p, { t: 'end', win, rep, me: p.st ? [p.st.k, p.st.d, p.st.a, p.st.sc, p.st.rev, p.st.cap, p.st.spot, p.st.ord] : null });
   for (const p of humans) if (p.deployed && p.team === win) addXp(p, 100);
 }
 // v0.30: the next round's map. The heightmap (about a second of work) is built in a worker thread while the end screen shows.
-function prepareNextMap() {
-  const seed = mapPick(); nextMap = { seed, H: null, F: null, used: seed };
+// ---- v0.49 map vote between rounds. Three cards: the trench map with Operation, the trench map with Attrition, and Wake Atoll
+// with Domination; each shows the time of day and weather it will have. Votes can change until the timer runs out; the most
+// votes wins (ties at random). No votes at all: the map is picked at random between the trenches and Wake, then the mode.
+const VOTE_T = 18, WX_CLOCK = { overcast: '14:00', fog: '07:00', rain: '16:00', night: '23:00' };
+let vote = null;
+function voteStart() {
+  const opts = [{ map: 'trench', mode: 'ops', n: 'The Trenches', g: 'OPERATION' }, { map: 'trench', mode: 'attr', n: 'The Trenches', g: 'ATTRITION' }, { map: 'wake', mode: 'dom', n: 'Wake Atoll', g: 'DOMINATION' }];
+  for (const o of opts) { o.wx = pickWx(); o.tm = WX_CLOCK[o.wx] || '12:00'; }
+  vote = { opts, by: new Map(), until: Date.now() + VOTE_T * 1000, done: -1 }; voteSend();
+}
+const voteCounts = () => vote.opts.map((_, i) => [...vote.by.values()].filter(v => v === i).length);
+function voteMsg(p) { return { t: 'vote', o: vote.opts.map(o => ({ n: o.n, g: o.g, wx: o.wx, tm: o.tm, k: o.map === 'wake' ? 'wake' : o.mode })), c: voteCounts(), s: Math.max(0, Math.ceil((vote.until - Date.now()) / 1000)), my: p && vote.by.has(p.id) ? vote.by.get(p.id) : -1, done: vote.done }; }
+function voteSend() { if (!vote) return; for (const p of humans) if (p.ws && p.ws.open) send(p, voteMsg(p)); }
+function voteCast(p, i) { if (!vote || vote.done >= 0 || !(i >= 0 && i < vote.opts.length)) return; vote.by.set(p.id, i | 0); voteSend(); }
+function voteTick() {
+  if (!vote || vote.done >= 0 || Date.now() < vote.until) return;
+  const c = voteCounts(), top = Math.max(...c); let i;
+  if (top === 0) { const wake = rnd() < .5; i = wake ? 2 : (rnd() < .5 ? 0 : 1); }   // nobody voted: trenches or Wake at random, then the mode
+  else { const best = c.map((n, k) => n === top ? k : -1).filter(k => k >= 0); i = best[Math.floor(rnd() * best.length)]; }
+  const o = vote.opts[i]; vote.done = i; nextWx = o.wx; nextMode = o.mode;
+  if (o.map === 'wake') nextMap = { seed: T.WAKE_SEED, H: null, F: null, used: T.WAKE_SEED };   // (the trench map built in the background is simply dropped)
+  else if (nextMap && nextMap.seed === T.WAKE_SEED) prepareNextMapSeed(T.newSeed());
+  console.log('[vote] ' + c.join('/') + ' -> ' + o.n + ' · ' + o.g + (top === 0 ? ' (no votes: random)' : ''));
+  voteSend(); round.t = Math.min(round.t, 5);
+}
+function prepareNextMap() { prepareNextMapSeed(mapPick()); }
+function prepareNextMapSeed(seed0) {
+  const seed = seed0; nextMap = { seed, H: null, F: null, used: seed };
   if (seed === mapSeed) return;   // same layout again (classic or a fixed seed): nothing to build
   let W; try { W = new (require('worker_threads').Worker)(path.join(__dirname, 'mapworker.js'), { workerData: { seed } }); } catch (e) { return; }
   const job = nextMap; W.on('message', r => { if (nextMap === job && r && r.seed != null) Object.assign(job, { used: r.seed, H: r.H, F: r.F }); }); W.on('error', e => console.error('map worker:', e.message)); W.unref();
@@ -1706,10 +1744,13 @@ function resetRound() {
    craters = []; grenades.length = 0; posts = []; aboxes = [];
   for (const p of humans) if (p.mg != null && NESTS[p.mg].fort) dismount(p, true);
   T.clearForts(); NESTS.length = BASE_NESTS; bcast({ t: 'fo', f: [] }); NAV.rebuild(); if (changed) NAV.clear();   // (routes cached on the old map would mislead bots for seconds)
-  OB.forEach((o, i) => { o.owner = i < 3 ? 0 : 1; o.p = i < 3 ? 1 : -1; o.lock = 0; });
-  supply = [12, 12]; op = isWake() ? null : newOp(op ? op.def : 0); wave = { side: op ? op.att : 0, t: 0 }; dom = null;
+  gameMode = isWake() ? 'dom' : nextMode || (CFG.mode === 'attrition' ? 'attr' : CFG.mode === 'mix' ? (rnd() < .5 ? 'attr' : 'ops') : 'ops'); nextMode = null; attrT = 0;
+  const L = OB.length - 1;
+  if (gameMode === 'attr') OB.forEach((o, i) => { o.owner = i === 0 ? 0 : i === L ? 1 : -1; o.p = i === 0 ? 1 : i === L ? -1 : 0; o.lock = 0; });   // v0.49 Attrition: only the home lines are held
+  else OB.forEach((o, i) => { o.owner = i < 3 ? 0 : 1; o.p = i < 3 ? 1 : -1; o.lock = 0; });
+  supply = [12, 12]; op = isWake() || gameMode === 'attr' ? null : newOp(op ? op.def : 0); wave = { side: op ? op.att : 0, t: 0 }; dom = null;
   orders[0].clear(); orders[1].clear(); crates.length = 0; sched = []; supCd = [supZero(), supZero()]; for (const e of ents.values()) { e.st = null; e.elite = null; if (e.w0) { e.w = e.w0; e.w0 = null; } e.burn = 0; e.goTo = null; } for (const p of humans) p.st = null;
-  VEHM.reset(); ekits.length = 0; kits.length = 0; fires.length = 0; flares.length = 0; alarms.length = 0; setWx(pickWx()); roundStartExtras(); cmdPts = [CP_START, CP_START]; smokes.length = 0; gases.length = 0; recons.length = 0; marks.length = 0; SQM.clear(); alertAt.clear(); vis[0].clear(); vis[1].clear(); for (const d of DP) { d.owner = -1; d.p = 0; } for (const e of ents.values()) e.depot = null;
+  VEHM.reset(); ekits.length = 0; kits.length = 0; fires.length = 0; flares.length = 0; alarms.length = 0; setWx(nextWx || pickWx()); nextWx = null; roundStartExtras(); cmdPts = [CP_START, CP_START]; smokes.length = 0; gases.length = 0; recons.length = 0; marks.length = 0; SQM.clear(); alertAt.clear(); vis[0].clear(); vis[1].clear(); for (const d of DP) { d.owner = -1; d.p = 0; } for (const e of ents.values()) e.depot = null;
   for (const p of humans) if (p.mg != null) dismount(p, true);
   for (const n of NESTS) { n.belt = 150; n.heat = 0; n.over = false; n.occ = null; if (n.bot) leaveFortNest(n.bot); }
   for (const e of ents.values()) { e.died = false; e.oob = 0; e.alive = false; e.down = 0; e.rt = .5 + rnd(); e.placed = false; e.para = false; e.hold = null; e.climb = null; e.cov = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; }
@@ -2111,7 +2152,7 @@ let bytesOut = 0, tickMs = 0, tickMax = 0, slowN = 0, gapMax = 0, lastTickAt = 0
 function broadcastState() {
   let objMsgs = null;
   if (tickNo % 10 === 0) {
-    const base = { t: 'o', ds: dom ? [dom.score[0], dom.score[1], DOM.win] : undefined, o: OB.map(o => [o.owner, +o.p.toFixed(2), Math.ceil(o.lock)]), w: [wave.side, Math.round(wave.t)], r: round.state, hv: [...humans].filter(p => p.deployed).length,
+    const base = { t: 'o', gm: gameMode, ds: dom ? [dom.score[0], dom.score[1], DOM.win] : undefined, o: OB.map(o => [o.owner, +o.p.toFixed(2), Math.ceil(o.lock)]), w: [wave.side, Math.round(wave.t)], r: round.state, hv: [...humans].filter(p => p.deployed).length,
       dp: DP.map(d => [d.owner, +d.p.toFixed(2)]), op: op && [op.att, op.sector, OPS.nsec, op.tk, op.tkMax, op.bat, OPS.nbat, Math.ceil(op.regroup), op.stall ? 1 : 0, OB.indexOf(opTarget())] };
     const fpFor = t => posts.filter(q => q.team === t || [...humans].some(h => h.team === t && h.alive && !h.cmd && Math.hypot(h.x - q.x, h.z - q.z) < 110)).map(q => [q.id, q.team, +q.x.toFixed(1), +q.z.toFixed(1), Math.ceil(q.hp), q.rally ? Math.max(0, Math.ceil((q.rally - tickNo) / TICK)) : 0, q.radio ? [+q.radio.x.toFixed(2), +q.radio.z.toFixed(2), +q.radio.yaw.toFixed(2), +q.y.toFixed(2)] : 0]);   // [5] rally point seconds left, [6] a building's respawn point: where its radio stands
     const abFor = t => aboxes.filter(b => b.team === t || [...humans].some(h => h.team === t && h.alive && Math.hypot(h.x - b.x, h.z - b.z) < 80)).map(b => [b.id, b.team, +b.x.toFixed(2), +b.z.toFixed(2), b.uses]);
@@ -2163,7 +2204,7 @@ const loadNow = () => [Math.round(Math.max(LOADW[0][0], LOADW[1][0])), Math.roun
 function tickBody() {
   const t0 = process.hrtime.bigint(); tickNo++; PROF.clear();
   { const now = hr(); if (lastTickAt) { const gap = now - lastTickAt; if (gap > gapMax) gapMax = gap; } lastTickAt = now; }
-  if (round.state === 'ended') { round.t -= DT; if (round.t <= 0) resetRound(); }
+  if (round.state === 'ended') { voteTick(); round.t -= DT; if (round.t <= 0) { vote = null; resetRound(); } }
   if (tickNo % TICK === 0) { guard('nestfix', nestAutofix); guard('phonefix', phoneAutofix); }
   { const t = hr(); buildGrid(); computeLeaders(); prof('grid', hr() - t); } guard('nav', () => NAV.tick()); if (tickNo % 20 === 0) guard('squads', squadTick);
   { const due = sched.filter(s => s.at <= tickNo); if (due.length) { sched = sched.filter(s => s.at > tickNo); for (const s of due) { try { s.fn(); } catch (e) { console.error(e); } } } }
@@ -2229,6 +2270,7 @@ function onText(c, txt) {
     c.player = e; humans.add(e);
     send(e, { t: 'prof', id: e.id, team, xp: e.xp, rank: T.rankOf(e.xp), sq: sqSizes(team), max: SQ_MAX, acct: acct ? 1 : 0, name: e.name, server: CFG.name, map: mapSeed, back: back ? back.sq : null });
     send(e, perkState(e));   // v0.47
+    if (vote && round.state === 'ended') send(e, voteMsg(e));   // v0.49: joined during the map vote
   } else if (!p) return;
   else if (m.t === 'join' || m.t === 'loadout') {
     let l = T.fixLoadout(p.xp, m); let sq = m.sq | 0; const sz = sqSizes(p.team);
@@ -2256,10 +2298,11 @@ function onText(c, txt) {
   } else if (m.t === 'tp' && process.env.T128_TEST && Number.isFinite(+m.x) && Number.isFinite(+m.z)) { p.x = +m.x; p.z = +m.z; p.y = T.hAt(terr.H, p.x, p.z); p.vy = 0; p.cl = null;
   } else if (m.t === 'dmg' && process.env.T128_TEST && Number.isFinite(+m.n)) { damage(p, +m.n, null, !!m.head);
   } else if (m.t === 'tk' && process.env.T128_TEST) { const v = VEHM.spawnTank(p.team, 'test'); if (v) { v.x = p.x + 8; v.z = p.z; v.yaw = p.yaw; v.order = { x: v.x, z: v.z }; }
-  } else if (m.t === 'tround' && process.env.T128_TEST && round.state === 'play') { endRound(m.win === 1 ? 1 : 0); round.t = 3;   // test: end the round now, reset 3 s later
+  } else if (m.t === 'tround' && process.env.T128_TEST && round.state === 'play') { endRound(m.win === 1 ? 1 : 0); round.t = 3; if (vote) { const vt = Number.isFinite(+m.vt) ? clamp(+m.vt, 1, 60) : VOTE_T; vote.until = Date.now() + vt * 1000; round.t = vt + 4; voteSend(); }   // test: end the round now, reset 3 s later (vote mode: after the vote; m.vt shortens it)
   } else if (m.t === 'wxs' && process.env.T128_TEST && T.WXS[m.k]) { setWx(m.k);
   } else if (m.t === 'act') onAct(p, String(m.a), m);
   else if (m.t === 'perk') perkMsg(p, m);
+  else if (m.t === 'vote') voteCast(p, +m.i);
   else if (m.t === 'cmd') { if (p.deployed && p.cmd && p.alive) { if (m.k === 'order') issueOrder(p, m); else if (m.k === 'sup') callSupport(p, m); } }
   else if (m.t === 'ping') { if (Number.isFinite(m.p)) p.ping = clamp(Math.round(m.p), 0, 9999); const ld = loadNow(); send(p, { t: 'pong', c: m.c, s: ld[0], g: ld[1] }); }   // the client reports the round trip it last measured (for the scoreboard)
   else if (m.t === 'chat') chatMsg(p, m);
@@ -2404,8 +2447,8 @@ const server = http.createServer((req, res) => {
   if (u.startsWith('/api/') || u === '/servers' || u === '/announce') return api(req, res, u);
   if (u === '/vendor/three.min.js') return fs.readFile(path.join(__dirname, 'public', 'vendor', 'three.min.js'), (err, data) => { if (err) { res.statusCode = 404; return res.end('not found'); } res.setHeader('content-type', 'text/javascript; charset=utf-8'); res.setHeader('cache-control', 'public, max-age=604800'); res.end(data); });
   if (u.startsWith('/assets/')) {   // static art: flat whitelist, no sub-paths
-    const nm = u.slice(8), ext = path.extname(nm), ct = { '.png': 'image/png', '.json': 'application/json', '.mp3': 'audio/mpeg' }[ext];
-    if (!ct || !/^[A-Za-z0-9_]+\.(png|json|mp3)$/.test(nm)) { res.statusCode = 404; return res.end('not found'); }
+    const nm = u.slice(8), ext = path.extname(nm), ct = { '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json', '.mp3': 'audio/mpeg' }[ext];
+    if (!ct || !/^[A-Za-z0-9_]+\.(png|jpg|json|mp3)$/.test(nm)) { res.statusCode = 404; return res.end('not found'); }
     return fs.readFile(path.join(__dirname, 'public', 'assets', nm), (err, data) => { if (err) { res.statusCode = 404; return res.end('not found'); } res.setHeader('content-type', ct); res.setHeader('cache-control', 'public, max-age=3600'); res.end(data); });
   }
   if (u.startsWith('/maps/')) {   // v0.43 imported maps (public/maps): the heightmap, its json and the browser bundle, gzipped when the client takes it
@@ -2480,7 +2523,9 @@ fs.mkdirSync(path.join(__dirname, 'public'), { recursive: true });
 VEHM = require('./vehicles.js')({ aaDps: (team, x, z) => aaFor(1 - team).filter(a => Math.hypot(a.x - x, a.z - z) < AA_R).length * AA_DPS * 1.6, T, ents, humans, DT, TICK, terr: () => terr, tickNo: () => tickNo, damage, explode, send, bcast, tell, teamTell, addXp, supply: () => supply, fireBullet,
   forNear, op: () => op, opTarget, lineZ, spawnLine, wave: () => wave, removeFort, alert, smokeBlocks, sightAt, addCrew, homeZ, faceYaw, later, killFeedRaw });
 T.WX.k = pickWx();
-NAV.rebuild(); fillBots(); op = isWake() ? null : newOp(0); wave.side = op ? op.att : 0; if (isWake()) domReset(); roundStartExtras();   // bots and flag guards exist before the first tick, so guards start on their flag
+gameMode = isWake() ? 'dom' : CFG.mode === 'attrition' ? 'attr' : CFG.mode === 'mix' && rnd() < .5 ? 'attr' : 'ops';
+if (gameMode === 'attr') OB.forEach((o, i) => { const L = OB.length - 1; o.owner = i === 0 ? 0 : i === L ? 1 : -1; o.p = i === 0 ? 1 : i === L ? -1 : 0; });
+NAV.rebuild(); fillBots(); op = isWake() || gameMode === 'attr' ? null : newOp(0); wave.side = op ? op.att : 0; if (isWake()) domReset(); roundStartExtras();   // bots and flag guards exist before the first tick, so guards start on their flag
 if (process.env.T128_FAST) { const run = () => { for (let i = 0; i < 20; i++) { try { tick(); } catch (e) { console.error('tick error', e); } } setImmediate(run); }; setImmediate(run); }   // simulation fast-forward (balance tests)
 else setInterval(() => { try { tick(); } catch (e) { console.error('tick error', e); } }, 1000 / TICK);
 server.listen(PORT, () => console.log(`Trench 128 v${VERSION} "${CFG.name}" on http://localhost:${PORT}  (fill ${FILL}/team, ${SLOTS} human slots/team, accounts ${CFG.accounts}${CFG.registry ? ', server list' : ''}${CFG.master ? ', listed at ' + CFG.master : ''}, data ${CFG.data})`));
@@ -2489,4 +2534,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { pkt: { chatMsg, perkMsg, perkState, startReload, downEnt, damage, maskAct, psMag, kits: () => kits, buildPost, reconSpot, fireWeapon, posts: () => posts }, domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { vt: { canCap, round: () => round, op: () => op, vote: () => vote, voteStart, voteCast, voteTick, gameMode: () => gameMode, attrNext, isAttr, setMode: m => { CFG.mode = m; }, setMaps: m => { CFG.maps = m; } }, pkt: { chatMsg, perkMsg, perkState, startReload, downEnt, damage, maskAct, psMag, kits: () => kits, buildPost, reconSpot, fireWeapon, posts: () => posts }, domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
