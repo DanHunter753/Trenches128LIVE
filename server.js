@@ -62,12 +62,16 @@ const lineZ = (o, x) => isWake() ? o.z : T.trenchC(o.t, x);   // the line's cent
 let supply = [12, 12], wave = { side: 0, t: 0 }, sT = 0, round = { state: 'play', t: 0, win: -1 };
 // ---- Operations: one team attacks the other's three lines (sectors) in order, on a ticket pool, with three battalions
 const OPS = { nsec: 3, nbat: 3, regroup: 15, stallMax: 30, oobGrace: 10 };
+// v0.55 Operation was quick and favoured the attackers: a defender on his own line counts as 1.5 men, attackers take a line
+// at 60% of the old rate, an uncontested line swings back to its holders twice as fast, 1.4 tickets per player, and the
+// next line is locked for 60 s after a sector falls.
+const OP_BAL = { defW: 1.5, cap: .042, back: .06, tk: 1.4, lock: 60 };
 let op = null;
 const defLines = att => att === 0 ? [3, 4, 5] : [2, 1, 0];          // defender lines, front first
 const attSide = att => att === 0 ? 1 : -1;                           // +z is blue's side
 function newOp(att) {
   const n = [...ents.values()].filter(e => e.team === att && !e.cmd).length + [...humans].filter(h => h.team === att && h.deployed).length;
-  const tkMax = Math.max(70, Math.round(Math.max(n, 40) * 1.8));   // v0.27: 1.8 per player; about half of all downed men are now revived, so each ticket goes further   // tuned with fast-forward bot matches on the 320 m map (v0.24)
+  const tkMax = Math.max(60, Math.round(Math.max(n, 40) * OP_BAL.tk));   // v0.55 fewer tickets per push (was 1.8 per player)   // v0.27: 1.8 per player; about half of all downed men are now revived, so each ticket goes further   // tuned with fast-forward bot matches on the 320 m map (v0.24)
   return { att, def: 1 - att, sector: 0, tk: tkMax, tkMax, bat: 0, stall: 0, regroup: 0 };
 }
 const opTarget = () => op && OB[defLines(op.att)[op.sector]];
@@ -427,7 +431,7 @@ function downEnt(e, by) {   // knocked down instead of killed: a medic can reviv
   for (const q of humans) if (q !== e && q.team === e.team && q.deployed && q.alive && q.cls === 'medic' && Math.hypot(q.x - e.x, q.z - e.z) < 60) tell(q, e.name + ' is down — hold [E] next to them to revive');
 }
 function finishDown(e, msg) {
-  if (e.bot) { e.down = 0; e.died = true; bodyOut(e, null); e.rt = 8 + rnd() * 4; return; }
+  if (e.bot) { e.down = 0; e.died = true; bodyOut(e, null); e.rt = (8 + rnd() * 4) * (op && e.team === op.def ? .75 : 1); return; }
   e.down = 0; e.rt = .6; e.ready = false; send(e, { t: 'dead', by: msg || 'bleeding out', rt: e.rt });
 }
 function reviveEnt(e, by) {
@@ -446,7 +450,7 @@ function bodyOut(e, imp) { kits.push({ x: e.x, z: e.z, until: tickNo + 90 * TICK
 function killEnt(e, by) {
   e.died = true; moraleHit(e, 8);
   if (!e.cmd) bodyOut(e, e._imp); e._imp = null; if (e.fortNest) leaveFortNest(e);
-  e.alive = false; e.hp = 0; e.down = 0; e.rt = e.bot ? 9 + rnd() * 4 : 5;
+  e.alive = false; e.hp = 0; e.down = 0; e.rt = (e.bot ? 9 + rnd() * 4 : 5) * (op && e.team === op.def ? .75 : 1);   // v0.55 defenders are back in the fight sooner
   if (e.mg != null && !e.bot) dismount(e, true); if (e.veh) VEHM.leave(e, true);
   if (e.elite === 'flame') { const x = e.x, z = e.z, k = by && by.team !== e.team ? by : null; later(0, () => explode(x, z, k, .45)); }   // a holed fuel tank goes up
   killFeed(e, by, arguments[2]); creditKill(e, by, arguments[2]);
@@ -1450,10 +1454,10 @@ function objectivesTick() {
   const cnt = OB.map(() => [0, 0]);
   for (const e of ents.values()) if (e.alive && !e.cmd) OB.forEach((o, i) => { if (nearO(e, o)) cnt[i][e.team]++; });
   OB.forEach((o, i) => {
-    const bl = cnt[i][0], rd = cnt[i][1]; if (o.lock > 0) o.lock -= DT;
-    if (bl > rd && canCap(i, 0)) o.p = Math.min(1, o.p + DT * .07 * Math.min(3, bl - rd));
-    else if (rd > bl && canCap(i, 1)) o.p = Math.max(-1, o.p - DT * .07 * Math.min(3, rd - bl));
-    else o.p = o.owner < 0 ? (Math.abs(o.p) < DT * .03 ? 0 : o.p - Math.sign(o.p) * DT * .03) : clamp(o.p + (o.owner === 0 ? 1 : -1) * DT * .03, -1, 1);   // (a neutral line drifts back to the middle)
+    const dw = op ? [op.def === 0 ? OP_BAL.defW : 1, op.def === 1 ? OP_BAL.defW : 1] : [1, 1], bl = cnt[i][0] * dw[0], rd = cnt[i][1] * dw[1], cr = op ? OP_BAL.cap : .07, br = op ? OP_BAL.back : .03; if (o.lock > 0) o.lock -= DT;
+    if (bl > rd && canCap(i, 0)) o.p = Math.min(1, o.p + DT * cr * Math.min(3, bl - rd));
+    else if (rd > bl && canCap(i, 1)) o.p = Math.max(-1, o.p - DT * cr * Math.min(3, rd - bl));
+    else o.p = o.owner < 0 ? (Math.abs(o.p) < DT * .03 ? 0 : o.p - Math.sign(o.p) * DT * .03) : clamp(o.p + (o.owner === 0 ? 1 : -1) * DT * br, -1, 1);   // (a neutral line drifts back to the middle)
     if (isAttr() && o.owner >= 0 && (o.owner === 0 ? o.p <= 0 : o.p >= 0)) { const was = o.owner; o.owner = -1; teamTell(was, o.n + ' has been neutralised. Retake it!'); teamTell(1 - was, o.n + ' is neutral: keep pushing to take it.'); }   // v0.49 Attrition: a line goes neutral before it changes hands
     let to = -1;
     if (o.p >= 1 && o.owner !== 0) to = 0; else if (o.p <= -1 && o.owner !== 1) to = 1;
@@ -1670,7 +1674,7 @@ function sectorFalls(i) {
   if (op.sector >= OPS.nsec) { opMsg('won', { n: o.n }); endRound(att); return; }
   op.tk = op.tkMax; op.stall = 0;
   const nxt = opTarget(), sd = attSide(att), lost = (x, z) => (z - lineZ(nxt, x)) * sd > 6;   // ground now behind the attackers' line
-  nxt.lock = 40;   // v0.27: the defenders get 40 s to man the next line before it can be taken (lines used to fall within half a minute of each other)
+  nxt.lock = OP_BAL.lock;   // v0.27: the defenders get 40 s to man the next line before it can be taken (lines used to fall within half a minute of each other)
   for (const q of posts.slice()) if (q.team === def && !q.fort && lost(q.x, q.z)) posts = posts.filter(r => r !== q);
   for (const f of [...T.FORTS.values()]) if (f.team === def && lost(f.x, f.z)) removeFort(f);      // demolished as the defenders fall back
   VEHM.groundLost(def, lost); eliteStock(0, true); eliteStock(1, true);
