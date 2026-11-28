@@ -121,7 +121,7 @@ module.exports = function (C) {
     p.vy = 0; p.cl = null; p.crouch = false;
     C.send(p, { t: 'veh', id: v.id, seat, k: v.k });
     C.tell(p, v.k === 'plane' ? 'Biplane: W throttle up (S down), steer with the mouse, pull up to take off. LMB guns; hold RMB for the bombsight, click to drop. [C] outside view, [F] get out once landed.' : v.k === 'tank' ? (seat === 0 ? 'Driving: WASD to move, mouse lays the main gun, click to fire. [F] get out, [C] outside view.' : 'Hull machine gun: hold click to fire. [F] get out, [C] outside view.')
-      : v.k === 'fgun' ? 'Field gun: aim with the mouse (the sight shows the range), click to fire. 1 supply a shell. [F] leave.' : 'Trench mortar: mouse left/right to traverse, up/down sets the range. Click to fire. 1 supply a bomb. [F] leave.');
+      : v.k === 'fgun' ? 'Field gun: aim with the mouse (the sight shows the range), click to fire.  [F] leave.' : 'Trench mortar: mouse left/right to traverse, up/down sets the range. Click to fire.  [F] leave.');
     return true;
   }
   function leave(p, quiet) {
@@ -266,7 +266,7 @@ module.exports = function (C) {
   function fireGun(v, by, ai) {
     if (v.rl > 0 || v.dead) return false;
     const D = VEH[v.k];
-    if (!by.bot) { const sup = C.supply(); if (sup[v.team] < 1) { if ((by.msgCd || 0) <= now()) { C.tell(by, 'No supplies for shells'); by.msgCd = now() + 2 * TICK; } return false; } sup[v.team]--; }
+    // v0.52: shells cost nothing; supply is only for building
     const yaw = v.base.yaw + v.gy, [fx, fz] = fwd(yaw);
     if (v.k === 'fgun') fireShell(v.x + fx * 2.4, v.y + 1.2, v.z + fz * 2.4, yaw + (ai ? 0 : (rnd() - .5) * .006), v.gp, D.v, by, 1, v.team, v);
     else { const r = v.rng * (1 + (rnd() - .5) * .07); fireShell(v.x + fx * .4, v.y + .9, v.z + fz * .4, yaw + (rnd() - .5) * .035, D.th, T.mortarV(r), by, .75, v.team, v); }

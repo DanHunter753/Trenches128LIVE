@@ -39,7 +39,7 @@ const input = (c, f, s, bits, yaw, pitch, n) => { const cmds = []; for (let i = 
   place(a, fg.seat.x, fg.seat.z); A.send({ t: 'act', a: 'mg' }); await sleep(200);
   ck('enterFieldGun', a.veh === fg && A.got('veh', m => m.k === 'fgun').length === 1 && fg.crew.manned === true);
   { const s0 = X.supply()[0], n0 = A.got('shl').length; fg.rl = 0; input(A, 0, 0, 8, fg.base.yaw, .2, 2); await sleep(250); input(A, 0, 0, 0, fg.base.yaw, .2, 1);
-    ck('fieldGunFires', A.got('shl').length === n0 + 1 && X.supply()[0] === s0 - 1 && Math.abs(fg.gp - .2) < .01);
+    ck('fieldGunFires', A.got('shl').length === n0 + 1 && X.supply()[0] === s0 && Math.abs(fg.gp - .2) < .01);
     await sleep(3500); ck('shellBursts', A.got('shx').length >= 1); }
   A.send({ t: 'act', a: 'mg' }); await sleep(1500); A.send({ t: 'act', a: 'mg' }); await sleep(200);
   ck('leaveGun', !a.veh && fg.crew.manned === false || a.veh === fg);   // the second F may re-enter: either state is consistent

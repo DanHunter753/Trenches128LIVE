@@ -860,7 +860,7 @@ const PERKS = {
   quick: { n: 'Quick Hands', c: '*', cost: 1, st: 1, d: 'Reload 8% faster' },
   dress: { n: 'Field Dressing', c: '*', cost: 1, st: 1, d: 'Your bandages heal 10 HP more' },
   light: { n: 'Light Pack', c: '*', cost: 1, st: 1, d: '4% faster on your feet', t: 'One grenade fewer' },
-  pockets: { n: 'Deep Pockets', c: '*', cost: 2, d: 'Every third reload costs no supply', t: '3% slower' },
+  pockets: { n: 'Deep Pockets', c: '*', cost: 2, d: '6 spare magazines instead of 4', t: '3% slower' },   // v0.52
   steady: { n: 'Steady Hands', c: '*', cost: 2, d: '10% tighter aim-down-sights spread', t: 'Aiming in takes 10% longer' },
   gasdrill: { n: 'Gas Drill', c: '*', cost: 1, d: 'Gas mask on in 0.9 s instead of 1.5 s' },
   lastwords: { n: 'Last Words', c: '*', cost: 2, d: 'Last stand: 2 more revolver rounds and 15 more health', t: 'You bleed out 20% sooner' },

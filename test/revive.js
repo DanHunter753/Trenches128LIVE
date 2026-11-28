@@ -57,7 +57,7 @@ const place = (e, x, z) => { e.x = x; e.z = z; e.y = 0; };
   ck('revBySet', g.revBy === m);
   // 3b. needs supplies
   place(g, 1.2, 80); S._test.damage(g, g.hp + 10, enemy, false); await sleep(100); S._test.setSupply(0, 0); MED.send({ t: 'act', a: 'revive' }); await sleep(120);
-  ck('reviveNeedsSupply', g.down > 0 && MED.msgs.some(x => x.t === 'msg' && /2 supplies/.test(x.m))); S._test.setSupply(0, 60); g.alive = true; g.down = 0; g.hp = 100; g.revBy = m;
+  ck('reviveIsFree', !MED.msgs.some(x => x.t === 'msg' && /supplies/.test(x.m))); m.rvTgt = null; m.rvT = 0;   // v0.52 reviving costs no supply S._test.setSupply(0, 60); g.alive = true; g.down = 0; g.hp = 100; g.revBy = m;
   // 4. kill share: the revived soldier's kill pays the medic 4
   const gx0 = g.xp || 0, mx1 = m.xp; const victim = [...S._test.ents.values()].find(e => e.bot && e.team === 1 && e.alive);
   S._test.damage(victim, 999, g, true); await sleep(150);

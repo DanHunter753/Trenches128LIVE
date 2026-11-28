@@ -74,6 +74,12 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.52 — Magazines, and supply is for building
+
+- **Magazines:** you carry 4 spare magazines (6 with the **Deep Pockets** perk, which used to save supply on reloads). Each reload uses one, shown as magazine icons above the ammo counter; with none left you can't reload. Refill them all at a gunner's ammo box, or slowly in your base (one every 6 s, with a small chime). Bots keep endless clips.
+- **Supply is your own, and only for building:** fortifications, field posts, respawn points, ammo boxes and digging. Everyone starts with 50 (sappers 250) and gains 2 a second standing within 25 m of an objective, up to a class cap: rifleman 100, assault 50, gunner 75, medic 150, sapper 250, recon 50.
+- **Free now:** grenades, rifle grenades, bandages, revives, MG belts, and field-gun and mortar shells.
+
 ## v0.51 — Mortar warning, slower planes, the vote click fixed, Attrition at 15 min
 
 - **Mortars:** bombs fly a steeper, slower arc (about 8 s at full range, was 5 s), and a long falling whistle plays about 3 s before one lands within 70 m of you.

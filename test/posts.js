@@ -27,13 +27,13 @@ function client(name, team, join) {
   const G = await client('GruntP', 0, { cls: 'rifleman', w: 'bolt', u: 'bandage', sq: 2 });
   const RD = await client('RedP', 1, { cls: 'rifleman', w: 'bolt', u: 'bandage', sq: 0 });
   await sleep(1500);
-  S._test.setSupply(0, 50); const s0 = S._test.supply()[0];
+  S._test.setSupply(0, 50); SP.ent().sup = 50; const s0 = SP.ent().sup;   // v0.52 building comes from the builder's own supply
   const se = SP.ent(); se.x = 0; se.z = 80; se.y = 0;     // open ground near blue's side, away from enemies
   RD.ent().z = -95; RD.ent().x = 0;   // red far from the post (>110 m) until it moves closer
   SP.send({ t: 'act', a: 'fob' }); await sleep(400);
   const P = S._test.posts();
   ck('built', P.length === 1 && P[0].team === 0);
-  ck('costsSupply', S._test.supply()[0] <= s0 - 10 + 3);
+  ck('costsSupply', SP.ent().sup <= s0 - 10 + 3);
   SP.send({ t: 'act', a: 'fob' }); await sleep(300);
   ck('cooldownBlocksSecond', S._test.posts().length === 1 && SP.said(/wait \d+s/));
   await sleep(1200);

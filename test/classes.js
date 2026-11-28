@@ -10,7 +10,7 @@ let nid = 9800; const mk = (cls, w, team) => { const p = { id: nid++, team: team
   await sleep(1500); X.setSupply(0, 100);
   const g = mk('gunner', 'lmg'), m = mk('rifleman', 'bolt'), a = mk('assault', 'smg'), red = mk('rifleman', 'bolt', 1);
   // ---- ammo box
-  X.abilityAct(g); const bx = X.aboxes()[0]; ck('boxDropped', X.aboxes().length === 1 && bx.team === 0 && X.supply()[0] === 97);
+  X.abilityAct(g); const bx = X.aboxes()[0]; ck('boxDropped', X.aboxes().length === 1 && bx.team === 0 && g.sup === 47);   // v0.52: from the gunner's own supply
   X.abilityAct(g); ck('boxCooldown', X.aboxes().length === 1);
   for (const p of [m, red]) { p.x = bx.x + .5; p.z = bx.z; p.y = T.hAt(X.terrH(), p.x, p.z); p.ammo = 0; p.gr = 0; p.bd = 0; }
   await sleep(800);
@@ -53,7 +53,7 @@ let nid = 9800; const mk = (cls, w, team) => { const p = { id: nid++, team: team
   const ng = X.grenades.length; rf.cd = 0; X.fireWeapon(rf); ck('rgNotBeforeFitted', X.grenades.length === ng && rf.rg === 1);
   X.abilityAct(rf); ck('rgUnload', rf.rg === 0 && rf.gr === 2); X.abilityAct(rf); await sleep(1150);
   rf.cd = 0; rf.pitch = .3; const sup0 = X.supply()[0], am0 = rf.ammo; X.fireWeapon(rf); const g1 = X.grenades[X.grenades.length - 1];
-  ck('rgLaunched', X.grenades.length === ng + 1 && g1.pow === T.RG.pow && g1.t > 1 && rf.gr === 1 && rf.rg === 0 && rf.ammo === am0 && X.supply()[0] === sup0 - 2);
+  ck('rgLaunched', X.grenades.length === ng + 1 && g1.pow === T.RG.pow && g1.t > 1 && rf.gr === 1 && rf.rg === 0 && rf.ammo === am0 && X.supply()[0] === sup0);
   // a bot rifleman lobs one onto a manned enemy gun 70 m off
   { const H = X.terrH(), b = mk('rifleman', 'bolt'), gn = mk('gunner', 'lmg', 1); b.gr = 2; b.rgCd = 0; X.setSupply(0, 50);
     b.x = 0; b.z = 125; b.y = T.hAt(H, 0, 125); gn.x = 70; gn.z = 125; gn.y = T.hAt(H, 70, 125); gn.mg = 0; gn.manned = true; await sleep(200);
