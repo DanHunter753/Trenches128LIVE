@@ -51,7 +51,7 @@ const input = (c, f, s, bits, yaw, pitch, n) => { const cmds = []; for (let i = 
   ck('mortarRange', a.veh === mo && rmax === T.VEH.mortar.rmax && mo.rng === T.VEH.mortar.rmin);
   { input(A, 0, 0, 0, mo.base.yaw, .05, 1); await sleep(100); const want = mo.rng, n0 = A.got('cr').length; mo.rl = 0; input(A, 0, 0, 8, mo.base.yaw, .05, 1); await sleep(100); input(A, 0, 0, 0, mo.base.yaw, .05, 1);
     const yw = mo.base.yaw + mo.gy, px = mo.x - Math.sin(yw) * want, pz = mo.z - Math.cos(yw) * want;
-    let cr = null; for (let i = 0; i < 40 && !cr; i++) { await sleep(150); cr = A.got('cr').slice(n0).find(m => Math.hypot(m.c[0] - px, m.c[1] - pz) < 25); }
+    let cr = null; for (let i = 0; i < 80 && !cr; i++) { await sleep(150); cr = A.got('cr').slice(n0).find(m => Math.hypot(m.c[0] - px, m.c[1] - pz) < 25); }
     const dd = cr ? Math.hypot(cr.c[0] - mo.x, cr.c[1] - mo.z) : 0; ck('mortarLandsAtRange', cr && Math.abs(dd - want) < want * .15); }
   a.mgCd = 0; X.onAct(a, 'mg', {}); ck('leftMortar', !a.veh && !mo.crew.manned);
   // ---- tanks

@@ -41,7 +41,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = Math.random;
 
 // ------------------------------------------------------------------ world state
-let rotN = 0, attrT = 0; const ATTR_T = 40 * 60;   // v0.45 'rotate': two random trench maps, then Wake Atoll, and round again
+let rotN = 0, attrT = 0; const ATTR_T = 15 * 60;   // v0.51 Attrition: 15 min, then most lines wins; level is a draw   // v0.45 'rotate': two random trench maps, then Wake Atoll, and round again
 const isVote = () => CFG.maps === 'vote';
 const mapPick = () => isVote() ? T.newSeed() : CFG.maps === 'rotate' ? (rotN++ % 3 === 2 ? T.WAKE_SEED : T.newSeed()) : CFG.maps === 'random' ? T.newSeed() : CFG.maps === 'classic' ? 0 : CFG.maps === 'wake' ? T.WAKE_SEED : +CFG.maps;
 const isWake = () => T.MP.kind === 'wake';   // v0.43 Wake Atoll: an imported island played as Domination (no lines, no Operations)
@@ -1456,7 +1456,7 @@ function objectivesTick() {
   if (!op && (w0 || w1)) endRound(w0 ? 0 : 1);
   else if (isAttr()) {   // v0.49 Attrition: taking the enemy's home line wins; after 40 minutes the side holding more lines (then the better-pushed lines) wins
     if (OB[OB.length - 1].owner === 0) endRound(0); else if (OB[0].owner === 1) endRound(1);
-    else if ((attrT += DT) >= ATTR_T) { const n0 = OB.filter(o => o.owner === 0).length, n1 = OB.filter(o => o.owner === 1).length, ps = OB.reduce((a, o) => a + o.p, 0); endRound(n0 !== n1 ? (n0 > n1 ? 0 : 1) : ps >= 0 ? 0 : 1); }
+    else if ((attrT += DT) >= ATTR_T) { const n0 = OB.filter(o => o.owner === 0).length, n1 = OB.filter(o => o.owner === 1).length, ps = OB.reduce((a, o) => a + o.p, 0); endRound(n0 !== n1 ? (n0 > n1 ? 0 : 1) : -1); }
   }
 }
 
