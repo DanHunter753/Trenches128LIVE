@@ -42,7 +42,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.mouse.down({ button: 'right' }); await sleep(700);
   ck('aimsDownSights', await page.evaluate(() => adsHeld && adsT > .6 && /^a/.test(String(gIdx)) && me.down));
   await page.mouse.up({ button: 'right' }); await sleep(500);
-  ck('aimReleases', await page.evaluate(() => !adsHeld && adsT < .3 && /^h/.test(String(gIdx))));
+  R.aimRel = await page.evaluate(() => [adsHeld, +adsT.toFixed(2), String(gIdx)]); ck('aimReleases', await page.evaluate(() => !adsHeld && adsT < .3 && /^h/.test(String(gIdx))));
   await page.evaluate(() => sendJ({ t: 'act', a: 'reload' })); await page.waitForFunction(() => me.psRel === true, null, { timeout: 2000 }).catch(() => {}); await sleep(200);
   ck('reloadShown', await page.evaluate(() => me.psRel && /^hr/.test(String(gIdx)) && /REVOLVER reloading/.test($('dn').textContent)));
   ck('noErrors', !errors.length); R.errors = errors.slice(0, 3);

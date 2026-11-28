@@ -15,7 +15,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.waitForFunction(() => document.querySelectorAll('#srv tr[data-u]').length >= 1, null, { timeout: 5000 }).catch(() => {});
   out.serverList = await page.evaluate(() => /BTest/.test($('srv').textContent) && !!$('srv').querySelector('button'));
   out.accountForm = await page.evaluate(() => !!$('pw') && !!$('lg') && !!$('rg'));
-  await page.fill('#nm', 'V27Acct'); await page.fill('#pw', 'password123'); await page.click('#rg');
+  await page.fill('#nm', 'V27Acct'); await page.fill('#pw', 'password123'); await page.click('#rg'); await page.waitForSelector('#rcok', { timeout: 6000 }).then(() => page.click('#rcok')).catch(() => {});   // v0.48: the recovery code is shown first
   await page.waitForSelector('#go', { timeout: 6000 }).catch(() => {});
   out.registered = await page.evaluate(() => { const k = tokGet($('host') ? $('host').value : location.host) || tokGet(location.host); return !!k && k.n === 'V27Acct' && !!prof && prof.acct === 1; });
   await page.click('#go'); await page.waitForFunction(() => me.alive === true, null, { timeout: 8000 }); await sleep(1500);

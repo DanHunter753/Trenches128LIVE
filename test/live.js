@@ -25,7 +25,7 @@ const hello = (port, msg) => new Promise(res => { const ws = new WebSocket('ws:/
     const xp0 = e.acct.xp; X.ACC.addXp(e.acct, 25); X.ACC.flush(); const db = JSON.parse(fs.readFileSync(path.join(DA, 'accounts.json'), 'utf8'));
     ck('xpSavedToAccount', db.users.rook_1.xp === xp0 + 25 && !/longenough/.test(JSON.stringify(db)));
     const b = await hello(8083, { t: 'hello', name: 'Rook_1' }); ck('protectedCallsign', b.m && b.m.t === 'err' && /belongs to an account/.test(b.m.m));
-    const c = await hello(8083, { t: 'hello', name: 'x', token: r2.j.token }); ck('noDoubleLogin', c.m && c.m.t === 'err' && /already playing/.test(c.m.m));
+    const c = await hello(8083, { t: 'hello', name: 'x', token: r2.j.token }); await sleep(300); ck('noDoubleLogin', c.m && c.m.t === 'prof' && [...X.humans].filter(h => h.name === 'Rook_1').length === 1);   // v0.48: a second login takes over the first (rejoin after a drop) instead of being refused
     const g = await hello(8083, { t: 'hello', name: 'GuestGus' }); ck('guestAllowed', g.m && g.m.t === 'prof' && g.m.acct === 0);
     for (const s of [a, b, c, g]) s.ws.close(); }
   { let last = 0; for (let i = 0; i < 9; i++) last = (await post(8083, '/api/login', { name: 'Rook_1', pass: 'wrong-' + i })).s; const r = await post(8083, '/api/login', { name: 'Rook_1', pass: 'longenough1' });
