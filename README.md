@@ -74,6 +74,14 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.51 — Mortar warning, slower planes, the vote click fixed, Attrition at 15 min
+
+- **Mortars:** bombs fly a steeper, slower arc (about 8 s at full range, was 5 s), and a long falling whistle plays about 3 s before one lands within 70 m of you.
+- **Planes** fly much slower (top speed 34 m/s, was 52), so bombs and guns are easier to put on target.
+- **Map vote:** a vote now registers the moment you press. The vote screen redraws every half second for its timer, and a click that spanned a redraw was lost. Your count goes up at once, with a tick.
+- **Attrition** ends at 15 minutes: the side holding more lines wins, and if they're even the round is a draw.
+- **Automatic weapons bloom more:** the first shots stay tight, and the cone opens about twice as fast while you hold the trigger (SMG, LMG, carbine, MG 08/15).
+
 ## v0.50 — Long shots register, spread ring, out-of-range notice, respawn on Deploy, fewer bot grenades
 
 - **Rifle hits register.** A player's round is now checked against where targets were *on his screen when he fired*: his lag plus the round's flight time. A long shot at a running man used to arrive after he'd moved half a metre or more and miss. Now it lands where the crosshair was, with no leading needed. In a test against a man running sideways at 6 m/s, every shot hit: bolt at 150 m, marksman at 200 m, sniper at 250 and 350 m. Bots' rounds are unchanged.

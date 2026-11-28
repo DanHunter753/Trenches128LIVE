@@ -17,6 +17,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   R.ui = ui; ck('voteScreen', ui.n === 3 && ui.modes === 'OPERATION,ATTRITION,DOMINATION' && ui.ring);
   await page.click('#vote .vcard[data-vi="1"]'); await sleep(500);
   ck('voted', await page.evaluate(() => voteS.my === 1 && voteS.c[1] === 1 && document.querySelector('#vote .vcard[data-vi="1"]').classList.contains('mine')));
+  { const bx = await page.locator('#vote .vcard[data-vi="2"]').boundingBox(); await page.mouse.move(bx.x + bx.width / 2, bx.y + bx.height / 2); await page.mouse.down(); await sleep(700); await page.mouse.up(); await sleep(400);   // v0.51: a slow press across a countdown redraw still votes
+    ck('slowPressVotes', await page.evaluate(() => voteS.my === 2 && voteS.c[2] === 1 && voteS.c[1] === 0)); }
+  await page.click('#vote .vcard[data-vi="1"]'); await sleep(400);
   await page.keyboard.press('Escape'); await sleep(200); ck('escShowsReport', await page.evaluate(() => getComputedStyle($('vote')).display === 'none' && !!$('vtag')));
   await page.keyboard.press('Escape'); await sleep(200); ck('escBack', await page.evaluate(() => getComputedStyle($('vote')).display === 'flex'));
   await page.waitForFunction(s => typeof T !== 'undefined' && T.MP.seed !== s && me.alive === true && gmS === 'attr', seed0, { timeout: 40000 }).catch(() => {});

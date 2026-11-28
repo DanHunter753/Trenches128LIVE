@@ -594,7 +594,7 @@ const AIRF = [{ x: 140, z: 177, yaw: Math.PI / 2 }, { x: -140, z: -177, yaw: -Ma
 // v0.33 flight model, shared so the pilot's own screen predicts his plane exactly like the server flies it. Mouse aim: the
 // plane turns and climbs toward where the pilot is looking (cmd.yaw / cmd.pitch), banking into turns; W/S set the throttle,
 // A/D add rudder. Below PL.vStall the nose drops; a hard or steep touch-down is a crash ('crash' is returned).
-const PL = { vStall: 19, vMin: 24, vMax: 52, lift: 23, turn: .85, pRate: .9, climb: .5, ceil: 150, thr: .45, wheel: 1.3 };
+const PL = { vStall: 13, vMin: 16, vMax: 34,   /* v0.51 slower planes (was 19/24/52): easier to aim bombs and guns */ lift: 23, turn: .85, pRate: .9, climb: .5, ceil: 150, thr: .45, wheel: 1.3 };
 function flyStep(v, c, H) {
   const dt = c.dt; if (!(dt > 0)) return null;
   const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a)), cl = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -609,7 +609,7 @@ function flyStep(v, c, H) {
     if (v.spd < PL.vStall) wantP = -.6;   // stalled: the nose falls until the speed comes back
     v.pitch += cl(wantP - v.pitch, -PL.pRate * dt, PL.pRate * dt);
     const want = PL.vMin + (PL.vMax - PL.vMin) * v.thr;
-    v.spd += ((want - v.spd) * .35 - Math.sin(v.pitch) * 9.8 * .9) * dt; v.spd = cl(v.spd, 8, 75);
+    v.spd += ((want - v.spd) * .35 - Math.sin(v.pitch) * 9.8 * .9) * dt; v.spd = cl(v.spd, 8, 50);
     const cp = Math.cos(v.pitch);
     v.x += -Math.sin(v.yaw) * cp * v.spd * dt; v.z += -Math.cos(v.yaw) * cp * v.spd * dt; v.y += Math.sin(v.pitch) * v.spd * dt;
     const g2 = hAt(H, v.x, v.z);
@@ -817,15 +817,15 @@ function rgPath(H, x, y, z, yaw, pitch, vm) {   // vm: muzzle-speed factor (Rifl
 }   // bayonet-charge stamina (s), bullet gravity (m/s²)
 const WPN = {
   bolt: { n: 'Bolt Rifle', d: 'Slow. One-shot kills at 40–120 m, reaches 800 m. Bayonet.', dmg: 50, cd: .6, mag: 8, pel: 1, spr: 0, rng: 800, fo: [240, 20], hip: .025, rl: 1.5, auto: 0, vel: 700, rcl: .055, blm: 0, bay: 1, sw: [40, 120, 100] },
-  carbine: { n: 'Semi-auto Carbine', d: 'Quicker follow-up shots. Bayonet.', dmg: 34, cd: .35, mag: 10, pel: 1, spr: .012, rng: 800, fo: [190, 15], hip: .03, rl: 1.5, auto: 0, vel: 620, rcl: .03, blm: .006, bay: 1 },
+  carbine: { n: 'Semi-auto Carbine', d: 'Quicker follow-up shots. Bayonet.', dmg: 34, cd: .35, mag: 10, pel: 1, spr: .012, rng: 800, fo: [190, 15], hip: .03, rl: 1.5, auto: 0, vel: 620, rcl: .03, blm: .009, bay: 1 },
   shotgun: { n: 'Trench Shotgun', d: 'Devastating inside 25 m. Bayonet.', dmg: 22, cd: .9, mag: 5, pel: 6, spr: .09, rng: 28, hip: .05, rl: 2, auto: 0, vel: 330, rcl: .08, blm: 0, bay: 1 },
-  smg: { n: 'Submachine Gun', d: 'Automatic. Hold to fire.', dmg: 18, cd: .1, mag: 32, pel: 1, spr: .03, rng: 60, hip: .05, rl: 1.8, auto: 1, vel: 300, rcl: .011, blm: .004 },
-  lmg: { n: 'Light Machine Gun', d: 'Heavy sustained fire. Strong suppression.', dmg: 24, cd: .12, mag: 45, pel: 1, spr: .035, rng: 150, hip: .06, rl: 2.8, auto: 1, vel: 400, rcl: .016, blm: .005 },
+  smg: { n: 'Submachine Gun', d: 'Automatic. Hold to fire.', dmg: 18, cd: .1, mag: 32, pel: 1, spr: .03, rng: 60, hip: .05, rl: 1.8, auto: 1, vel: 300, rcl: .011, blm: .009 },
+  lmg: { n: 'Light Machine Gun', d: 'Heavy sustained fire. Strong suppression.', dmg: 24, cd: .12, mag: 45, pel: 1, spr: .035, rng: 150, hip: .06, rl: 2.8, auto: 1, vel: 400, rcl: .016, blm: .01 },
   mark: { n: 'Marksman Rifle', d: 'Long range, heavy hit, 3.5x scope. One-shot kills at 70–180 m. The scope glints.', dmg: 80, cd: 1, mag: 5, pel: 1, spr: 0, rng: 800, fo: [300, 35], hip: .035, rl: 2, auto: 0, vel: 780, rcl: .07, blm: 0, sw: [70, 180, 100], scope: 3.5 },
   // v0.26 elite kits (Operations pickups): not in any class list, so no loadout can ask for them
   flame: { n: 'Flammenwerfer', d: 'Flamethrower. A 14 m jet that sets men and ground alight. R refuels (3 supply).', dmg: 6, cd: .1, mag: 100, pel: 1, spr: .01, rng: 14, hip: .02, rl: 4, auto: 1, vel: 30, rcl: .004, blm: 0, flame: 1, elite: 1 },
   atr: { n: 'Tankgewehr M1918', d: '13 mm anti-tank rifle: pierces tank armour, kills a man outright. Its grenades are bundle charges.', dmg: 150, cd: 2.2, mag: 1, pel: 1, spr: 0, rng: 340, hip: .09, rl: 2.8, auto: 0, vel: 780, rcl: .2, blm: 0, at: 150, elite: 1 },
-  hmg: { n: 'MG 08/15', d: 'Water-cooled machine gun carried by an armoured sentry. 100-round belts.', dmg: 22, cd: .105, mag: 100, pel: 1, spr: .028, rng: 260, hip: .05, rl: 5, auto: 1, vel: 800, rcl: .035, blm: .0025, elite: 1 },
+  hmg: { n: 'MG 08/15', d: 'Water-cooled machine gun carried by an armoured sentry. 100-round belts.', dmg: 22, cd: .105, mag: 100, pel: 1, spr: .028, rng: 260, hip: .05, rl: 5, auto: 1, vel: 800, rcl: .035, blm: .005, elite: 1 },
   sniper: { n: 'Sniper Rifle', d: '6x telescopic sight, sways while scoped: hold Shift to hold your breath. One body shot kills out to 260 m. The scope glints.', dmg: 100, cd: 1.4, mag: 5, pel: 1, spr: 0, rng: 800, fo: [260, 50], hip: .06, rl: 2.4, auto: 0, vel: 850, rcl: .085, blm: 0, sw: [90, 260, 100], scope: 6 },
 };
 const CLS = {
@@ -923,8 +923,8 @@ const spOf = p => (p.elite && ELITE[p.elite] ? ELITE[p.elite].sp : CLS[p.cls] ? 
 // v0.26 vehicles and crewed guns (server simulates them; the client draws and drives them)
 const VEH = { plane: { n: 'Biplane', hp: 300 }, tank: { n: 'Tank', hp: 2000, len: 8.2, wid: 4.1, hgt: 2.6, spd: 2.6, rev: 1.2, turn: .36, rl: 4.5, v: 130 },
   fgun: { n: 'Field gun', hp: 450, rl: 5, v: 85, arc: .6, pmin: -.08, pmax: .45 },
-  mortar: { n: 'Trench mortar', hp: 220, rl: 2.4, arc: 1.0, rmin: 25, rmax: 170, th: 1.0 } };
-const SHELL_G = 19.6;   // shells fall at twice real gravity so flight times suit the map (a 170 m mortar shot is ~5 s)
+  mortar: { n: 'Trench mortar', hp: 220, rl: 2.4, arc: 1.0, rmin: 25, rmax: 170, th: 1.35 } };   // v0.51 a steeper lob: about 1.7x the flight time, so men under it can run
+const SHELL_G = 19.6;   // shells fall at twice real gravity so flight times suit the map (v0.51: a 170 m mortar shot is ~8 s)
 const mortarV = r => Math.sqrt(r * SHELL_G / Math.sin(2 * VEH.mortar.th));
 // v0.26 weather, chosen per round by the server. sight scales how far bots and spotting see; mud slows movement in the rain
 const WXS = { overcast: { n: 'Overcast', sight: 1, mud: 1 }, fog: { n: 'Fog', sight: .55, mud: 1 }, rain: { n: 'Rain', sight: .8, mud: .86 }, night: { n: 'Night', sight: .45, mud: 1 } };
