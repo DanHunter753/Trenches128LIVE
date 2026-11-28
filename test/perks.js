@@ -43,7 +43,7 @@ const last = (p, t) => p.msgs.filter(m => m.t === t).pop();
   const as = mk('assault', 'shotgun', 0, u); as.pk = ['bomber', 'light']; ck('grenadesNet', X.grMax(as) === 4);
   const lw = mk('rifleman', 'bolt', 0, u); lw.pk = ['lastwords']; P.downEnt(lw, null); ck('lastWords', lw.ps.ammo === 8 && lw.dhp === 75 && Math.abs(lw.down - 24) < 1e-9);
   const gm = mk('rifleman', 'bolt', 0, u); gm.pk = ['gasdrill']; gm.mask = 0; P.maskAct(gm); ck('gasDrill', Math.abs(gm.mask - TK() - .9 * 20) <= 1);
-  const pkt = mk('rifleman', 'bolt', 0, u); pkt.pk = ['pockets']; X.supply()[0] = 30; let used = 0; for (let i = 0; i < 3; i++) { pkt.ammo = 0; pkt.rel = 0; const s0 = X.supply()[0]; P.startReload(pkt); used += s0 - X.supply()[0]; } ck('deepPockets', used === 2);
+  const pkt = mk('rifleman', 'bolt', 0, u); pkt.pk = ['pockets']; ck('deepPockets', X.sup.magMax(pkt) === 6);   // v0.52: six spare magazines
   // Scrounger: a body refills the magazine once
   const sc = mk('rifleman', 'bolt', 0, u); sc.pk = ['scrounger']; P.kits().length = 0; P.kits().push({ x: sc.x + .5, z: sc.z, until: TK() + 999, by: new Set() }); sc.ammo = 1;
   await sleep(400); ck('scrounger', sc.ammo === T.WPN.bolt.mag); sc.ammo = 1; await sleep(400); ck('scroungeOnce', sc.ammo === 1);

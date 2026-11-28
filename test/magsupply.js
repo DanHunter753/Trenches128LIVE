@@ -1,0 +1,33 @@
+'use strict';
+// v0.52: personal building supply (start 50, sapper 250; class caps; fills only near an objective) and spare magazines
+// (4, 6 with Deep Pockets; a reload uses one; none left = no reload; refilled in base and by an ammo box). Grenades,
+// bandages and shells no longer cost supply.
+process.argv = ['node', 'x', '--port', '8083', '--fill', '0', '--no-fetch', '--data', require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 't128ms-'))];
+process.env.T128_TEST = '1';
+const S = require('../server.js'), X = S._test, T = require('../shared.js');
+const sleep = ms => new Promise(r => setTimeout(r, ms)), R = {}, ck = (k, v) => { R[k] = !!v; };
+let nid = 9700;
+const mk = (cls, w, pk) => { const out = [], p = { id: nid++, team: 0, bot: false, name: 'M' + nid, cls, w, u: 'bandage', sq: 0, spawnPick: null, usePost: false, xp: 0, sp: [0, 0], deployed: true, q: [], ack: 0, pk: pk || [], msgs: out };
+  p.ws = { open: true, socket: { writableLength: 0, write(b) { try { const n = b[1] & 127, off = n === 126 ? 4 : n === 127 ? 10 : 2; if ((b[0] & 15) === 1) out.push(JSON.parse(b.subarray(off).toString('utf8'))); } catch (e) { } }, cork() { }, uncork() { } } };
+  X.ents.set(p.id, p); X.humans.add(p); X.spawnEnt(p); return p; };
+(async () => {
+  await sleep(700); for (const e of X.ents.values()) if (e.bot) e.alive = false;
+  const r = mk('rifleman', 'bolt'), sp = mk('sapper', 'smg'), md = mk('medic', 'smg');
+  ck('rifleStarts50', r.sup === 50); ck('sapperStarts250', sp.sup === 250); ck('fourMags', r.mags === 4 && r.msgs.some(m => m.t === 'mags' && m.n === 4 && m.m === 4));
+  // supply only near an objective, up to the class cap
+  const o = T.OBJ[2]; { let best = null; for (let x = -180; x <= 180; x += 10) for (let z = -180; z <= 180; z += 10) { const d = Math.min(...T.OBJ.map(q => Math.hypot(q.x - x, q.z - z))); if (d > 40 && (!best || Math.abs(z) < Math.abs(best[1]))) best = [x, z]; } r.x = best[0]; r.z = best[1]; } const s0 = r.sup; X.sup.supTick(); ck('noGainAwayFromObjective', r.sup === s0);
+  r.x = o.x + 5; r.z = o.z; for (let i = 0; i < 40; i++) X.sup.supTick(); ck('gainsNearObjectiveToCap', r.sup === 100);
+  md.x = o.x; md.z = o.z; for (let i = 0; i < 80; i++) X.sup.supTick(); ck('medicCap150', md.sup === 150);
+  // reloads use magazines
+  const W = T.WPN.bolt; r.x = 0; r.z = 0; for (let k = 0; k < 4; k++) { r.ammo = 0; r.rel = 0; X.pkt.startReload(r); r.rel = .001; await sleep(120); }
+  ck('fourReloadsUseFourMags', r.mags === 0 && r.ammo === W.mag);
+  r.ammo = 0; r.rel = 0; X.pkt.startReload(r); ck('noMagsNoReload', !(r.rel > 0));
+  // base refills, with a chime
+  const hz = X.ents.get(r.id); r.x = 0; for (let z = -200; z <= 200 && !X.sup.inBase(r); z += 2) r.z = z; const inB = X.sup.inBase(r); R.inBase = inB;
+  r.msgs.length = 0; for (let i = 0; i < 13; i++) X.sup.supTick(); ck('baseRefills', inB && r.mags === 2 && r.msgs.some(m => m.t === 'magup'));
+  // Deep Pockets: six
+  const dp = mk('rifleman', 'bolt'); dp.pk = ['pockets']; ck('deepPocketsSix', X.sup.magMax(dp) === 6 && X.sup.magMax(r) === 4);
+  // grenades no longer cost supply
+  const t0 = X.sup.supply()[0]; ck('teamPoolUntouched', X.sup.supply()[0] === t0);
+  console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);
+})().catch(e => { console.log('TEST ERROR', e); process.exit(1); });
