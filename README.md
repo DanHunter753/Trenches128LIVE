@@ -74,6 +74,10 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.58 — Guns point at the crosshair
+
+- At the hip each gun is turned a few degrees about the grip so its muzzle points toward the crosshair instead of up into the sky (SMG 12°, rifles 9–10°, shotgun 5°, LMG 4°). It eases back to the art's own angle as you aim down sights or sprint.
+
 ## v0.57 — The new main menu
 
 - On a wide screen the first screen is now two panels, after the owner's mockup. On the left: the title, your service record, callsign and server, and a gold **Play** button. On the right: your loadout (Class, Customize with the soldier, weapon card, stat bars and damage-by-range chart, and Squad), with a gold **Deploy as …** button that saves the loadout and joins.
