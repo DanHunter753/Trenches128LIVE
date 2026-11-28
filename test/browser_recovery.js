@@ -11,7 +11,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } }); page.on('pageerror', e => errors.push(e.message)); page.on('dialog', d => d.accept()); await page.route('**/three.min.js', r => r.fulfill({ contentType: 'text/javascript', body: STUB }));
   await page.goto(url); await page.fill('#nm', 'NewRecruit'); await page.fill('#pw', 'mypassword1'); await page.click('#rg');
   await page.waitForSelector('.rcc', { timeout: 8000 }).catch(() => {}); const code = await page.evaluate(() => document.querySelector('.rcc') && document.querySelector('.rcc').textContent);
-  ck('codeShownOnRegister', /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(code || '')); ck('waitsBeforeJoining', await page.evaluate(() => !document.getElementById('go')));
+  ck('codeShownOnRegister', /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/.test(code || '')); ck('waitsBeforeJoining', await page.evaluate(() => !document.getElementById('go') || !!document.getElementById('mmR')));   // v0.57: the menu's own loadout panel has a Deploy button
   await page.click('#rcok'); await page.waitForSelector('#go', { timeout: 15000 }).catch(() => {}); ck('joinsAfterOk', await page.evaluate(() => !!document.getElementById('go')));
   // a fresh browser that forgot the password
   const p2 = await browser.newPage({ viewport: { width: 1280, height: 760 } }); p2.on('pageerror', e => errors.push(e.message)); p2.on('dialog', d => d.accept()); await p2.route('**/three.min.js', r => r.fulfill({ contentType: 'text/javascript', body: STUB }));
