@@ -39,7 +39,8 @@ jobs:
             fs.writeFileSync('dist/latest.yml','version: '+v+'\nfiles:\n  - url: Trench128-Setup.exe\n    sha512: '+h+'\n    size: '+b.length+'\npath: Trench128-Setup.exe\nsha512: '+h+'\nreleaseDate: \''+new Date().toISOString()+'\'\n');"
           ls -l dist
       - name: Publish to one release
-        if: startsWith(github.ref, 'refs/tags/')
+        # a launcher-v* tag, or Actions -> Launcher release -> Run workflow on main
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         shell: bash
         env:
           # the workflow's own token can publish to this repository; to publish to another (public) repository, add a
