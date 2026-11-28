@@ -44,5 +44,8 @@ const mk = (cls, w, pk) => { const out = [], p = { id: nid++, team: 0, bot: fals
   HU.x = 0; HU.z = land.f[2] + land.v[2] * land.T; for (let i = 0; i < 60 && HU.hp <= 30; i++) { HU.x = 0; await sleep(50); }
   ck('kitHealsMate', HU.hp >= 89 && X.mk.medkits().length === 0); ck('kitRange', Math.abs(40 - HU.z) > 9 && Math.abs(40 - HU.z) < 19);
   ck('kitCooldown', (X.abilityAct(MD), MD.rg === 0));
+  // v0.56 XP also counts for the class it was earned with
+  { const g = mk('recon', 'sniper'); g.msgs.length = 0; X.sup.addXp(g, 25); g.cls = 'medic'; X.sup.addXp(g, 5); const m = g.msgs.filter(q => q.t === 'xp').pop();
+    ck('classXp', m && m.cx && m.cx.recon === 25 && m.cx.medic === 5 && X.sup.cxOf(g).recon === 25); }
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);
 })().catch(e => { console.log('TEST ERROR', e); process.exit(1); });

@@ -936,7 +936,7 @@ const RK = [['Private', 0], ['Corporal', 100], ['Sergeant', 300], ['Lieutenant',
 // 50 at 51,940, 100 at 203,940). levelOf(xp) -> { lv, at (XP where this level began), next (XP for the next one, or null) }
 const LV_MAX = 100, lvXp = n => 100 * (n - 1) + 20 * (n - 1) * (n - 2);
 function levelOf(xp) { let lv = 1; while (lv < LV_MAX && xp >= lvXp(lv + 1)) lv++; return { lv, at: lvXp(lv), next: lv < LV_MAX ? lvXp(lv + 1) : null }; }
-const REQ = { 'cls:medic': 1, 'cls:gunner': 1, 'cls:recon': 1, 'cls:sapper': 2, 'cls:officer': 3, 'w:carbine': 1, 'w:smg': 2, 'w:mark': 2, 'u:nade': 1, 'u:smokenade': 1, 'u:gasnade': 2, 'u:flare': 0 };
+const REQ = { 'cls:medic': 1, 'cls:gunner': 1, 'cls:recon': 1, 'cls:sapper': 2, 'cls:officer': 7, 'w:carbine': 1, 'w:smg': 2, 'w:mark': 2, 'u:nade': 1, 'u:smokenade': 1, 'u:gasnade': 2, 'u:flare': 0 };
 const rankOf = xp => { let r = 0; RK.forEach((k, i) => { if (xp >= k[1]) r = i; }); return r; };
 // Server-side validation of a requested loadout against rank. Returns a safe loadout.
 // own-property lookup: client strings like 'constructor' or '__proto__' must never index a table (v0.28 audit: crashed the server)

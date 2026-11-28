@@ -2,7 +2,7 @@
 // In-process test of the RTS officer layer: fog of war, squad morale (break, fall back, rally), order queues,
 // creeping barrage (+ squads advance behind it), requisition tiers, spotter marks (discount, XP), strike warnings, alerts.
 const fs = require('fs'), path = require('path');
-fs.writeFileSync(path.join(__dirname, '..', 'xp.json'), JSON.stringify({ rtsoff: 800 }));
+fs.writeFileSync(path.join(__dirname, '..', 'xp.json'), JSON.stringify({ rtsoff: 12000 }));
 process.argv = ['node', 'x', '--port', '8095', '--fill', '16'];
 const S = require('../server.js'); const T = require('../shared.js');
 fs.unlinkSync(path.join(__dirname, '..', 'xp.json'));

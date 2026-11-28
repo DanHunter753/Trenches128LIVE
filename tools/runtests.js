@@ -12,7 +12,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const UNIT = ['snapdec', 'trench', 'climb', 'dugouts', 'destruct', 'net', 'round', 'limits', 'posts', 'forts', 'revive', 'officer', 'ops', 'gunplay',
   'ai', 'command', 'rts', 'recon', 'comms', 'vehicles', 'bots27', 'live', 'tanktrench', 'v29', 'fuzz', 'launcherfiles', 'maps', 'wrecks', 'mud', 'phones', 'tunnels', 'planes', 'spawnmap', 'structs', 'movebank', 'flying', 'spacing', 'botjobs', 'lights', 'classes', 'v38', 'laststand', 'hitboxes', 'ranges', 'wake', 'wake2', 'wake3', 'rotate', 'perks', 'rejoin', 'recovery', 'stuck', 'vote', 'attrition', 'hitreg', 'deploywait', 'magsupply'];
 // Browser tests: run against a fresh T128_TEST server on :8099 with a seeded xp.json (ranks the tests need).
-const SEED = { offtester: 800, officerbrowser: 800, leaderbrowser: 150, settester: 900, camtester: 800, cmdbrowser: 800, reconbrowser: 150, rtsbrowser: 800, gunnerbrowser: 150 };
+const SEED = { offtester: 12000, officerbrowser: 12000, leaderbrowser: 150, settester: 900, camtester: 12000, cmdbrowser: 12000, reconbrowser: 150, rtsbrowser: 12000, gunnerbrowser: 150 };
 const BROWSER = [['browser'], ['browser_ads'], ['browser_audio'], ['browser_climb'], ['browser_command'], ['browser_comms'], ['browser_forts'], ['browser_gunplay'],
   ['browser_officer'], ['browser_officer_cam'], ['browser_officer_esc'], ['browser_ops'], ['browser_polish'], ['browser_recon'], ['browser_revive'], ['browser_rts'],
   ['browser_settings'], ['browser_v16'], ['browser_v26', { env: { T128_WX: 'night' } }],

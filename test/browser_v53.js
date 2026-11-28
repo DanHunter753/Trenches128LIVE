@@ -8,7 +8,17 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] }); const R = {}, ck = (k, v) => { R[k] = !!v; }, errors = [];
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } }); page.on('pageerror', e => errors.push(e.message)); await page.route('**/three.min.js', r => r.fulfill({ contentType: 'text/javascript', body: STUB }));
-  await page.goto(url); await page.fill('#nm', 'Nighty'); await page.click('#cn'); await page.waitForSelector('#go'); await page.click('#go'); await page.waitForFunction(() => me.alive === true, null, { timeout: 20000 });
+  await page.goto(url); await page.fill('#nm', 'Nighty');
+  // v0.56 loadout from the first screen, rank ladder, class XP on the cards
+  await page.evaluate(() => { localStorage.setItem('t128rec', JSON.stringify({ nighty: 2500 })); localStorage.setItem('t128cx', JSON.stringify({ nighty: { recon: 321 } })); });
+  await page.click('#lo'); await page.waitForSelector('#ovb .rkl');
+  ck('menuLoadout', await page.evaluate(() => /LOADOUT/.test($('ovb').querySelector('h1').textContent) && /Save loadout/.test($('go').textContent)));
+  ck('rankLadder', await page.evaluate(() => { const t = $('ovb').querySelector('.rkl').textContent; return /Colonel/.test(t) && /Officer/.test(t) && /Sapper/.test(t); }));
+  ck('officerLockedTillColonel', await page.evaluate(() => /Requires Colonel/.test(document.querySelector('.card[data-k="cls"][data-v="officer"]').textContent)));
+  ck('classXpShown', await page.evaluate(() => /Class XP 321/.test(document.querySelector('.card[data-v="recon"]').textContent)));
+  await page.click('.card[data-k="cls"][data-v="recon"]'); await page.click('#go'); await page.waitForSelector('#cn');
+  ck('savedAndBack', await page.evaluate(() => JSON.parse(localStorage.getItem('t128mp')).cls === 'recon' && !!$('nm')));
+  await page.click('#cn'); await page.waitForSelector('#go'); await page.click('#go'); await page.waitForFunction(() => me.alive === true, null, { timeout: 20000 });
   ck('night', await page.evaluate(() => wxK === 'night'));
   ck('nightTracer', await page.evaluate(() => { tracer(me.x, 2, me.z, 0, 0, -1, 300, false, 700, 'smg'); const o = trc[(trI - 1) % trc.length]; return o.l.material === trN && o.nt === 14; }));
   ck('smgNoSmoke', await page.evaluate(() => SMK.every(q => !q.l.visible)));

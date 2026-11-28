@@ -2,7 +2,7 @@
 // In-process test of side objectives (flank depots: capture, neutralise, command-point income, bot raiders)
 // and the officer's call-ins paid in command points (smoke, gas, recon, rally, over-the-top, not-enough-CP).
 const fs = require('fs'), path = require('path');
-fs.writeFileSync(path.join(__dirname, '..', 'xp.json'), JSON.stringify({ cmdoff: 800 }));
+fs.writeFileSync(path.join(__dirname, '..', 'xp.json'), JSON.stringify({ cmdoff: 12000 }));
 process.argv = ['node', 'x', '--port', '8094', '--fill', '16'];
 const S = require('../server.js'); const T = require('../shared.js');
 fs.unlinkSync(path.join(__dirname, '..', 'xp.json'));
