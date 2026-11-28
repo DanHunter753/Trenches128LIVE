@@ -460,8 +460,10 @@ function stageZ(){if(WAKE){const s=T.MP.meta.start.find(q=>q.team===me.team)||T.
  if(me.team===att)return sec>0?{n:'Forward HQ',z:z(L[sec-1],sd*9)}:{n:'Jump-off trench',z:z(att===0?2:3,sd*14)};const nx=L[sec+1];return nx!=null?{n:'Reserve position',z:z(nx,-sd*25)}:{n:'Last-ditch position',z:z(L[Math.min(sec,2)],-sd*35)}}
 /* v0.31.1 spawn map: when dead, a map of the battlefield. Click your home base, a field post / rally point / building
    respawn point, or a flag your side fully holds (greyed out while it is being taken or enemies are near it). */
+let slS=null;
 function spawnList(){const st=stageZ();const L=[{id:0,k:'home',n:st.n,x:st.x||0,z:st.z,ok:1}];if(!(WAKE&&me.team===0))L.push({id:-99,k:'air',n:'Airfield',x:T.AIRF[me.team].x,z:T.AIRF[me.team].z,ok:1});
  T.OBJ.forEach((q,i)=>{if(WAKE&&i>=5)return;if(obj[i].owner===me.team)L.push({id:-(i+1),k:'flag',n:'Flag: '+flagName(i),x:q.x,z:q.z,ok:Math.abs(obj[i].p)>=.99&&!flagHot(i)})});
+ if(slS&&slS.n&&performance.now()-slS.at<3000)L.push({id:-98,k:'sl',n:'Squad leader: '+slS.n+(slS.cd?' ('+slS.cd+'s)':slS.ok?'':' (busy)'),x:slS.x,z:slS.z,ok:slS.ok});   /* v0.52: once every 3 min */
  for(const [id,q] of fposts)if(q.team===me.team)L.push({id,k:q.rally?'rally':'post',n:(q.rally?'Rally point ('+q.rally+'s)':q.hp>1e6?'Building respawn point':'Field post')+' · '+nearLine(q.x,q.z),x:q.x,z:q.z,ok:1});return L}
 function flagHot(i){const q=T.OBJ[i];for(const e of ents.values())if(e.team!==me.team&&e.alive&&e.vis!==false&&Math.hypot(e.x-q.x,e.z-(WAKE?q.z:T.trenchC(T.FL[i],e.x)))<25)return true;return false}
 /* v0.50: you respawn when you press Deploy (and the respawn wait is over), not on a timer, so there's time to pick a spot or change class */
@@ -484,10 +486,10 @@ function spawnDraw(){const el=$('spk');if(!deployed||me.alive||me.down||me.offic
  T.OBJ.forEach((q,i)=>{if(i>=NFL()||obj[i].owner===me.team)return;g.fillStyle=obj[i].owner<0?'#bbb':'#c84a3a';g.beginPath();g.arc(X(q.x),Y(q.z),6,0,7);g.fill();g.fillStyle='#ddd';g.font='10px monospace';g.textAlign='center';g.fillText(flagTag(i),X(q.x),Y(q.z)-10)});
  if(me.x!=null){g.strokeStyle='#ff4030';g.lineWidth=2;const x=X(me.x),y=Y(me.z);g.beginPath();g.moveTo(x-5,y-5);g.lineTo(x+5,y+5);g.moveTo(x+5,y-5);g.lineTo(x-5,y+5);g.stroke()}
  L.forEach((it,i)=>{const x=X(it.x),y=Y(it.z),sel=it.id===spawnSel,hov=i===spHover;const col=!it.ok?'#777':it.k==='flag'?(me.team===0?'#7aa8e0':'#62d66a'):it.k==='home'?'#e9c46a':it.k==='rally'?'#ffd24a':'#4cff9a';
-  g.fillStyle=col;g.strokeStyle='#000';g.lineWidth=1.5;g.beginPath();if(it.k==='flag')g.arc(x,y,8,0,7);else if(it.k==='home'||it.k==='air')g.rect(x-9,y-6,18,12);else g.rect(x-6,y-6,12,12);g.fill();g.stroke();
+  g.fillStyle=col;g.strokeStyle='#000';g.lineWidth=1.5;g.beginPath();if(it.k==='flag')g.arc(x,y,8,0,7);else if(it.k==='home'||it.k==='air')g.rect(x-9,y-6,18,12);else if(it.k==='sl'){g.moveTo(x,y-9);g.lineTo(x+8,y+6);g.lineTo(x-8,y+6);g.closePath()}else g.rect(x-6,y-6,12,12);g.fill();g.stroke();
   if(sel||hov){g.strokeStyle=sel?'#fff':'#ffffffaa';g.lineWidth=2;g.beginPath();g.arc(x,y,14,0,7);g.stroke()}
   g.fillStyle='#000';g.font='bold 10px monospace';g.textAlign='center';g.fillText(i<10?String(i):'',x,y+3.5);
-  if(it.k==='flag'||it.k==='home'||hov||sel){g.fillStyle=it.ok?'#fff':'#999';g.font='10px monospace';g.fillText(it.k==='flag'?flagTag(-it.id-1):it.k==='home'||it.k==='air'?it.n:'',x,y-13)}});
+  if(it.k==='flag'||it.k==='home'||hov||sel){g.fillStyle=it.ok?'#fff':'#999';g.font='10px monospace';g.fillText(it.k==='flag'?flagTag(-it.id-1):it.k==='home'||it.k==='air'||it.k==='sl'?it.n:'',x,y-13)}});
  const s=L.find(it=>it.id===spawnSel),h=L[spHover],t=(s?'Respawning at: '+s.n:'No choice yet: a random post, or home')+(h&&h!==s?'  ›  '+(h.ok?'click: '+h.n:h.n+' (under attack)'):'');
  const n=$('spn');if(n.textContent!==t)n.textContent=t}
 /* Operations HUD: role, sector, tickets, battalions; announcer banners; out-of-bounds countdown */
@@ -638,13 +640,18 @@ function reloadSnd(w,mg){if(mg)return play('s_rl_lmg',.6,{rate:1.2});const W=WPN
  play(n,.6,{rate:b?Math.max(.8,Math.min(1.7,b.duration/W.rl)):1})}
 let AC,MG;function snd(v){if(!AC||v<.03)return;if(!MG){MG=AC.createGain();MG.connect(AC.destination)}MG.gain.value=S.master;const b=AC.createBuffer(1,4000,22050),d=b.getChannelData(0);for(let i=0;i<4000;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/4000,3);
  const s=AC.createBufferSource();s.buffer=b;const g=AC.createGain();g.gain.value=Math.min(.5,v)*S.sfx;s.connect(g);g.connect(MG);s.start()}
-const trc=[],trM=new THREE.LineBasicMaterial({color:0xffe9a0});let trI=0;
+const trc=[],trM=new THREE.LineBasicMaterial({color:0xffe9a0}),trN=new THREE.LineBasicMaterial({color:0xff9a40,fog:false});let trI=0;
+/* v0.52 a light smoke trail behind rifle rounds (bolt, carbine, marksman, sniper): a grey line from the muzzle that fades in about 1.5 s */
+const SMK=[],SMK_W={bolt:1,carbine:1,mark:1,sniper:1};let smI=0;
+for(let i=0;i<40;i++){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3));const m=new THREE.LineBasicMaterial({color:0xd8d8d0,transparent:true,opacity:0,depthWrite:false});const l=new THREE.Line(g,m);l.visible=false;l.frustumCulled=false;scene.add(l);SMK.push({l,m,t:0,o:null})}
+function smkTick(dt){for(const q of SMK){if(!q.l.visible)continue;const a=q.l.geometry.attributes.position.array;if(q.o&&q.o.t>0){const d=Math.min(120,q.o.d);a[3]=q.sx+q.dx*d;a[4]=q.sy+q.dy*d;a[5]=q.sz+q.dz*d;q.l.geometry.attributes.position.needsUpdate=true}else q.o=null;q.t+=dt;q.m.opacity=Math.max(0,.22*(1-q.t/1.5));if(q.t>1.5)q.l.visible=false}}
 for(let i=0;i<96;i++){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3));const l=new THREE.Line(g,trM);l.visible=false;l.frustumCulled=false;scene.add(l);trc.push({l,t:0})}
 /* tracers fly: a 4 m streak moves at the muzzle velocity, drops under gravity and kicks up dirt where it lands */
-function tracer(x,y,z,dx,dy,dz,len,own,vel){const o=trc[trI++%trc.length],s=own?1.8:0;o.x=x+dx*s;o.y=y+dy*s-(own?.25:0);o.z=z+dz*s;vel=vel||400;o.vx=dx*vel;o.vy=dy*vel;o.vz=dz*vel;o.d=s;o.len=len;o.t=len/vel+.1;o.l.visible=false}
+function tracer(x,y,z,dx,dy,dz,len,own,vel,wk){const o=trc[trI++%trc.length],s=own?1.8:0;o.x=x+dx*s;o.y=y+dy*s-(own?.25:0);o.z=z+dz*s;vel=vel||400;o.vx=dx*vel;o.vy=dy*vel;o.vz=dz*vel;o.d=s;o.len=len;o.t=len/vel+.1;o.l.visible=false;o.l.material=wxK==='night'?trN:trM;o.nt=wxK==='night'?14:4;   /* v0.52: every round shows a bright, longer tracer at night */
+ if(SMK_W[wk]&&Math.hypot(x-cam.position.x,z-cam.position.z)<220){const q=SMK[smI++%SMK.length],a=q.l.geometry.attributes.position.array;q.sx=o.x;q.sy=o.y;q.sz=o.z;q.dx=dx;q.dy=dy;q.dz=dz;a[0]=a[3]=o.x;a[1]=a[4]=o.y;a[2]=a[5]=o.z;q.l.geometry.attributes.position.needsUpdate=true;q.o=o;q.t=0;q.m.opacity=.22;q.l.visible=true}}
 function trTick(dt){for(const o of trc){if(!(o.t>0))continue;o.t-=dt;o.vy-=T.GRAV*dt;const sp=Math.hypot(o.vx,o.vy,o.vz)||1;o.x+=o.vx*dt;o.y+=o.vy*dt;o.z+=o.vz*dt;o.d+=sp*dt;
  const g=hAt(o.x,o.z);if(o.d>=o.len||o.y<g||o.t<=0){if(o.y<g+.3&&o.d<o.len+2&&Math.hypot(o.x-me.x,o.z-me.z)<70)puff(o.x,g,o.z);o.t=0;o.l.visible=false;continue}
- const a=o.l.geometry.attributes.position.array,k=Math.min(4,o.d)/sp;a[0]=o.x-o.vx*k;a[1]=o.y-o.vy*k;a[2]=o.z-o.vz*k;a[3]=o.x;a[4]=o.y;a[5]=o.z;o.l.geometry.attributes.position.needsUpdate=true;o.l.visible=true}}
+ const a=o.l.geometry.attributes.position.array,k=Math.min(o.nt||4,o.d)/sp;a[0]=o.x-o.vx*k;a[1]=o.y-o.vy*k;a[2]=o.z-o.vz*k;a[3]=o.x;a[4]=o.y;a[5]=o.z;o.l.geometry.attributes.position.needsUpdate=true;o.l.visible=true}}
 /* v0.34.2 smouldering wrecks: a slow smoke column and a low fire glow over the burnt-out tanks, lorries and planes */
 let WRK=null;const fireTex=()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d'),r=g.createRadialGradient(16,18,1,16,18,15);r.addColorStop(0,'rgba(255,220,140,1)');r.addColorStop(.35,'rgba(255,130,40,.8)');r.addColorStop(1,'rgba(120,30,0,0)');g.fillStyle=r;g.fillRect(0,0,32,32);return new THREE.CanvasTexture(c)};
 function wrecksFrame(dt){if(!WRK){WRK=[];const ft=fireTex();T.STRUCT.forEach((S,i)=>{if(!/tank|lorry|plane/.test(S.k))return;const y=(S.parts[0]?S.parts[0].y0:hAt(S.x,S.z))+(S.k==='tank'?2:1),w={x:S.x,y,z:S.z,sm:[],fi:null,ph:T.hash(i,77)*9};
@@ -776,6 +783,7 @@ function onMsg(m){
   case'rgf':{const mesh=new THREE.Sprite(spMat('nade_mills').clone());mesh.scale.set(.22,.3,1);scene.add(mesh);rgL.push({mesh,t:0,f:m.f,v:m.v,T:m.T});if(m.id===me.id){gunKick=1.4;gFire=0;recoil()}
    {const d=Math.hypot(m.f[0]-me.x,m.f[2]-me.z),v=Math.max(.05,1-d/160);tone(140,60,.18,.12*v,'triangle');tone(900,300,.12,.04*v,'sawtooth')}break}
   case'mh':medHp.clear();for(const[id,v]of m.l||[])medHp.set(id,v);medHpAt=performance.now();break;
+  case'sl':slS=m;slS.at=performance.now();if($('spk')&&$('spk').style.display==='block')spawnDraw();break;
   case'mags':magsUI(m.n,m.m);break;
   case'magup':tone(1320,1320,.07,.05,'sine');setTimeout(()=>tone(1760,1760,.09,.045,'sine'),70);break;   /* v0.52 picking up magazines */
   case'mhd':{medHp.delete(m.id);say('Bandaged '+m.n+' (+'+m.hp+' HP) · +'+m.xp+' XP');break}
@@ -807,7 +815,7 @@ function onMsg(m){
   case'cr':applyCrater(m.c,true);firesPlace();break;
   case'bd':for(const b of m.b)bodyFx(b);break;
   case'gr':{const stick=m.tm===1,mt=spMat(stick?'nade':'nade_mills').clone(),mesh=new THREE.Sprite(mt);mesh.scale.set(stick?.26:.3,stick?.62:.36,1);scene.add(mesh);nades.push({mesh,t:0,f:m.f,to:m.to,spin:stick?14:9});break}   /* blue throws Mills bombs, green stick grenades (LP Weapons Pack) */
-  case'sh':for(const s of m.s){if(s[7]===me.id)continue;tracer(s[0],s[1],s[2],s[3],s[4],s[5],s[6],false,s[9]);shotSnd(s[0],s[2],s[8])}break;
+  case'sh':for(const s of m.s){if(s[7]===me.id)continue;tracer(s[0],s[1],s[2],s[3],s[4],s[5],s[6],false,s[9],s[8]);shotSnd(s[0],s[2],s[8])}break;
   case'ord':myOrder=m.o;orderPing=4;if(m.o)say(m.o.done?'Order reached':'ORDER: '+m.o.ty.toUpperCase()+' '+m.o.n);syncBeams();break;
   case'ords':offOrders=m.l;syncBeams();renderOff();break;
   case'sqs':sqs=m.l;supCd=m.cd;supCost=m.cost;if(m.k){supK=m.k;supR=m.r;cpS=[m.cp,m.cpMax,m.inc];supTr=m.tr||[];tierS=m.tier||1}supK.forEach((k,i)=>{cdMax[k]=Math.max(cdMax[k]||1,supCd[i]||0)});renderOff();break;
@@ -831,7 +839,7 @@ function onMsg(m){
 const WKEY=['bolt','carbine','shotgun','smg','lmg','mark','sniper','mg'];
 function onShots(buf){const dv=new DataView(buf),n=dv.getUint16(1,true);for(let i=0,o=3;i<n;i++,o+=18){if(dv.getUint16(o+13,true)===me.id)continue;   /* binary tracers (v0.23) */
  const x=dv.getInt16(o,true)/PQ,y=dv.getInt16(o+2,true)/PQ,z=dv.getInt16(o+4,true)/PQ,dx=dv.getInt16(o+6,true)/1e4,dy=dv.getInt16(o+8,true)/1e4,dz=dv.getInt16(o+10,true)/1e4,w=WKEY[dv.getUint8(o+15)]||'bolt';
- tracer(x,y,z,dx,dy,dz,dv.getUint8(o+12),false,dv.getUint16(o+16,true));shotSnd(x,z,w)}}
+ tracer(x,y,z,dx,dy,dz,dv.getUint8(o+12),false,dv.getUint16(o+16,true),w);shotSnd(x,z,w)}}
 function onSnap(buf){
  const dv=new DataView(buf),now=performance.now();if(lastSnapAt)netGap=Math.max(netGap,now-lastSnapAt);lastSnapAt=now;const ack=dv.getUint32(5,true),sx=dv.getFloat32(9,true),sy=dv.getFloat32(13,true),sz=dv.getFloat32(17,true),svy=dv.getFloat32(21,true);
  const hp=dv.getUint8(25),fl=dv.getUint8(26),ammo=dv.getUint16(27,true),sup=dv.getUint16(29,true),heat=dv.getUint8(31),n=dv.getUint16(32,true);
@@ -1302,7 +1310,7 @@ function stepSnd(f,s,bits){if(me.sld>0||!me.alive||me.cl||me.y>T.groundAt(terr.H
    later. predTick mirrors the server's own rules (rate of fire, sprint-to-fire delay, semi-automatic trigger); each shot the
    server then confirms is matched against a shown one, and a shown shot that is never confirmed is simply forgotten. */
 const predAt=[];let pCd=0,pSpr=0,pHold=false,netGap=0,netGapAt=0,lastSnapAt=0,pingAt=0,srvMs=0,srvGap=0,nfN=0,nfT=0,nfMax=0,nfFps=0,nfWorst=0,nfLast=0;
-function shotFx(){const W=WPN[me.w]||{},zv=me.mg?420:W.vel||400,pz=me.pitch+(zv>=360&&!W.flame?T.GRAV*(W.scope&&!me.mg?150:100)/(2*zv*zv):0),cp=Math.cos(pz),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(pz),dz=-Math.cos(me.yaw)*cp;   /* v0.42 sights zeroed at 100 m, as on the server */TUT.shot=1;gunKick=W.flame?.25:1;gFire=0;recoil();if(!(W.flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(W.pel===1&&!W.flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:W.rng,true,me.mg?420:W.vel)}
+function shotFx(){const W=WPN[me.w]||{},zv=me.mg?420:W.vel||400,pz=me.pitch+(zv>=360&&!W.flame?T.GRAV*(W.scope&&!me.mg?150:100)/(2*zv*zv):0),cp=Math.cos(pz),dx=-Math.sin(me.yaw)*cp,dy=Math.sin(pz),dz=-Math.cos(me.yaw)*cp;   /* v0.42 sights zeroed at 100 m, as on the server */TUT.shot=1;gunKick=W.flame?.25:1;gFire=0;recoil();if(!(W.flame&&!me.mg))ownShot(me.mg?'mg':me.w);if(me.mg||(W.pel===1&&!W.flame))tracer(me.x,me.y+me.eye,me.z,dx,dy,dz,me.mg?140:W.rng,true,me.mg?420:W.vel,me.mg?'mg':me.w)}
 function predTick(dt,bits,f,s){pCd-=dt;pSpr=(bits&1)&&(f||s)&&!me.mg?.18:pSpr-dt;const want=!!(bits&8),W=WPN[me.w],now=performance.now();
  while(predAt.length&&now-predAt[0]>ping*1.5+700)predAt.shift();
  if(want&&W&&!W.flame&&me.alive&&!me.mg&&!myVeh&&!me.elite&&!me.rel&&!me.charging&&!me.cl&&!me.rg&&pSpr<=0&&pCd<=0&&(W.auto||!pHold)&&(me.ammo|0)-predAt.length>0&&!(maskAt>now)){pCd=W.cd*(me.cls==='rifleman'&&me.w==='bolt'?.8:1);predAt.push(now);shotFx()}
@@ -1876,7 +1884,7 @@ function frame(){
    const g=hAt(P.x,P.z);if(P.y<=g+.35&&c.vy<=0){P.y=g+.35;if(Math.hypot(c.vx,c.vz)>1.5&&c.vy<-4){c.vy=-c.vy*.25;c.vx*=.5;c.vz*=.5}else{c.rest=true;if(ART.dead){const dm=ART.dead[c.team][(c.id||0)%3].clone();c.m.material=dm;c.m.center.set(.5,.05);c.m.scale.set(2,1,1);P.y=g-.02}else{mt.rotation=c.side*Math.PI/2;c.m.scale.set(SPW(),1.95,1)}}}}
   if(c.t>25){mt.transparent=true;mt.opacity=Math.max(0,1-(c.t-25)/3);if(c.t>28){scene.remove(c.m);corpses.splice(i,1)}}}
 
- trTick(dt);
+ trTick(dt);smkTick(dt);
  for(const c of crateM.values()){c.left=Math.max(0,c.left-dt);c.m.position.set(c.x,hAt(c.x,c.z)+.7+c.left/2.2*30,c.z)}orderPing=Math.max(0,orderPing-dt);
  syncDirty();
  flags.forEach((f,i)=>{f.material.color.set(obj[i].owner===0?0x7aa8e0:obj[i].owner===1?0x62d66a:0xd8d2c0);f.position.y=WAKE?3+Math.abs(obj[i].p)*5:3+(obj[i].p+1)*2.5});   /* a neutral flag on Wake is white and half-mast */

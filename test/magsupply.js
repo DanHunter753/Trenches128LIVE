@@ -29,5 +29,11 @@ const mk = (cls, w, pk) => { const out = [], p = { id: nid++, team: 0, bot: fals
   const dp = mk('rifleman', 'bolt'); dp.pk = ['pockets']; ck('deepPocketsSix', X.sup.magMax(dp) === 6 && X.sup.magMax(r) === 4);
   // grenades no longer cost supply
   const t0 = X.sup.supply()[0]; ck('teamPoolUntouched', X.sup.supply()[0] === t0);
+  // v0.52 spawn on the squad leader, once every 3 minutes
+  const L = mk('rifleman', 'bolt'), F = mk('rifleman', 'bolt'); L.xp = 5000; F.xp = 100; L.sq = F.sq = 3; L.x = 30; L.z = 60; await sleep(100); L.x = 30; L.z = 60;
+  for (const e of X.ents.values()) if (e.team === 1) { e.x = 150; e.z = -150; }
+  X.sup.computeLeaders(); ck('leaderFound', X.sup.leaders().get(3) === L && !!X.sup.slOk(F));
+  F.alive = false; F.spawnPick = -98; X.spawnEnt(F); ck('spawnsOnLeader', Math.hypot(F.x - L.x, F.z - L.z) < 3 && F.slCd > 0);
+  F.alive = false; X.spawnEnt(F); ck('cooldownBlocksSecond', Math.hypot(F.x - L.x, F.z - L.z) > 5 && !X.sup.slOk(F));
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);
 })().catch(e => { console.log('TEST ERROR', e); process.exit(1); });
