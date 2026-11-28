@@ -74,6 +74,30 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.59 — Class unlocks and five new guns
+
+XP you earn as a class now unlocks gameplay sidegrades for that class. Each class card shows the next unlock and a progress bar, the Customize tab has a **Class unlocks** list, and a banner tells you when you earn one.
+
+| Class | 250 | 750 | 1,500 | 3,000 | 5,000 |
+|---|---|---|---|---|---|
+| Rifleman | Stripper clips (reload 25% faster from empty) | **Gewehr 91 Carbine** | Long bayonet charge (+30%) | Third rifle grenade | **Gewehr 91 · 2x scope** |
+| Assault | +1 grenade | Third morphine | **MP18** | Long slide (+30%) | |
+| Machine Gunner | Ammo box restocks 15 (was 10) | Reload 20% faster | **Browning M1918** | Ammo box cooldown −30% | |
+| Medic | Med kit every 15 s | Revive 25% faster | **Fedorov Avtomat** | Med kit reaches 20 m | |
+| Sapper | Dig 25% faster | Buildings cost 20% less | | | |
+| Recon | Hold breath 30% longer | Spotted enemies marked 50% longer | | | |
+
+The new guns are sidegrades, not upgrades:
+- **Gewehr 91 Carbine:** cycles and aims faster than the bolt rifle, but holds 5 rounds and falls off sooner. One-shot kills at 30–80 m.
+- **Gewehr 91 · 2x scope:** the carbine with a 2× scope. Easier hits at range, slower to aim and cycle, and it glints.
+- **MP18:** very fast fire and a 50-round drum, but lighter hits that spread quickly.
+- **Browning M1918:** harder hits, tighter and further than the LMG, but a 20-round magazine and slower fire.
+- **Fedorov Avtomat:** steady automatic fire out to 200 m. Lighter hits than the carbine, tighter than an SMG.
+
+First-person art is from the owner. `tools/make_gun_sheet.py` turns a two-pose picture (hip and aiming) into a gun sheet. In third person, the new guns use the nearest existing gun's look and sound.
+
+Also fixed: in the main-menu loadout, clicking a Customize slot no longer drops you out of the menu, and the Deploy button stays in view.
+
 ## v0.58 — Guns point at the crosshair
 
 - At the hip each gun is turned a few degrees about the grip so its muzzle points toward the crosshair instead of up into the sky (SMG 12°, rifles 9–10°, shotgun 5°, LMG 4°). It eases back to the art's own angle as you aim down sights or sprint.

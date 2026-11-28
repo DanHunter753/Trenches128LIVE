@@ -51,7 +51,7 @@ let posts = [], postId = 1;
 // v0.36 class abilities ([N]): the machine gunner drops ammo boxes, the assault man injects morphine
 const ABOX_USES = 10, ABOX_LIFE = 150 * TICK, ABOX_CD = 35 * TICK, ABOX_COST = 3, ABOX_R = 2.6, ABOX_RE = 25 * TICK, ABOX_MAX = 2, MPH_T = 10 * TICK, MPH_DOSES = 2, MPH_SPD = 1.2, MPH_ARM = .6;
 let aboxes = [], aboxId = 1;
-const grMax = e => (e.cls === 'assault' ? 4 : e.cls === 'sapper' ? 3 : 2) + (T.hasPk(e, 'bomber') ? 1 : 0) - (T.hasPk(e, 'light') ? 1 : 0);   // v0.47 perks
+const grMax = e => (e.cls === 'assault' ? 4 : e.cls === 'sapper' ? 3 : 2) + (T.hasPk(e, 'bomber') ? 1 : 0) - (T.hasPk(e, 'light') ? 1 : 0) + (T.cun(e, 'rg3') || T.cun(e, 'nade1') ? 1 : 0);   // v0.59 class unlocks   // v0.47 perks
 const bdMax = e => e.u === 'gasnade' || e.u === 'smokenade' ? 2 : e.u === 'flare' ? 3 + (T.hasPk(e, 'flarehand') ? 1 : 0) : e.cls === 'medic' ? 5 + (T.hasPk(e, 'fieldkit') ? 2 : 0) : 3;   // sapper field posts: shared, destructible respawn points
 const POST_HP = 300, POST_COST = 10, POST_MAX = 3;
 const ents = new Map();      // id -> entity (humans and bots share one id space)
@@ -169,9 +169,10 @@ function cxOf(p) {
   if (!p.cxg) { p.cxg = {}; const key = (p.name || '').toLowerCase(); for (const c in T.CLS) if (xpdb[key + '#' + c]) p.cxg[c] = xpdb[key + '#' + c]; }
   return p.cxg;
 }
-function addXp(p, n) {
+function addXp(p, n, noCls) {
   if (p.bot || !p.name) return; st(p).sc += n;
-  const cls = T.CLS[p.cls] ? p.cls : null, cx = cxOf(p);   // v0.56 XP is also counted for the class you earned it with
+  const cls = T.CLS[p.cls] && !noCls ? p.cls : null, cx = cxOf(p);   // v0.56 XP is also counted for the class you earned it with
+  if (cls && !p.bot) { const c0 = cx[cls] | 0; for (const u of T.CUNL[cls] || []) if (c0 < u[0] && c0 + n >= u[0]) later(600, () => send(p, { t: 'unl', c: cls, n: u[2], d: u[3] })); }   // v0.59 a class unlock just earned
   if (p.acct) { const before = T.rankOf(p.xp || 0); if (cls) cx[cls] = (cx[cls] || 0) + n; p.xp = ACC.addXp(p.acct, n); send(p, { t: 'xp', xp: p.xp, rank: T.rankOf(p.xp), up: T.rankOf(p.xp) > before, cx }); return; }   // account XP
   if (CFG.accounts === 'required') return;
   const key = p.name.toLowerCase(), before = T.rankOf(xpdb[key] || 0);
@@ -218,6 +219,7 @@ let home = t => {
 function flagSpawnOk(team, i) { const o = OB[i]; if (!o || o.owner !== team || Math.abs(o.p) < .99) return false;
   for (const q of ents.values()) if (q.team !== team && q.alive && !q.cmd && Math.hypot(q.x - o.x, q.z - lineZ(o, q.x)) < 25) return false; return true; }
 function spawnEnt(e) {
+  if (!e.bot) e.cx = cxOf(e);   // v0.59 class XP drives the class unlocks (T.cun)
   if (op && e.team === op.att && e.died && !e.cmd) {
     if (op.tk <= 0 || op.regroup > 0) { e.rt = 1; return; }      // no tickets: wait for the next battalion
     op.tk--; if (op.tk === 0 && !op.stall) attackStalls();
@@ -226,7 +228,7 @@ function spawnEnt(e) {
   e.pk = !e.bot && e.acct && !e.cmd ? T.perkActive(T.perkNorm(e.acct.perks), e.cls, T.levelOf(e.xp || 0).lv) : null; e.rlN = 0; e.crT = 0; e.sbB = false;   // v0.47: this life's perks
   e.died = false; e.hist = null; e.mask = 0; e.hitBy = null; e.lastHit = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; e.bloom = 0;
   e.sup = Math.min(supMax(e), e.cls === 'sapper' ? 250 : 50); e.mags = magMax(e); e.magT = 0; if (!e.bot) magSend(e);   // v0.52 own building supply; spare magazines
-  e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = grMax(e); e.gCd = e.bot ? tickNo + Math.round((15 + rnd() * 20) * TICK) : 0; /* v0.50: a fresh bot waits before his first grenade */ e.bd = bdMax(e); e.sld = 0; e.sldCd = 0; e.pb = 0; e.rg = 0; e.rgAt = 0; e.rgCd = 0; e.mph = false; e.mphU = 0; e.mphN = e.cls === 'assault' ? MPH_DOSES : 0; e.boxCd = 0; e.healCd = 0; e.mgCd = 0; e.para = false;
+  e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = grMax(e); e.gCd = e.bot ? tickNo + Math.round((15 + rnd() * 20) * TICK) : 0; /* v0.50: a fresh bot waits before his first grenade */ e.bd = bdMax(e); e.sld = 0; e.sldCd = 0; e.pb = 0; e.rg = 0; e.rgAt = 0; e.rgCd = 0; e.mph = false; e.mphU = 0; e.mphN = e.cls === 'assault' ? MPH_DOSES + (T.cun(e, 'mph3') ? 1 : 0) : 0; e.boxCd = 0; e.healCd = 0; e.mgCd = 0; e.para = false;
   let { x, z } = home(e.team), py = null;
   const atPost = q => { x = q.x + (rnd() - .5) * (q.fort ? 1 : 3); z = q.z + (rnd() - .5) * (q.fort ? 1 : 3); py = q.fort ? null : q.y; };
   if (e.mg === true) { x = e.hx; z = e.hz; }
@@ -277,10 +279,10 @@ function abilityAct(p) {
 function dropAmmo(p) {
   if ((p.aboxCd || 0) > tickNo) { if (!p.bot) tell(p, 'Ammo box: next one in ' + Math.ceil((p.aboxCd - tickNo) / TICK) + 's'); return false; }
   if (supOf(p) < ABOX_COST) { if (!p.bot) tell(p, 'An ammo box costs ' + ABOX_COST + ' supply'); return false; }
-  supUse(p, ABOX_COST); p.aboxCd = tickNo + ABOX_CD;
+  supUse(p, ABOX_COST); p.aboxCd = tickNo + Math.round(ABOX_CD * (T.cun(p, 'boxcd') ? .7 : 1));
   const mine = aboxes.filter(b => b.by === p); if (mine.length >= ABOX_MAX) aboxes = aboxes.filter(b => b !== mine[0]);
   const x = clamp(p.x - Math.sin(p.yaw) * .8, -T.W + 1, T.W - 1), z = clamp(p.z - Math.cos(p.yaw) * .8, -T.W + 1, T.W - 1);
-  aboxes.push({ id: aboxId++, team: p.team, x, z, uses: ABOX_USES, until: tickNo + ABOX_LIFE, by: p });
+  aboxes.push({ id: aboxId++, team: p.team, x, z, uses: T.cun(p, 'box15') ? 15 : ABOX_USES, until: tickNo + ABOX_LIFE, by: p });
   if (!p.bot) tell(p, 'Ammo box down: teammates who walk over it restock'); bcast({ t: 'abd', x: +x.toFixed(1), z: +z.toFixed(1) }); return true;
 }
 // v0.52 supply is personal and only for building: it fills while you stand near an objective. Reloads come from spare
@@ -321,14 +323,14 @@ function rgFit(p) {
 }
 // v0.54 medic: [N] takes a med kit in hand (the rifle-grenade arc shows where it lands), the trigger lobs it up to ~15 m.
 // The first teammate it hits, or who walks over it, is patched up (+60 HP). One every 20 s; a kit on the ground lasts 40 s.
-const MK = { v: Math.sqrt(15 * T.RG.g), cd: 20, heal: 60, life: 40, r: 1.1 }, medkits = []; let mkId = 1;
+const MK = { v: Math.sqrt(15 * T.RG.g), v20: Math.sqrt(20 * T.RG.g), cd: 20, heal: 60, life: 40, r: 1.1 }, medkits = []; let mkId = 1;
 function mkReady(p) {
   if ((p.mkCd || 0) > tickNo) { if (!p.bot) tell(p, 'Med kit: next one in ' + Math.ceil((p.mkCd - tickNo) / TICK) + 's'); return false; }
   p.rg = 2; p.rgAt = tickNo; p.rel = 0; if (!p.bot) send(p, { t: 'rg', s: 2, f: 0 }); return true;
 }
 function throwKit(p) {
-  const ey = p.y + eyeH(p), P = T.rgPath(terr.H, p.x, ey, p.z, p.yaw, p.pitch, MK.v / T.RG.v);
-  p.rg = 0; p.cd = 1; p.mkCd = tickNo + MK.cd * TICK;
+  const ey = p.y + eyeH(p), P = T.rgPath(terr.H, p.x, ey, p.z, p.yaw, p.pitch, (T.cun(p, 'kit20') ? MK.v20 : MK.v) / T.RG.v);
+  p.rg = 0; p.cd = 1; p.mkCd = tickNo + (T.cun(p, 'kit15') ? 15 : MK.cd) * TICK;
   const k = { id: mkId++, team: p.team, by: p, f: [p.x, ey, p.z], v: [P.vx, P.vy, P.vz], T: P.t, t: 0, x: p.x, y: ey, z: p.z, land: false, until: 0 };
   medkits.push(k);
   bcast({ t: 'rgf', mk: k.id, f: [+p.x.toFixed(2), +ey.toFixed(2), +p.z.toFixed(2)], v: [+P.vx.toFixed(3), +P.vy.toFixed(3), +P.vz.toFixed(3)], T: +P.t.toFixed(3), to: [+P.x.toFixed(1), +P.y.toFixed(1), +P.z.toFixed(1)], tm: p.team, id: p.id });
@@ -609,7 +611,7 @@ function startReload(p) {
   if (p.rg) { rgUnload(p); return; }   // R with a rifle grenade fitted takes it off again
   if (p.rel > 0 || p.mg != null) return; const w = WPN[p.w]; if (p.ammo >= w.mag) return;
   if (!p.bot && !p.elite && !(p.mags > 0)) { if ((p.magMsg || 0) <= tickNo) { tell(p, 'Out of magazines: find a gunner\'s ammo box or go back to base'); p.magMsg = tickNo + 3 * TICK; } return; }
-  p.rel = w.rl * (p.cls === 'assault' && !p.elite ? .7 : 1) * (T.hasPk(p, 'quick') ? .92 : 1) * (T.hasPk(p, 'riflegren') ? 1.1 : 1) * (T.hasPk(p, 'belt') && p.w === 'lmg' ? .85 : 1);   // v0.36: the assault man is quick with a clip; v0.47 perks
+  p.rel = w.rl * (p.ammo <= 0 && T.cun(p, 'strip') ? .75 : 1) * (T.cun(p, 'belt') ? .8 : 1) * (p.cls === 'assault' && !p.elite ? .7 : 1) * (T.hasPk(p, 'quick') ? .92 : 1) * (T.hasPk(p, 'riflegren') ? 1.1 : 1) * (T.hasPk(p, 'belt') && p.w === 'lmg' ? .85 : 1);   // v0.36: the assault man is quick with a clip; v0.47 perks
 }
 function fireWeapon(p) {
   const w = WPN[p.w]; if (p.cd > 0 || p.rel > 0 || p.charging || p.sprOut > 0 || (p.mask && tickNo < p.mask)) return;   // no firing while sprinting or charging
@@ -701,7 +703,7 @@ function reviveAct(p) {
   const gap = tickNo - (p.rvLast || -99);
   if (p.rvTgt !== t || gap > 8) { p.rvT = 0; p.rvTgt = t; p.rvLast = tickNo; }
   p.rvT += Math.min(gap, 6) * DT; p.rvLast = tickNo;
-  const rvT = REV_T * (T.hasPk(p, 'triage') ? .8 : 1);   // v0.47 Triage
+  const rvT = REV_T * (T.hasPk(p, 'triage') ? .8 : 1) * (T.cun(p, 'revq') ? .75 : 1);   // v0.47 Triage
   send(p, { t: 'rvp', p: Math.min(1, p.rvT / rvT) }); if (!t.bot) send(t, { t: 'rvp', p: Math.min(1, p.rvT / rvT), by: p.name });
   if (p.rvT >= rvT) { p.rvT = 0; p.rvTgt = null; reviveEnt(t, p); }
 }
@@ -746,7 +748,7 @@ function onAct(p, a, m) {
   } else if (a === 'dig') {
     if (p.u !== 'tool' || p.mg != null || (p.digCd || 0) > tickNo) return;
     if (supOf(p) < 1) { tell(p, 'No supplies for digging: stand near an objective'); return; }
-    supUse(p, 1); p.digCd = tickNo + Math.round((T.hasPk(p, 'spade') ? 2.4 : 3) * TICK);
+    supUse(p, 1); p.digCd = tickNo + Math.round((T.hasPk(p, 'spade') ? 2.4 : 3) * (T.cun(p, 'dig') ? .75 : 1) * TICK);
     const r = p.cls === 'sapper' ? 3.4 : 2.4; { const c = [+p.x.toFixed(2), +p.z.toFixed(2), r, 1.4]; T.dig(terr, c[0], c[1], r, 1.4); craters.push(c); } bcast({ t: 'cr', c: craters[craters.length - 1] });
   }
 }
@@ -778,8 +780,8 @@ function buildAct(p, k) {
     if (own.filter(q => q.by === p).length >= BLD_PER) { tell(p, 'You can only have ' + BLD_PER + ' buildings at once'); return; }
     f.y = Math.min(...hs);
   }
-  if (supOf(p) < D.cost) { tell(p, D.n + ' costs ' + D.cost + ' supply'); return; }
-  supUse(p, D.cost);
+  const dc = T.fortCost(p, D); if (supOf(p) < dc) { tell(p, D.n + ' costs ' + dc + ' supply'); return; }
+  supUse(p, dc);
   if (D.small) { const mine = [...T.FORTS.values()].filter(q => q.by === p && T.FORT[q.k].small); if (mine.length >= SMALL_PER) removeFort(mine[0]); }
   T.addFort(f); fortSync(f); if (D.small) NAV.rebuild(f.x - 4, f.z - 4, f.x + 4, f.z + 4);
   if (D.small) addXp(p, 1); else tell(p, D.n + ' laid out. Hold [E] next to it to build it up (teammates can help).');
@@ -1596,7 +1598,7 @@ function reconSpot(p, passive) {   // recon: everything in the sights is spotted
   const cone = passive ? .03 : p.ads && w.scope ? .1 / Math.sqrt(w.scope / 3) : .16, reach = p.ads && w.scope ? 240 : 120; const got = [];
   for (const e of ents.values()) { if (e.team === p.team || !e.alive || e.cmd) continue; const vx = e.x - p.x, vy = e.y + 1.2 - ey, vz = e.z - p.z, l = Math.hypot(vx, vy, vz); if (l > reach || l < 2) continue;
     if (Math.acos(clamp((vx * dx + vy * dy + vz * dz) / l, -1, 1)) < cone && T.los(terr.H, p.x, ey, p.z, e.x, e.y + 1.2, e.z) && !(smokes.length && smokeBlocks(p.x, p.z, e.x, e.z))) {
-      const fresh = !(e.sp[p.team] > tickNo + 2 * TICK); e.sp[p.team] = Math.max(e.sp[p.team], tickNo + ((passive ? 6 : 12) + (T.hasPk(p, 'spotter') ? 3 : 0)) * TICK); e.spBy = p; if (fresh) got.push(e); } }
+      const fresh = !(e.sp[p.team] > tickNo + 2 * TICK); e.sp[p.team] = Math.max(e.sp[p.team], tickNo + Math.round(((passive ? 6 : 12) + (T.hasPk(p, 'spotter') ? 3 : 0)) * (T.cun(p, 'spot') ? 1.5 : 1) * TICK)); e.spBy = p; if (fresh) got.push(e); } }
   return got;
 }
 // quick chat: requests and pings for the team (artillery / smoke requests also reach the officer)
@@ -2235,7 +2237,7 @@ function snapshot(p, framed) {   // framed: return a ready WebSocket binary fram
   return Buffer.from(SNAP.subarray(0, o));
 }
 const CLASS_IDX = { rifleman: 0, assault: 1, gunner: 2, medic: 3, sapper: 4, officer: 5, recon: 6 };
-const W_IDX = { bolt: 0, carbine: 1, shotgun: 2, smg: 3, lmg: 4, mark: 5, sniper: 6 };
+const W_IDX = { bolt: 0, carbine: 1, shotgun: 2, smg: 3, lmg: 4, mark: 5, sniper: 6, gew: 0, gews: 5, mp18: 3, bar: 4, fed: 1 };   // v0.59 new guns borrow the look and sound of the nearest old one
 // shown as the shouldered-rifle pose: humans aiming down sights or firing, bots with a target in sight
 const aiming = e => e.alive && (e.bot ? !!(e.tgt && e.td < 70) || e.flash > 0 : !!e.ads || e.flash > 0);
 let bytesOut = 0, tickMs = 0, tickMax = 0, slowN = 0, gapMax = 0, lastTickAt = 0, slowLogAt = 0; const SLOW_MS = 40;
@@ -2364,7 +2366,7 @@ function onText(c, txt) {
     if (vote && round.state === 'ended') send(e, voteMsg(e));   // v0.49: joined during the map vote
   } else if (!p) return;
   else if (m.t === 'join' || m.t === 'loadout') {
-    let l = T.fixLoadout(p.xp, m); let sq = m.sq | 0; const sz = sqSizes(p.team);
+    let l = T.fixLoadout(p.xp, m, cxOf(p)); let sq = m.sq | 0; const sz = sqSizes(p.team);
     if (l.cls === 'officer' && officerCount(p.team, p) >= OFFICERS_MAX) { l = { cls: 'rifleman', w: 'bolt', u: 'bandage' }; tell(p, 'Officer slots are full. Deploying as Rifleman.'); }
     if (p.deployed && sq === p.sq) sz[sq]--;
     if (!(sq >= 0 && sq < T.SQUADS.length && sz[sq] < SQ_MAX)) sq = sz.findIndex(n => n < SQ_MAX);
@@ -2385,7 +2387,7 @@ function onText(c, txt) {
     for (const c2 of m.c.slice(0, 20)) if (Array.isArray(c2) && c2.length >= 7) p.q.push(c2);
     if (Number.isFinite(m.rt)) p.rw = clamp(tickNo - (m.rt | 0), 0, LAGC_MAX);   // how far behind the server this player's view is
     if (p.q.length > 60) p.q.splice(0, p.q.length - 60);
-  } else if (m.t === 'txp' && process.env.T128_TEST && Number.isFinite(+m.n)) { addXp(p, +m.n); send(p, perkState(p));   // test hook: grant XP
+  } else if (m.t === 'txp' && process.env.T128_TEST && Number.isFinite(+m.n)) { addXp(p, +m.n, true); send(p, perkState(p));   // test hook: grant XP (account XP only)
   } else if (m.t === 'tp' && process.env.T128_TEST && Number.isFinite(+m.x) && Number.isFinite(+m.z)) { p.x = +m.x; p.z = +m.z; p.y = T.hAt(terr.H, p.x, p.z); p.vy = 0; p.cl = null;
   } else if (m.t === 'dmg' && process.env.T128_TEST && Number.isFinite(+m.n)) { damage(p, +m.n, null, !!m.head);
   } else if (m.t === 'tk' && process.env.T128_TEST) { const v = VEHM.spawnTank(p.team, 'test'); if (v) { v.x = p.x + 8; v.z = p.z; v.yaw = p.yaw; v.order = { x: v.x, z: v.z }; }
