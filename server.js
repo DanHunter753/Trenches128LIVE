@@ -260,7 +260,7 @@ function damagePost(q, dmg, by) {
 }
 function abilityAct(p) {
   if (!p.alive || p.down > 0 || p.cmd || (p.mg != null && p.mg !== false) || p.inV || p.elite) return;
-  if (p.cls === 'gunner') dropAmmo(p); else if (p.cls === 'assault') morphine(p); else if (p.cls === 'rifleman') { if (p.rg) rgUnload(p); else rgFit(p); }
+  if (p.cls === 'gunner') dropAmmo(p); else if (p.cls === 'assault') morphine(p); else if (p.cls === 'rifleman') { if (p.rg) rgUnload(p); else rgFit(p); } else if (p.cls === 'medic') { if (p.rg) rgUnload(p); else mkReady(p); }
 }
 /** Gunner: put down an ammo box at your feet. Teammates who walk over it get a full magazine, their grenades and utility back. */
 function dropAmmo(p) {
@@ -307,6 +307,39 @@ function aboxTick() {
 function rgFit(p) {
   if (!(p.gr > 0)) { if (!p.bot) tell(p, 'No grenades left for the cup'); return false; }
   p.rg = 1; p.rgAt = tickNo + Math.round(T.RG.fit * TICK); p.rel = 0; if (!p.bot) send(p, { t: 'rg', s: 1, f: T.RG.fit }); return true;
+}
+// v0.54 medic: [N] takes a med kit in hand (the rifle-grenade arc shows where it lands), the trigger lobs it up to ~15 m.
+// The first teammate it hits, or who walks over it, is patched up (+60 HP). One every 20 s; a kit on the ground lasts 40 s.
+const MK = { v: Math.sqrt(15 * T.RG.g), cd: 20, heal: 60, life: 40, r: 1.1 }, medkits = []; let mkId = 1;
+function mkReady(p) {
+  if ((p.mkCd || 0) > tickNo) { if (!p.bot) tell(p, 'Med kit: next one in ' + Math.ceil((p.mkCd - tickNo) / TICK) + 's'); return false; }
+  p.rg = 2; p.rgAt = tickNo; p.rel = 0; if (!p.bot) send(p, { t: 'rg', s: 2, f: 0 }); return true;
+}
+function throwKit(p) {
+  const ey = p.y + eyeH(p), P = T.rgPath(terr.H, p.x, ey, p.z, p.yaw, p.pitch, MK.v / T.RG.v);
+  p.rg = 0; p.cd = 1; p.mkCd = tickNo + MK.cd * TICK;
+  const k = { id: mkId++, team: p.team, by: p, f: [p.x, ey, p.z], v: [P.vx, P.vy, P.vz], T: P.t, t: 0, x: p.x, y: ey, z: p.z, land: false, until: 0 };
+  medkits.push(k);
+  bcast({ t: 'rgf', mk: k.id, f: [+p.x.toFixed(2), +ey.toFixed(2), +p.z.toFixed(2)], v: [+P.vx.toFixed(3), +P.vy.toFixed(3), +P.vz.toFixed(3)], T: +P.t.toFixed(3), to: [+P.x.toFixed(1), +P.y.toFixed(1), +P.z.toFixed(1)], tm: p.team, id: p.id });
+  if (!p.bot) send(p, { t: 'rg', s: 0 }); return true;
+}
+function mkHeal(k, e) {
+  const h0 = e.hp; e.hp = Math.min(maxHp(e), e.hp + MK.heal); e.burn = 0; const gain = Math.round(e.hp - h0);
+  if (!e.bot) tell(e, (k.by && k.by !== e ? k.by.name + "'s med kit" : 'A med kit') + ' patched you up (+' + gain + ' HP)');
+  if (k.by && k.by !== e && !k.by.bot && gain > 0) { addXp(k.by, gain >= 30 ? 8 : 4); send(k.by, { t: 'mhd', id: e.id, n: nameOf(e), hp: gain, xp: gain >= 30 ? 8 : 4 }); }
+  bcast({ t: 'mkx', id: k.id });
+}
+function mkTick() {   // every tick
+  for (let i = medkits.length - 1; i >= 0; i--) {
+    const k = medkits[i];
+    if (!k.land) { k.t = Math.min(k.T, k.t + DT); const t = k.t; k.x = k.f[0] + k.v[0] * t; k.y = k.f[1] + k.v[1] * t - .5 * T.RG.g * t * t; k.z = k.f[2] + k.v[2] * t;
+      if (k.t >= k.T) { k.land = true; k.y = hAt(terr.H, k.x, k.z); k.until = tickNo + MK.life * TICK; } }
+    else if (tickNo > k.until) { bcast({ t: 'mkx', id: k.id }); medkits.splice(i, 1); continue; }
+    let hit = null;
+    forNear(k.x, k.z, 2, e => { if (hit || e.team !== k.team || !e.alive || e.cmd || e.down > 0 || e.inV || e.hp >= maxHp(e)) return; if (e === k.by && !k.land) return;
+      if (Math.hypot(e.x - k.x, e.z - k.z) < (k.land ? MK.r : .8) && k.y > e.y - .3 && k.y < e.y + 2.1) hit = e; });
+    if (hit) { mkHeal(k, hit); medkits.splice(i, 1); }
+  }
 }
 function rgUnload(p) { p.rg = 0; if (!p.bot) send(p, { t: 'rg', s: 0 }); }
 function fireRifleGrenade(p) {
@@ -569,6 +602,7 @@ function startReload(p) {
 }
 function fireWeapon(p) {
   const w = WPN[p.w]; if (p.cd > 0 || p.rel > 0 || p.charging || p.sprOut > 0 || (p.mask && tickNo < p.mask)) return;   // no firing while sprinting or charging
+  if (p.rg === 2) { throwKit(p); return; }   // v0.54 medic's med kit in hand
   if (p.rg) { if (tickNo >= p.rgAt) fireRifleGrenade(p); return; }   // v0.37: a rifle grenade is fitted: the trigger launches it
   if (p.ammo <= 0) { startReload(p); return; }
   p.ammo--; p.cd = w.cd * (p.cls === 'rifleman' && p.w === 'bolt' && !p.elite ? .8 : 1); p.flash = 3;   // v0.37: riflemen work the bolt faster
@@ -1777,7 +1811,7 @@ function resetRound() {
   const changed = switchMap(); T.resetBays();
   for (let i = 0; i < BASE_NESTS; i++) Object.assign(NESTS[i], T.NEST[i], { dead: false, bot: null, occ: null, hp: 100, fix: 0, fixAt: 0 });
   phoneCut.clear(); tunReset(); planes.length = 0; AAS.length = 0; T.AA.forEach(a => AAS.push({ ...a, dead: false, hp: 100, fix: 0, fixAt: 0 }));   // (every round, same map or not)
-   craters = []; grenades.length = 0; posts = []; aboxes = [];
+   craters = []; grenades.length = 0; posts = []; aboxes = []; medkits.length = 0;
   for (const p of humans) if (p.mg != null && NESTS[p.mg].fort) dismount(p, true);
   T.clearForts(); NESTS.length = BASE_NESTS; bcast({ t: 'fo', f: [] }); NAV.rebuild(); if (changed) NAV.clear();   // (routes cached on the old map would mislead bots for seconds)
   gameMode = isWake() ? 'dom' : nextMode || (CFG.mode === 'attrition' ? 'attr' : CFG.mode === 'mix' ? (rnd() < .5 ? 'attr' : 'ops') : 'ops'); nextMode = null; attrT = 0;
@@ -2265,6 +2299,7 @@ function tickBody() {
   for (const n of NESTS) if (n.heat > 0) { n.heat = Math.max(0, n.heat - DT * (n.over ? .3 : .2)); if (n.over && n.heat <= .35) n.over = false; }
   if (round.state === 'play') guard('objectives', objectivesTick);
   if (tickNo % 40 === 0) guard('fill', fillBots);
+  if (medkits.length) guard('medkits', mkTick);
   if (tickNo % 10 === 0) { guard('orders', orderTick); guard('crates', crateTick); guard('aboxes', aboxTick); if (tickNo % TICK === 0) guard('supply', supTick); guard('medics', medicSee); }
   if (tickNo % 4 === 0) for (const e of ents.values()) if (e.mph && e.mphU <= tickNo) { e.mph = false; if (!e.bot) send(e, { t: 'mph', s: 0, n: e.mphN }); }
   if (tickNo % 20 === 0) guard('sqs', sendSqs);
@@ -2579,4 +2614,4 @@ process.on('uncaughtException', e => console.error('uncaught', e && e.stack || e
 process.on('unhandledRejection', e => console.error('unhandled rejection', e && e.stack || e));
 function shutdown() { saveXp(); if (ACC) ACC.flush(); setTimeout(() => process.exit(0), 150); }
 process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);   // docker stop / systemctl stop save XP and accounts first
-module.exports = { _test: { vt: { canCap, round: () => round, op: () => op, vote: () => vote, voteStart, voteCast, voteTick, gameMode: () => gameMode, attrNext, isAttr, setMode: m => { CFG.mode = m; }, setMaps: m => { CFG.maps = m; } }, sup: { supTick, inBase, magMax, supMax, supply: () => supply, slOk, computeLeaders, leaders: () => leaders }, pkt: { chatMsg, perkMsg, perkState, startReload, downEnt, damage, maskAct, psMag, kits: () => kits, buildPost, reconSpot, fireWeapon, posts: () => posts }, domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };
+module.exports = { _test: { vt: { canCap, round: () => round, op: () => op, vote: () => vote, voteStart, voteCast, voteTick, gameMode: () => gameMode, attrNext, isAttr, setMode: m => { CFG.mode = m; }, setMaps: m => { CFG.maps = m; } }, mk: { medkits: () => medkits, mkTick, throwKit, MK }, sup: { supTick, inBase, magMax, supMax, supply: () => supply, slOk, computeLeaders, leaders: () => leaders }, pkt: { chatMsg, perkMsg, perkState, startReload, downEnt, damage, maskAct, psMag, kits: () => kits, buildPost, reconSpot, fireWeapon, posts: () => posts }, domPlan, domGoal, domRally, dom: () => dom, domState: () => dom && { score: dom.score.slice(), mk: dom.mk.slice(), flags: OB.slice(0, 5).map(o => [o.n, o.owner, +o.p.toFixed(2)]) }, domSet: o => Object.assign(dom, o), supplyOf: t => supply[t], navPassable: (x, z) => NAV.passable(x, z), DOM, sightZero, HEAD_STAND, HIT_KNEEL, HEAD_KNEEL, fireBullet, finishHit, pistolFire, PISTOL, DOWN_HP, buildGrid, bulletsTick, bullets, processCmds, creditKill, medicTarget, medicSee, fortSpawn, buildAct, onAct, rgFit, rgUnload, fireRifleGrenade, rgAim, grenades, aboxes: () => aboxes, abilityAct, dropAmmo, aboxTick, morphine, botAbility, grMax, bdMax, BSTAT, terr: () => terr, setHome: f => { home = f; }, flagSpawnOk, spawnEnt, planes, AAS, planesTick, planeHurt, planeLaunch, aaWreck, TUN, tunnelAct, tunBlow, supCd: () => supCd, phoneSet, phoneAct, phoneAutofix, phoneUp, phoneCut, workAct, nestAutofix, nestWreck, resetRound, mapSeed: () => mapSeed, nextMap: () => nextMap, rejoins, CFG, ACC, serverList, listed, pushSmoke, enemiesNear, reviveAct, SQS: () => SQS, BSTAT, alarms, raiseAlarm, botGrenade, botChargeStart, shelterFor, kitTick, callMedic, finishDown, downEnt, blowBay, craters: () => craters, KSTAT, VEHM: () => VEHM, ekits, eliteStock, takeElite, giveElite, eliteErrands, flameJet, fires, firesTick, flares, flareAt, fireFlare, sightAt, setWx, pickWx, nightFlares, addCrew, onAct, processCmds: p => processCmds(p), maxHp, lookByte, homeZ, tickNo: () => tickNo, op: () => op, OPS, sectorFalls, battalionLost, terrH: () => terr.H, navStats: () => NAV.stats(), SQS: () => SQS, crewForts, botBuildTick, fortComplete, navMove, NAV, killEnt, bodies, damage, reviveEnt, kitTick, explode, trace, NESTS, st, scoreRows, report, pingAct, maskAct, masked, throwUtil, endRound, histAt, histTick, snapshot, LAGC_MAX, reconSpot, DP, cmdPts: () => cmdPts, setCmd: (t, v) => { cmdPts[t] = v; }, smokes, gases, recons, marks, smokeBlocks, SQM, sqmOf, isBroken, moraleTick, moraleBoost, tierOf, vis, visTick, markAct, aiOrderTick, assignRaiders, depotsTick, callSupport, goal, bullets, bulletsTick, fireBullet, bulletStep, meleeStrike, suppress, fireWeapon, dropPara, assignGuards, mount, dismount, fortMsg, posts: () => posts, OB, ents, humans, orders, crates, supply: () => supply, setSupply: (t, v) => { supply[t] = v; } } };

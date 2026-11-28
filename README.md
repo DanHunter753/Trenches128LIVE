@@ -74,9 +74,10 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
-## v0.54 — Magazine icons beside the ammo count, Wake bots stay out of the water
+## v0.54 — Medic med kit, magazine icons beside the ammo count, Wake bots stay out of the water
 
 - **Magazine icons:** curved magazines in the HUD's cream and black, now to the right of the ammo count instead of over the gun picture.
+- **Medic med kit:** [N] takes a med kit in hand and shows the throwing arc (green ring), the trigger lobs it up to about 15 m. The first teammate it hits, or who walks over it, gets +60 HP, and the medic earns XP. One every 20 s; a kit on the ground lasts 40 s.
 - **Wake bots** treat wading water as 8 times the walk, so they go round by land or take the shortest crossing at the bridges. The shallows stay passable so they don't get stuck; deep water was already a wall.
 
 ## v0.53 — Spawn on your squad leader, night tracers, rifle smoke
