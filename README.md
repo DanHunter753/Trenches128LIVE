@@ -74,6 +74,11 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.57 — The new main menu
+
+- On a wide screen the first screen is now two panels, after the owner's mockup. On the left: the title, your service record, callsign and server, and a gold **Play** button. On the right: your loadout (Class, Customize with the soldier, weapon card, stat bars and damage-by-range chart, and Squad), with a gold **Deploy as …** button that saves the loadout and joins.
+- Phones and narrow windows keep the single panel with the **Loadout** button.
+
 ## v0.56 — Loadout from the first screen, Officer at Colonel, class XP, rank unlocks
 
 - **Loadout before you join:** a **Loadout** button on the first screen opens the Class and Customize tabs, so you can pick your class, weapon and perks without joining a server. It's saved on this computer and used when you join. The Squad tab will later let you team up with friends before joining.
