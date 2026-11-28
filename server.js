@@ -214,7 +214,7 @@ function spawnEnt(e) {
   if (e.veh && VEHM) VEHM.leave(e, true); if (e.elite) eliteLost(e); e.burn = 0; e.goTo = null; e.job = null;
   e.pk = !e.bot && e.acct && !e.cmd ? T.perkActive(T.perkNorm(e.acct.perks), e.cls, T.levelOf(e.xp || 0).lv) : null; e.rlN = 0; e.crT = 0; e.sbB = false;   // v0.47: this life's perks
   e.died = false; e.hist = null; e.mask = 0; e.hitBy = null; e.lastHit = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; e.bloom = 0;
-  e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = grMax(e); e.gCd = 0; e.bd = bdMax(e); e.sld = 0; e.sldCd = 0; e.pb = 0; e.rg = 0; e.rgAt = 0; e.rgCd = 0; e.mph = false; e.mphU = 0; e.mphN = e.cls === 'assault' ? MPH_DOSES : 0; e.boxCd = 0; e.healCd = 0; e.mgCd = 0; e.para = false;
+  e.cl = null; e.climb = null; e.cov = null; e.crouch = false; e.peek = false; e.down = 0; e.revBy = null; e.shelter = null; e.bandaged = false; e.seen = null; e.chgCd = 0; e.gr = grMax(e); e.gCd = e.bot ? tickNo + Math.round((15 + rnd() * 20) * TICK) : 0; /* v0.50: a fresh bot waits before his first grenade */ e.bd = bdMax(e); e.sld = 0; e.sldCd = 0; e.pb = 0; e.rg = 0; e.rgAt = 0; e.rgCd = 0; e.mph = false; e.mphU = 0; e.mphN = e.cls === 'assault' ? MPH_DOSES : 0; e.boxCd = 0; e.healCd = 0; e.mgCd = 0; e.para = false;
   let { x, z } = home(e.team), py = null;
   const atPost = q => { x = q.x + (rnd() - .5) * (q.fort ? 1 : 3); z = q.z + (rnd() - .5) * (q.fort ? 1 : 3); py = q.fort ? null : q.y; };
   if (e.mg === true) { x = e.hx; z = e.hz; }
@@ -315,7 +315,7 @@ function botAbility(b) {
     forNear(b.x, b.z, 110, cand);
     if (best) { const d = Math.hypot(best.x - b.x, best.z - b.z), a = rgAim(d, best.y - (b.y + 1.6)); if (a != null) {
       const y0 = b.yaw, p0 = b.pitch; b.yaw = Math.atan2(-(best.x - b.x), -(best.z - b.z)) + (rnd() - .5) * .06; b.pitch = a + (rnd() - .5) * .07;   // a lob, not a sniper shot
-      if (fireRifleGrenade(b)) { b.rgCd = tickNo + Math.round((40 + rnd() * 30) * TICK); best.rgTgt = tickNo + 15 * TICK;   // one rifle grenade per target every 15 s, side-wide
+      if (fireRifleGrenade(b)) { b.rgCd = tickNo + Math.round((75 + rnd() * 45) * TICK); best.rgTgt = tickNo + 15 * TICK;   // one rifle grenade per target every 15 s, side-wide
         BSTAT.rg = (BSTAT.rg || 0) + 1; } b.yaw = y0; b.pitch = p0; } }
     if (!best) b.rgCd = tickNo + 3 * TICK;
   }
@@ -406,7 +406,7 @@ function downEnt(e, by) {   // knocked down instead of killed: a medic can reviv
 }
 function finishDown(e, msg) {
   if (e.bot) { e.down = 0; e.died = true; bodyOut(e, null); e.rt = 8 + rnd() * 4; return; }
-  e.down = 0; e.rt = .6; send(e, { t: 'dead', by: msg || 'bleeding out' });
+  e.down = 0; e.rt = .6; e.ready = false; send(e, { t: 'dead', by: msg || 'bleeding out', rt: e.rt });
 }
 function reviveEnt(e, by) {
   e.down = 0; e.alive = true; e.hp = Math.ceil(maxHp(e) * .4); e.rel = 0; e.cd = 0; e.rvT = 0; e.revBy = by.bot ? null : by; BSTAT.revives++;
@@ -428,7 +428,7 @@ function killEnt(e, by) {
   if (e.mg != null && !e.bot) dismount(e, true); if (e.veh) VEHM.leave(e, true);
   if (e.elite === 'flame') { const x = e.x, z = e.z, k = by && by.team !== e.team ? by : null; later(0, () => explode(x, z, k, .45)); }   // a holed fuel tank goes up
   killFeed(e, by, arguments[2]); creditKill(e, by, arguments[2]);
-  if (!e.bot) send(e, { t: 'dead', by: by ? (by.bot ? 'an enemy soldier' : by.name) : 'an explosion' });
+  if (!e.bot) { e.ready = false; send(e, { t: 'dead', by: by ? (by.bot ? 'an enemy soldier' : by.name) : 'an explosion', rt: e.rt }); }
 }
 function explode(x, z, by, pow, src) {   // pow: 1 = artillery shell / grenade; mortar bombs .75, tank shells .8; src 'shell' = fired by a gun
   pow = pow || 1; const R = 7 * pow, cr = +(4 * Math.min(1.2, .4 + .6 * pow)).toFixed(2), dep = +(1.6 * Math.min(1.2, .4 + .6 * pow)).toFixed(2);
@@ -471,7 +471,7 @@ function blowBay(x, z, by) {
 // A bullet that passes within 2.6 m of an enemy suppresses them (once per bullet per soldier).
 // lag compensation: every entity keeps 1 s of positions; a human's bullets hit targets where that player saw them
 // (the client reports the server tick it is rendering, `rt`; rewind is capped at LAGC_MAX ticks)
-const HIST = 20, LAGC_MAX = 8;
+const HIST = 48, LAGC_MAX = 8;   // v0.50: 2.4 s of history, so a player's bullet can be checked against where targets were when he fired (flight time included)
 function histTick() { const k = tickNo % HIST; for (const e of ents.values()) { let h = e.hist; if (!h) { h = e.hist = new Float32Array(HIST * 4); for (let i = 0; i < HIST; i++) { h[i * 4] = e.x; h[i * 4 + 1] = e.y; h[i * 4 + 2] = e.z; } }   // new / respawned: no ghost of where it used to be
  h[k * 4] = e.x; h[k * 4 + 1] = e.y; h[k * 4 + 2] = e.z; h[k * 4 + 3] = e.crouch ? 1 : 0; } }
 function histAt(e, rw, out) {   // position of e rw ticks ago (falls back to now)
@@ -484,7 +484,7 @@ const HEAD_STAND = 1.52, HIT_KNEEL = 1.42, HEAD_KNEEL = 1.08;
 const bullets = [], SUPW = { mg: .3, lmg: .22, smg: .1, shotgun: .12, bolt: .18, carbine: .14, mark: .25, hmg: .3, atr: .35 };
 const ZERO_D = 100, sightZero = w => w && (w.vel || 400) >= 360 && !w.flame ? T.GRAV * (w.scope ? 150 : ZERO_D) / (2 * (w.vel || 400) ** 2) : 0;   // pitch that puts the bullet back on the line of sight at 100 m (scoped rifles: 150 m)
 function fireBullet(by, ox, oy, oz, yw, pt, rng, dmg, wk, vel, sw) {
-  const cp = Math.cos(pt), dx = -Math.sin(yw) * cp, dy = Math.sin(pt), dz = -Math.cos(yw) * cp, b = { by, team: by.team, x: ox, y: oy, z: oz, vx: dx * vel, vy: dy * vel, vz: dz * vel, d: 0, rng, dmg, wk, sw, sup: null, rw: by.bot ? 0 : clamp(by.rw || 0, 0, LAGC_MAX) };
+  const cp = Math.cos(pt), dx = -Math.sin(yw) * cp, dy = Math.sin(pt), dz = -Math.cos(yw) * cp, b = { by, team: by.team, x: ox, y: oy, z: oz, vx: dx * vel, vy: dy * vel, vz: dz * vel, d: 0, rng, dmg, wk, sw, sup: null, rw: by.bot ? 0 : clamp(by.rw || 0, 0, LAGC_MAX), t0: tickNo, hum: !by.bot };
   bullets.push(b); shots.push([ox, oy, oz, dx, dy, dz, Math.min(rng, 140), by.id, wk, vel]); return b;
 }
 function suppress(e, wk, by) {
@@ -493,12 +493,16 @@ function suppress(e, wk, by) {
 }
 function bulletStep(b, dt) {   // true when the bullet is spent
   const spd = Math.hypot(b.vx, b.vy, b.vz), n = Math.max(1, Math.ceil(spd * dt / .5)), h = dt / n, cand = [];
-  forNear(b.x + b.vx * dt / 2, b.z + b.vz * dt / 2, spd * dt / 2 + 4 + (b.rw ? 4 : 0), e => { if (e.team !== b.team && e.alive && !e.cmd) cand.push(e); });
+  // v0.50 a player's bullet meets targets where they were on his screen when he fired: lag (rw) plus the bullet's flight so far.
+  // Rifles hit what the crosshair was on without leading a running man (players reported long shots that 'didn't register').
+  const rwb = b.hum ? Math.min(HIST - 2, b.rw + Math.max(0, tickNo - b.t0 - 1)) : b.rw;   // (history is written at the end of a tick: one tick less, so a round fired this tick reads positions from after it was fired)
+  forNear(b.x + b.vx * dt / 2, b.z + b.vz * dt / 2, spd * dt / 2 + 4 + (rwb ? 4 + rwb * .45 : 0), e => { if (e.team !== b.team && e.alive && !e.cmd) cand.push(e); });
   for (let k = 0; k < n; k++) {
     const px = b.x, py = b.y, pz = b.z;
     b.vy -= T.GRAV * h; b.x += b.vx * h; b.y += b.vy * h; b.z += b.vz * h; b.d += spd * h;
     const x = b.x, y = b.y, z = b.z;
-    if (b.d > b.rng || Math.abs(x) > T.W || Math.abs(z) > T.W) return true;
+    if (b.d > b.rng) { if (b.hum) farCheck(b); return true; }
+    if (Math.abs(x) > T.W || Math.abs(z) > T.W) return true;
     if (y < hAt(terr.H, x, z) || T.inRoof(x, y, z) || T.sbHit(terr.H, x, y, z) || T.fortSeg(px, py, pz, x, y, z) >= 0) return true;   // walls clipped exactly: no tunnelling through 0.45 m logs
     if (VEHM && VEHM.bulletHit(b, x, y, z)) return true;
     if (y > 15) { const pl = planes.find(q => q.team !== b.team && q.ph !== 'down' && Math.abs(q.y - y) < 3 && Math.hypot(q.x - x, q.z - z) < 3.5); if (pl) { planeHurt(pl, b.dmg * .5, b.by); return true; } }   // armour stops bullets (anti-tank rounds hurt it)
@@ -506,7 +510,7 @@ function bulletStep(b, dt) {   // true when the bullet is spent
     if (pq) { damagePost(pq, b.dmg * .6, b.by); return true; }
     for (const e of downed) if (e.team !== b.team && e.down > 0 && Math.abs(e.x - x) < .8 && Math.abs(e.z - z) < .8 && y > e.y - .1 && y < e.y + .65) { finishHit(e, b.dmg, b.by); return true; }   // a wounded man on the ground: low, and easy to finish
     for (const e of cand) {
-      if (!e.alive) continue; const P = histAt(e, b.rw, RW), ex = P[0] - x, ez = P[2] - z, ey = P[1], cr = P[3];
+      if (!e.alive) continue; const P = histAt(e, rwb, RW), ex = P[0] - x, ez = P[2] - z, ey = P[1], cr = P[3];
       if (Math.abs(ex) < .6 && Math.abs(ez) < .6 && y > ey && y < ey + (cr ? HIT_KNEEL : 1.9)) {
         const head = y >= ey + (cr ? HEAD_KNEEL : HEAD_STAND), scoped = b.by.cls === 'recon' && WPN[b.wk] && WPN[b.wk].scope;
         const dmg = head && scoped ? 250 : WPN[b.wk] && WPN[b.wk].fo ? T.rangeDmg(WPN[b.wk], b.d, b.dmg) : b.sw && b.d >= b.sw[0] && b.d <= b.sw[1] ? b.sw[2] : b.dmg;   // recon scoped headshot kills outright; v0.49 rifles: sweet spot, then a fall-off to a floor at 800 m
@@ -516,6 +520,16 @@ function bulletStep(b, dt) {   // true when the bullet is spent
     }
   }
   return false;
+}
+// v0.50 a player's round ran out of reach: was an enemy on that line further on? Then tell him the target was out of range.
+function farCheck(b) {
+  const p = b.by; if (!p || !p.ws || (p.farAt && tickNo - p.farAt < 2 * TICK)) return;
+  const s = Math.hypot(b.vx, b.vy, b.vz) || 1, dx = b.vx / s, dy = b.vy / s, dz = b.vz / s;
+  for (const e of ents.values()) {
+    if (e.team === b.team || !e.alive || e.cmd) continue;
+    const rx = e.x - b.x, ry = e.y + 1.2 - b.y, rz = e.z - b.z, t = rx * dx + ry * dy + rz * dz; if (t < 0 || t > 400) continue;
+    if (Math.hypot(rx - dx * t, ry - dy * t, rz - dz * t) < 2.5 + t * .02) { p.farAt = tickNo; send(p, { t: 'far', r: Math.round(b.rng), d: Math.round(b.rng + t), w: b.wk }); return; }
+  }
 }
 function bulletsTick() { for (let i = bullets.length - 1; i >= 0; i--) if (bulletStep(bullets[i], DT)) bullets.splice(i, 1); }
 function trace(by, ox, oy, oz, yw, pt, rng, dmg) {   // instant resolve (tests, legacy callers)
@@ -638,7 +652,8 @@ function onAct(p, a, m) {
   if (p.deployed && a === 'ping' && p.down > 0) { callMedic(p); return; }
   if (p.deployed && a === 'work') { workAct(p); return; }
   if (p.deployed && a === 'ability') { abilityAct(p); return; }
-  if (p.deployed && a === 'spawnAt') { const id = Math.floor(+(m && m.id)); p.spawnPick = Number.isFinite(id) ? id : null; return; }   // v0.34.1: picked while dead (it used to fall through the 'alive' check below and was dropped)
+  if (p.deployed && a === 'spawnAt') { const id = Math.floor(+(m && m.id)); p.spawnPick = Number.isFinite(id) ? id : null; return; }
+  if (p.deployed && a === 'deploy') { if (m && m.id != null) { const id = Math.floor(+m.id); p.spawnPick = Number.isFinite(id) ? id : null; } if (!p.alive && !(p.down > 0)) p.ready = true; return; }   // v0.50: the player chose to respawn   // v0.34.1: picked while dead (it used to fall through the 'alive' check below and was dropped)
   if (!p.deployed || !p.alive) return;
   if (p.veh && !['mg', 'ping', 'mark', 'mask'].includes(a)) return;   // seated in a vehicle or at a gun
   if (a === 'reload') { p.mg != null ? startBelt(p) : startReload(p); }
@@ -987,7 +1002,7 @@ function humanTick(p) {
   if (p.supSend) { p.supSend = false; send(p, { t: 'sup', v: +p.supp.toFixed(2), x: +p.supSrc[0].toFixed(1), z: +p.supSrc[1].toFixed(1) }); }
   if (p.alive && p.charging) meleeStrike(p, true);
   if (p.alive && p.cls === 'recon' && p.ads && (tickNo + p.id) % 10 === 0) reconSpot(p, true);   // a scoped recon passively spots what's under his crosshair
-  if (!p.alive) { if (p.down > 0) { p.down -= DT; if (p.down <= 0) finishDown(p); return; } p.rt -= DT; if (p.rt <= 0 && round.state === 'play') spawnEnt(p); return; }
+  if (!p.alive) { if (p.down > 0) { p.down -= DT; if (p.down <= 0) finishDown(p); return; } p.rt -= DT; if (p.rt <= 0 && round.state === 'play' && (!p.rdy || p.ready)) { p.ready = false; spawnEnt(p); } return; }   // v0.50: a current page waits for the player to press Deploy (time to pick a spot or change class)
   if (!p.cmd && ((tickNo + p.id) % 8) === 0) spotFrom(p, 80, p.y + eyeH(p));
   if (p.rel > 0) { p.rel -= DT; if (p.rel <= 0) { if (p.mg != null) NESTS[p.mg].belt = 150; else p.ammo = WPN[p.w].mag; } }
 }
@@ -1199,6 +1214,7 @@ function kitTick(b) {   // bots with a med kit go to downed teammates (players f
 // ------------------------------------------------------------------ v0.27 smarter bots
 const BSTAT = { nades: 0, charges: 0, chargeKills: 0, shelters: 0, revives: 0, smokes: 0, bandages: 0 };   // behaviour counters (balance tooling)
 // grenades: into a trench or crater where enemies shelter, at a knot of enemies, or where an enemy was last seen behind cover
+const botNades = [[], []];   // v0.50: recent bot grenade throws per side
 function botGrenade(b) {
   if (!(b.gr > 0) || b.mg || b.climb || b.charging || b.para || (b.gCd || 0) > tickNo) return false;
   const live = b.tgt && b.tgt.alive, t = live ? b.tgt : (b.seen && tickNo - b.seen.at < 6 * TICK ? b.seen : null); if (!t) return false;
@@ -1207,11 +1223,13 @@ function botGrenade(b) {
   if (own) return false;
   const dug = T.base(t.x, t.z) - t.y > .9, hidden = !live;
   if (!((dug && (hidden || foes >= 1)) || foes >= 3)) return false;   // men dug in (or out of sight in a hole), or a real knot of them
-  if (rnd() < .6) { b.gCd = tickNo + 3 * TICK; return false; }   // not every chance
+  if (rnd() < .85) { b.gCd = tickNo + 6 * TICK; return false; }   // not every chance (v0.50: far fewer: players asked)
+  const rec = botNades[b.team]; while (rec.length && tickNo - rec[0] > 10 * TICK) rec.shift(); if (rec.length >= 3) { b.gCd = tickNo + 4 * TICK; return false; }   // and at most 3 a side every 10 s
+  rec.push(tickNo);
   const er = .8 + d * .09, tx = t.x + (rnd() - .5) * 2 * er, tz = t.z + (rnd() - .5) * 2 * er;
   const g = { fx: b.x, fy: b.y + 1.5, fz: b.z, tx, tz, t: 1.4, by: b }; grenades.push(g); BSTAT.nades++;
   bcast({ t: 'gr', f: [+g.fx.toFixed(1), +g.fy.toFixed(1), +g.fz.toFixed(1)], to: [+tx.toFixed(1), +tz.toFixed(1)], tm: b.team });
-  b.gr--; b.gCd = tickNo + Math.round((18 + rnd() * 12) * TICK); b.yaw = Math.atan2(-(t.x - b.x), -(t.z - b.z)); b.cd = Math.max(b.cd, .9); b.peek = true;
+  b.gr--; b.gCd = tickNo + Math.round((45 + rnd() * 30) * TICK); b.yaw = Math.atan2(-(t.x - b.x), -(t.z - b.z)); b.cd = Math.max(b.cd, .9); b.peek = true;
   return true;
 }
 // bayonet charge: a bot with a bayonet rushes a close enemy (more often when his squad is pushing or the enemy is hurt)
@@ -1690,7 +1708,7 @@ function report(win) {   // after-action report
     dom: dom ? { s: dom.score.slice(), win: DOM.win, caps: dom.caps.slice(), rl: dom.rl.slice(), f: domFlags().map((o, i) => [(T.OBJ[i] && T.OBJ[i].id) || '', o.n, Math.round(dom.held[i][0]), Math.round(dom.held[i][1]), dom.fc[i]]) } : null };
 }
 function endRound(win) {
-  round = { state: 'ended', t: isVote() ? VOTE_T + 6 : 15, win }; const rep = report(win); prepareNextMap(); if (isVote()) voteStart();
+  round = { state: 'ended', t: isVote() ? VOTE_T + 3 : 15, win }; const rep = report(win); prepareNextMap(); if (isVote()) voteStart();
   for (const p of humans) if (p.ws && p.ws.open) send(p, { t: 'end', win, rep, me: p.st ? [p.st.k, p.st.d, p.st.a, p.st.sc, p.st.rev, p.st.cap, p.st.spot, p.st.ord] : null });
   for (const p of humans) if (p.deployed && p.team === win) addXp(p, 100);
 }
@@ -1698,7 +1716,8 @@ function endRound(win) {
 // ---- v0.49 map vote between rounds. Three cards: the trench map with Operation, the trench map with Attrition, and Wake Atoll
 // with Domination; each shows the time of day and weather it will have. Votes can change until the timer runs out; the most
 // votes wins (ties at random). No votes at all: the map is picked at random between the trenches and Wake, then the mode.
-const VOTE_T = 18, WX_CLOCK = { overcast: '14:00', fog: '07:00', rain: '16:00', night: '23:00' };
+const VOTE_T = 30,   // v0.50: the whole post-round (was 18 s); the map changes 3 s after it closes
+  WX_CLOCK = { overcast: '14:00', fog: '07:00', rain: '16:00', night: '23:00' };
 let vote = null;
 function voteStart() {
   const opts = [{ map: 'trench', mode: 'ops', n: 'The Trenches', g: 'OPERATION' }, { map: 'trench', mode: 'attr', n: 'The Trenches', g: 'ATTRITION' }, { map: 'wake', mode: 'dom', n: 'Wake Atoll', g: 'DOMINATION' }];
@@ -1706,7 +1725,7 @@ function voteStart() {
   vote = { opts, by: new Map(), until: Date.now() + VOTE_T * 1000, done: -1 }; voteSend();
 }
 const voteCounts = () => vote.opts.map((_, i) => [...vote.by.values()].filter(v => v === i).length);
-function voteMsg(p) { return { t: 'vote', o: vote.opts.map(o => ({ n: o.n, g: o.g, wx: o.wx, tm: o.tm, k: o.map === 'wake' ? 'wake' : o.mode })), c: voteCounts(), s: Math.max(0, Math.ceil((vote.until - Date.now()) / 1000)), my: p && vote.by.has(p.id) ? vote.by.get(p.id) : -1, done: vote.done }; }
+function voteMsg(p) { return { t: 'vote', o: vote.opts.map(o => ({ n: o.n, g: o.g, wx: o.wx, tm: o.tm, k: o.map === 'wake' ? 'wake' : o.mode })), c: voteCounts(), s: Math.max(0, Math.ceil((vote.until - Date.now()) / 1000)), tot: VOTE_T, my: p && vote.by.has(p.id) ? vote.by.get(p.id) : -1, done: vote.done }; }
 function voteSend() { if (!vote) return; for (const p of humans) if (p.ws && p.ws.open) send(p, voteMsg(p)); }
 function voteCast(p, i) { if (!vote || vote.done >= 0 || !(i >= 0 && i < vote.opts.length)) return; vote.by.set(p.id, i | 0); voteSend(); }
 function voteTick() {
@@ -1718,7 +1737,7 @@ function voteTick() {
   if (o.map === 'wake') nextMap = { seed: T.WAKE_SEED, H: null, F: null, used: T.WAKE_SEED };   // (the trench map built in the background is simply dropped)
   else if (nextMap && nextMap.seed === T.WAKE_SEED) prepareNextMapSeed(T.newSeed());
   console.log('[vote] ' + c.join('/') + ' -> ' + o.n + ' · ' + o.g + (top === 0 ? ' (no votes: random)' : ''));
-  voteSend(); round.t = Math.min(round.t, 5);
+  voteSend(); round.t = Math.min(round.t, 3);
 }
 function prepareNextMap() { prepareNextMapSeed(mapPick()); }
 function prepareNextMapSeed(seed0) {
@@ -1753,7 +1772,7 @@ function resetRound() {
   VEHM.reset(); ekits.length = 0; kits.length = 0; fires.length = 0; flares.length = 0; alarms.length = 0; setWx(nextWx || pickWx()); nextWx = null; roundStartExtras(); cmdPts = [CP_START, CP_START]; smokes.length = 0; gases.length = 0; recons.length = 0; marks.length = 0; SQM.clear(); alertAt.clear(); vis[0].clear(); vis[1].clear(); for (const d of DP) { d.owner = -1; d.p = 0; } for (const e of ents.values()) e.depot = null;
   for (const p of humans) if (p.mg != null) dismount(p, true);
   for (const n of NESTS) { n.belt = 150; n.heat = 0; n.over = false; n.occ = null; if (n.bot) leaveFortNest(n.bot); }
-  for (const e of ents.values()) { e.died = false; e.oob = 0; e.alive = false; e.down = 0; e.rt = .5 + rnd(); e.placed = false; e.para = false; e.hold = null; e.climb = null; e.cov = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; }
+  for (const e of ents.values()) { e.died = false; e.oob = 0; e.alive = false; e.down = 0; e.rt = .5 + rnd(); e.ready = true; e.placed = false; e.para = false; e.hold = null; e.climb = null; e.cov = null; e.supp = 0; e.chg = T.chgMax(e); e.charging = false; }
   bullets.length = 0;
   round = { state: 'play', t: 0, win: -1 };
   if (!changed) bcast({ t: 'reset', map: mapSeed });
@@ -2266,7 +2285,7 @@ function onText(c, txt) {
     const team = back ? back.team : (process.env.T128_TEST && (m.team === 0 || m.team === 1)) ? m.team : c0 < c1 ? 0 : c1 < c0 ? 1 : (rnd() < .5 ? 0 : 1);   // m.team honoured only in test mode
     if ((team === 0 ? c0 : c1) >= SLOTS) { wsSend(c, 1, Buffer.from(JSON.stringify({ t: 'err', m: 'Server full.' }))); return; }
     const e = newEnt(team, false);
-    Object.assign(e, { ws: c, name, acct, cid, xp: acct ? acct.xp || 0 : CFG.accounts === 'required' ? 0 : xpdb[name.toLowerCase()] || 0, deployed: false, q: [], ack: 0, sq: -1, cls: 'rifleman', w: 'bolt', u: 'bandage', hold: false, pend: null });
+    Object.assign(e, { ws: c, name, acct, cid, rdy: !!m.rdy, ready: false, xp: acct ? acct.xp || 0 : CFG.accounts === 'required' ? 0 : xpdb[name.toLowerCase()] || 0, deployed: false, q: [], ack: 0, sq: -1, cls: 'rifleman', w: 'bolt', u: 'bandage', hold: false, pend: null });
     c.player = e; humans.add(e);
     send(e, { t: 'prof', id: e.id, team, xp: e.xp, rank: T.rankOf(e.xp), sq: sqSizes(team), max: SQ_MAX, acct: acct ? 1 : 0, name: e.name, server: CFG.name, map: mapSeed, back: back ? back.sq : null });
     send(e, perkState(e));   // v0.47
@@ -2279,7 +2298,7 @@ function onText(c, txt) {
     if (!(sq >= 0 && sq < T.SQUADS.length && sz[sq] < SQ_MAX)) sq = sz.findIndex(n => n < SQ_MAX);
     if (l.cls === 'officer') sq = -1;
     if (!p.deployed) {
-      p.cls = l.cls; p.w = l.w; p.u = l.u; p.sq = sq; p.deployed = true; p.alive = false; p.down = 0; p.rt = .3; p.sent = new Map();   // the client drops its entity copies on 'w'; resend everything
+      p.cls = l.cls; p.w = l.w; p.u = l.u; p.sq = sq; p.deployed = true; p.alive = false; p.down = 0; p.rt = .3; p.ready = true; p.sent = new Map();   // the client drops its entity copies on 'w'; resend everything
       send(p, { t: 'w', id: p.id, team: p.team, sq, cls: l.cls, w: l.w, u: l.u, wx: T.WX.k, craters, tick: TICK, state: round.state, crates: crates.filter(c => c.team === p.team).map(crateMsg), forts: [...T.FORTS.values()].map(fortMsg), nd: NESTS.slice(0, BASE_NESTS).map((n, i) => n.dead ? i : -1).filter(i => i >= 0), ph: [...phoneCut.keys()], tn: TUN.map((u, i) => p.team === T.TUNNELS[i].team || u.heard ? +u.p.toFixed(2) : 0), aa: AAS.map(a => a.dead ? 1 : 0) });
       if (sq >= 0) sendOrderTo(p); else sendOrders(p.team);
       send(p, VEHM.fullMsg()); send(p, eliteMsg()); for (const f of fires) if (f.until > tickNo) send(p, { t: 'fi', x: +f.x.toFixed(1), z: +f.z.toFixed(1), r: f.r, s: Math.ceil((f.until - tickNo) / TICK) });

@@ -14,13 +14,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const die = () => page.evaluate(() => sendJ({ t: 'dmg', n: 999, head: true }));
   // 1: a held flag
   await die(); await page.waitForFunction(() => !me.alive && $('spk').style.display === 'block', null, { timeout: 6000 });
-  const f = await page.evaluate(() => { const L = spawnList(), i = L.findIndex(q => q.k === 'flag' && q.ok); if (i < 0) return null; pickSpawn(i); return { x: L[i].x, z: L[i].z, n: L[i].n, line: T.FL[-L[i].id - 1] }; });
+  const f = await page.evaluate(() => { const L = spawnList(), i = L.findIndex(q => q.k === 'flag' && q.ok); if (i < 0) return null; pickSpawn(i); $('spgo').click(); return { x: L[i].x, z: L[i].z, n: L[i].n, line: T.FL[-L[i].id - 1] }; });
   R.flag = f && f.n; await page.waitForFunction(() => me.alive === true, null, { timeout: 20000 }); await sleep(300);
   const p1 = await page.evaluate(() => [me.x, me.z]); R.at1 = p1.map(v => +v.toFixed(1));
   ck('spawnsAtPickedFlag', f && Math.abs(p1[0] - f.x) < 9 && await page.evaluate(([x, z, l]) => Math.abs(z - T.trenchC(l, x)) < 2.5, [p1[0], p1[1], f.line]));
   // 2: the airfield
   await die(); await page.waitForFunction(() => !me.alive && $('spk').style.display === 'block', null, { timeout: 6000 });
-  await page.evaluate(() => { const L = spawnList(); pickSpawn(L.findIndex(q => q.id === -99)); }); await page.waitForFunction(() => me.alive === true, null, { timeout: 20000 }); await sleep(300);
+  await page.evaluate(() => { const L = spawnList(); pickSpawn(L.findIndex(q => q.id === -99)); $('spgo').click(); }); await page.waitForFunction(() => me.alive === true, null, { timeout: 20000 }); await sleep(300);
   const p2 = await page.evaluate(() => [me.x, me.z, T.AIRF[me.team].x, T.AIRF[me.team].z]); R.at2 = p2.map(v => +v.toFixed(1)); ck('spawnsAtAirfield', Math.hypot(p2[0] - p2[2], p2[1] - p2[3]) < 12);
   ck('noErrors', !errors.length);
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED');

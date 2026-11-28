@@ -29,7 +29,7 @@ const STUB = fs.readFileSync(__dirname + '/browser.js', 'utf8').match(/const STU
   { const pt = await page.evaluate(() => { const L = spawnList(), i = L.findIndex(q => q.k === 'flag' && q.ok), cv = $('spm'), r = cv.getBoundingClientRect(), [X, Y] = spawnXY(cv); return { i, id: L[i].id, x: r.left + X(L[i].x) * r.width / cv.width, y: r.top + Y(L[i].z) * r.height / cv.height }; });
     await page.mouse.click(pt.x, pt.y); await new Promise(r => setTimeout(r, 200)); out.mapClickPicksFlag = await page.evaluate(id => spawnSel === id && /Respawning at: Flag/.test($('spn').textContent), pt.id); }
   await page.evaluate(() => pickSpawn(0)); out.pickHighlighted = await page.evaluate(() => spawnSel === 0 && /Respawning at/.test($('spn').textContent));
-  await page.waitForFunction(() => me.alive, null, { timeout: 9000 }); await page.waitForTimeout(400);
+  await page.evaluate(() => { const iv = setInterval(() => { if (me.alive) clearInterval(iv); else spDeploy(); }, 200); }); await page.waitForFunction(() => me.alive, null, { timeout: 9000 }); await page.waitForTimeout(400);
   out.pickerHiddenWhenAlive = await page.evaluate(() => getComputedStyle(document.getElementById('spk')).display === 'none');
   await page.waitForFunction(() => !!opS, null, { timeout: 4000 }).catch(() => {}); out.spawnedHome = await page.evaluate(() => Math.abs(me.z - stageZ().z) < 12);   // the side's staging point (Operations; the picker shows it at x = 0)
   out.errors = errors; console.log(JSON.stringify(out, null, 1));
