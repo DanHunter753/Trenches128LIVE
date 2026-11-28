@@ -74,6 +74,13 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.56 — Loadout from the first screen, Officer at Colonel, class XP, rank unlocks
+
+- **Loadout before you join:** a **Loadout** button on the first screen opens the Class and Customize tabs, so you can pick your class, weapon and perks without joining a server. It's saved on this computer and used when you join. The Squad tab will later let you team up with friends before joining.
+- **Officer unlocks at Colonel** (was Lieutenant). Classes, weapons and gadgets still unlock with overall rank.
+- **Rank unlocks:** the Class tab lists each rank, the XP it needs, and what it opens up; ranks you've reached are lit.
+- **Class XP:** XP is now also counted for the class you earned it with, and shown on each class card. It's the groundwork for future class-specific guns, attachments and perks. It's kept with your account, or under your callsign for guests.
+
 ## v0.55 — Operation: a fairer fight for the defenders
 
 Players found Operation too quick and too easy for the attackers. Now:

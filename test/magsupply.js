@@ -35,5 +35,8 @@ const mk = (cls, w, pk) => { const out = [], p = { id: nid++, team: 0, bot: fals
   X.sup.computeLeaders(); ck('leaderFound', X.sup.leaders().get(3) === L && !!X.sup.slOk(F));
   F.alive = false; F.spawnPick = -98; X.spawnEnt(F); ck('spawnsOnLeader', Math.hypot(F.x - L.x, F.z - L.z) < 3 && F.slCd > 0);
   F.alive = false; X.spawnEnt(F); ck('cooldownBlocksSecond', Math.hypot(F.x - L.x, F.z - L.z) > 5 && !X.sup.slOk(F));
+  // v0.56 XP also counts for the class it was earned with
+  { const g = mk('recon', 'sniper'); g.msgs.length = 0; X.sup.addXp(g, 25); g.cls = 'medic'; X.sup.addXp(g, 5); const m = g.msgs.filter(q => q.t === 'xp').pop();
+    ck('classXp', m && m.cx && m.cx.recon === 25 && m.cx.medic === 5 && X.sup.cxOf(g).recon === 25); }
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);
 })().catch(e => { console.log('TEST ERROR', e); process.exit(1); });

@@ -2,7 +2,7 @@
 // In-process test of the officer layer: officer cap, leader election, orders (human + AI squads), order completion,
 // support calls (barrage, drop, cooldown, cost), invisibility/invulnerability of officers, snapshot visibility rules.
 const fs = require('fs'), path = require('path');
-fs.writeFileSync(path.join(__dirname, '..', 'xp.json'), JSON.stringify({ officera: 800, officerb: 800, officerc: 800, leaderx: 150, grunty: 0 }));
+fs.writeFileSync(path.join(__dirname, '..', 'xp.json'), JSON.stringify({ officera: 12000, officerb: 12000, officerc: 12000, leaderx: 150, grunty: 0 }));
 process.argv = ['node', 'x', '--port', '8096', '--fill', '20'];
 const S = require('../server.js');
 fs.unlinkSync(path.join(__dirname, '..', 'xp.json'));
