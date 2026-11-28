@@ -74,6 +74,12 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.53 — Spawn on your squad leader, night tracers, rifle smoke
+
+- **Spawn on your squad leader:** he shows on the respawn map as a triangle. You can deploy on him once every 3 minutes, as long as he's alive, on foot, not manning a gun, and has no enemy within 15 m. The cooldown shows on the map; if he can't take you, you deploy at base. He's told when you land on him.
+- **Night tracers:** at night every round shows a bright orange streak, 14 m long (was a faint 4 m line), so firefights read in the dark.
+- **Rifle smoke:** bolt rifles, carbines, marksman and sniper rifles leave a light grey smoke trail along the round's path that fades in about 1.5 s. A perk or attachment can remove it later.
+
 ## v0.52 — Magazines, and supply is for building
 
 - **Magazines:** you carry 4 spare magazines (6 with the **Deep Pockets** perk, which used to save supply on reloads). Each reload uses one, shown as magazine icons above the ammo counter; with none left you can't reload. Refill them all at a gunner's ammo box, or slowly in your base (one every 6 s, with a small chime). Bots keep endless clips.
