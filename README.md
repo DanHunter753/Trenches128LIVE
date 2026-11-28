@@ -74,6 +74,16 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.55 — Operation: a fairer fight for the defenders
+
+Players found Operation too quick and too easy for the attackers. Now:
+- A defender standing on his own line counts as 1.5 men when the meter is weighed.
+- Attackers take a line at 60% of the old speed, and a line with no attackers on it swings back to its holders twice as fast.
+- Each push has 1.4 tickets per player (was 1.8).
+- After a sector falls, the next line is locked for 60 s (was 40 s), so the defenders have time to man it.
+- Defenders respawn 25% sooner.
+
+## v0.54 — Magazine icons beside the ammo count, Wake bots stay out of the water
 ## v0.54 — Medic med kit, magazine icons beside the ammo count, Wake bots stay out of the water
 
 - **Magazine icons:** curved magazines in the HUD's cream and black, now to the right of the ammo count instead of over the gun picture.
