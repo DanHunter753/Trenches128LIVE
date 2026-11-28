@@ -690,14 +690,14 @@ function mkPost(team){const g=new THREE.Group(),sb=new THREE.MeshLambertMaterial
 /* v0.36 gunners' ammo boxes: a wooden crate with a painted band in the side's colour; the band thins as it empties */
 /* v0.37 rifle grenades: flights drawn on the same arc the server flew; while one is fitted, the predicted arc and impact ring */
 const rgL=[];let rgReady=0,rgVis=null;
-function rgFrame(dt){for(let i=rgL.length-1;i>=0;i--){const g=rgL[i];g.t+=dt;const t=Math.min(g.t,g.T);g.mesh.position.set(g.f[0]+g.v[0]*t,g.f[1]+g.v[1]*t-.5*T.RG.g*t*t,g.f[2]+g.v[2]*t);if(g.mesh.material)g.mesh.material.rotation+=dt*8;if(g.t>=g.T+.05){scene.remove(g.mesh);rgL.splice(i,1)}}
+function rgFrame(dt){for(let i=rgL.length-1;i>=0;i--){const g=rgL[i];g.t+=dt;const t=Math.min(g.t,g.T);g.mesh.position.set(g.f[0]+g.v[0]*t,g.f[1]+g.v[1]*t-.5*T.RG.g*t*t,g.f[2]+g.v[2]*t);if(g.mk){if(g.t>=g.T){g.mesh.position.set(g.to[0],hAt(g.to[0],g.to[2])+.25,g.to[2]);if(g.t>45){scene.remove(g.mesh);rgL.splice(i,1)}}continue}if(g.mesh.material)g.mesh.material.rotation+=dt*8;if(g.t>=g.T+.05){scene.remove(g.mesh);rgL.splice(i,1)}}
  const on=me.rg&&me.alive&&deployed&&!me.officer&&!myVeh;
  if(!rgVis){if(!on)return;const ring=new THREE.Mesh(new THREE.RingGeometry(1.4,3,28),new THREE.MeshBasicMaterial({color:0xffa040,transparent:true,opacity:.75,depthTest:false,side:THREE.DoubleSide,fog:false}));ring.rotation.x=-Math.PI/2;ring.renderOrder=5;scene.add(ring);
   const ap=new Float32Array(16*3),ag=new THREE.BufferGeometry();ag.setAttribute('position',new THREE.BufferAttribute(ap,3));const arc=new THREE.Points(ag,new THREE.PointsMaterial({color:0xffc070,size:4,sizeAttenuation:false,transparent:true,opacity:.8,depthTest:false,fog:false}));arc.frustumCulled=false;arc.renderOrder=5;scene.add(arc);rgVis={ring,arc,ap,ag,d:0}}
  rgVis.ring.visible=rgVis.arc.visible=!!on;if(!on)return;
- const ey=me.y+me.eye,P=T.rgPath(terr.H,me.x,ey,me.z,me.yaw,me.pitch,T.hasPk(me,'riflegren')?Math.sqrt(1.15):1);rgVis.ring.position.set(P.x,P.y+.15,P.z);rgVis.d=Math.hypot(P.x-me.x,P.z-me.z);
+ const ey=me.y+me.eye,P=T.rgPath(terr.H,me.x,ey,me.z,me.yaw,me.pitch,me.rg===2?Math.sqrt(15*T.RG.g)/T.RG.v:T.hasPk(me,'riflegren')?Math.sqrt(1.15):1);rgVis.ring.material.color.set(me.rg===2?0x60e070:0xffa040);rgVis.ring.position.set(P.x,P.y+.15,P.z);rgVis.d=Math.hypot(P.x-me.x,P.z-me.z);
  for(let i=0;i<16;i++){const t=P.t*(i+1)/17;rgVis.ap[i*3]=me.x+P.vx*t;rgVis.ap[i*3+1]=ey+P.vy*t-.5*T.RG.g*t*t;rgVis.ap[i*3+2]=me.z+P.vz*t}rgVis.ag.attributes.position.needsUpdate=true}
-const rgHint=()=>{if(!me.rg||!me.alive||!rgVis)return null;const ready=performance.now()>=rgReady;return 'RIFLE GRENADE · '+Math.round(rgVis.d)+' m · '+(ready?'['+kn('fire')+'] launch':'fitting…')+' · raise the muzzle for range · ['+kn('ability')+']/['+kn('reload')+'] take it off'};
+const rgHint=()=>{if(!me.rg||!me.alive||!rgVis)return null;if(me.rg===2)return 'MED KIT · '+Math.round(rgVis.d)+' m · ['+kn('fire')+'] throw · the first teammate it reaches is patched up (+60 HP) · ['+kn('ability')+'] put it away';const ready=performance.now()>=rgReady;return 'RIFLE GRENADE · '+Math.round(rgVis.d)+' m · '+(ready?'['+kn('fire')+'] launch':'fitting…')+' · raise the muzzle for range · ['+kn('ability')+']/['+kn('reload')+'] take it off'};
 /* v0.38 medics: a health bar over every hurt teammate within 45 m (seen through cover: a medic knows where he is needed),
    and the bandage goes to the hurt man in front of you before yourself */
 const medHp=new Map(),medS=[];let medHpAt=0,medMate=null,medBarM=null,medN=0;
@@ -780,9 +780,11 @@ function onMsg(m){
   case'far':farNote(m);break;
   case'hm':if(m.v===2){tone(2600,2300,.03,.05,'triangle');break}hmV=1;{const h=$('hm');h.className=(m.k?'k ':'')+(m.h?'h':'');}hitSnd(m);if(m.k&&m.h&&performance.now()-knAt<300)knShow(knTxt+'  ·  HEADSHOT','+10');else if(m.k&&m.m&&performance.now()-knAt<300)knShow(knTxt+'  ·  BAYONET','+10');break;
   case'mph':{const on=m.s>0;if(on&&!me.mph){itemPlay([4,5,4,5,5],.17);nz(.12,.12,2400,'highpass',0,3);tone(180,900,.35,.05,'sine');say('Morphine: faster and harder to drop for '+m.s+'s'+(m.n?' ('+m.n+' left)':''))}me.mph=on;mphEnd=performance.now()+m.s*1000;me.mphN=m.n;break}
-  case'rg':{me.rg=m.s;rgReady=performance.now()+(m.f||0)*1000;if(m.s){play('s_bolt',.4,{at:.1,rate:.7});say('Fitting a rifle grenade… then LMB to launch · ['+kn('ability')+'] or ['+kn('reload')+'] to take it off')}break}
-  case'rgf':{const mesh=new THREE.Sprite(spMat('nade_mills').clone());mesh.scale.set(.22,.3,1);scene.add(mesh);rgL.push({mesh,t:0,f:m.f,v:m.v,T:m.T});if(m.id===me.id){gunKick=1.4;gFire=0;recoil()}
+  case'rg':{me.rg=m.s;rgReady=performance.now()+(m.f||0)*1000;if(m.s===2)say('Med kit in hand: aim the arc, then ['+kn('fire')+'] to throw');else if(m.s){play('s_bolt',.4,{at:.1,rate:.7});say('Fitting a rifle grenade… then LMB to launch · ['+kn('ability')+'] or ['+kn('reload')+'] to take it off')}break}
+  case'rgf':if(m.mk){const mesh=new THREE.Sprite(new THREE.SpriteMaterial({map:CROSS,transparent:true}));mesh.scale.set(.42,.42,1);scene.add(mesh);rgL.push({mesh,t:0,f:m.f,v:m.v,T:m.T,mk:m.mk,to:m.to});if(m.id===me.id){gunKick=.6;gFire=0}tone(420,300,.08,.04,'triangle');break}   /* v0.54 a medic's thrown med kit */
+  {const mesh=new THREE.Sprite(spMat('nade_mills').clone());mesh.scale.set(.22,.3,1);scene.add(mesh);rgL.push({mesh,t:0,f:m.f,v:m.v,T:m.T});if(m.id===me.id){gunKick=1.4;gFire=0;recoil()}
    {const d=Math.hypot(m.f[0]-me.x,m.f[2]-me.z),v=Math.max(.05,1-d/160);tone(140,60,.18,.12*v,'triangle');tone(900,300,.12,.04*v,'sawtooth')}break}
+  case'mkx':{const g=rgL.find(q=>q.mk===m.id);if(g){scene.remove(g.mesh);rgL.splice(rgL.indexOf(g),1)}break}
   case'mh':medHp.clear();for(const[id,v]of m.l||[])medHp.set(id,v);medHpAt=performance.now();break;
   case'sl':slS=m;slS.at=performance.now();if($('spk')&&$('spk').style.display==='block')spawnDraw();break;
   case'mags':magsUI(m.n,m.m);break;

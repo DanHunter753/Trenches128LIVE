@@ -35,6 +35,15 @@ const mk = (cls, w, pk) => { const out = [], p = { id: nid++, team: 0, bot: fals
   X.sup.computeLeaders(); ck('leaderFound', X.sup.leaders().get(3) === L && !!X.sup.slOk(F));
   F.alive = false; F.spawnPick = -98; X.spawnEnt(F); ck('spawnsOnLeader', Math.hypot(F.x - L.x, F.z - L.z) < 3 && F.slCd > 0);
   F.alive = false; X.spawnEnt(F); ck('cooldownBlocksSecond', Math.hypot(F.x - L.x, F.z - L.z) > 5 && !X.sup.slOk(F));
+  // v0.54 the medic's thrown med kit
+  const MD = mk('medic', 'smg'), HU = mk('rifleman', 'bolt'); await sleep(100);
+  MD.x = 0; MD.z = 40; HU.x = 0; HU.z = 30; HU.hp = 30; MD.yaw = 0; MD.pitch = .5; MD.cd = 0; MD.rel = 0; MD.rg = 0; MD.mkCd = 0;
+  X.abilityAct(MD); ck('kitInHand', MD.rg === 2 && MD.msgs.some(m => m.t === 'rg' && m.s === 2));
+  X.pkt.fireWeapon(MD); ck('kitThrown', MD.rg === 0 && X.mk.medkits().length === 1);
+  const land = X.mk.medkits()[0]; R.kitAt = land && [+land.f[0].toFixed(1), +(land.f[2] + land.v[2] * land.T).toFixed(1)];
+  HU.x = 0; HU.z = land.f[2] + land.v[2] * land.T; for (let i = 0; i < 60 && HU.hp <= 30; i++) { HU.x = 0; await sleep(50); }
+  ck('kitHealsMate', HU.hp >= 89 && X.mk.medkits().length === 0); ck('kitRange', Math.abs(40 - HU.z) > 9 && Math.abs(40 - HU.z) < 19);
+  ck('kitCooldown', (X.abilityAct(MD), MD.rg === 0));
   // v0.56 XP also counts for the class it was earned with
   { const g = mk('recon', 'sniper'); g.msgs.length = 0; X.sup.addXp(g, 25); g.cls = 'medic'; X.sup.addXp(g, 5); const m = g.msgs.filter(q => q.t === 'xp').pop();
     ck('classXp', m && m.cx && m.cx.recon === 25 && m.cx.medic === 5 && X.sup.cxOf(g).recon === 25); }
