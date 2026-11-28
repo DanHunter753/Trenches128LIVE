@@ -5,7 +5,7 @@
 // finished structures (shared.js forts) are walls. Fields are invalidated when craters or structures change the ground.
 module.exports = function makeNav(T, getH) {
   const N = T.S, OFF = T.W, NN = N * N, INF = 1e9;   // 1 m cells over the whole map
-  const h = new Float32Array(NN), blk = new Uint8Array(NN), wir = new Uint8Array(NN), room = new Uint8Array(NN), door = new Uint8Array(NN);   // dugouts: entered only through their door
+  const h = new Float32Array(NN), blk = new Uint8Array(NN), wir = new Uint8Array(NN), room = new Uint8Array(NN), door = new Uint8Array(NN), wet = new Uint8Array(NN);   // dugouts: entered only through their door
   let ver = 1;
   const idx = (x, z) => { const i = Math.floor(x + OFF), j = Math.floor(z + OFF); return i < 0 || j < 0 || i >= N || j >= N ? -1 : j * N + i; };
   const cx = c => (c % N) - OFF + .5, cz = c => Math.floor(c / N) - OFF + .5;
@@ -15,7 +15,7 @@ module.exports = function makeNav(T, getH) {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const c = j * N + i, x = i - OFF + .5, z = j - OFF + .5, y = T.hAt(H, x, z); h[c] = y;
       blk[c] = Math.abs(x) > T.W - 3 || Math.abs(z) > T.W - 3 || (T.isSea && T.isSea(H, x, z)) || ((T.FORTS.size || T.SBOX.length) && T.fortHit(x, y, z, .2, true)) ? 1 : 0;
-      wir[c] = T.wireK(x, z) < 1 ? 1 : 0;
+      wir[c] = T.wireK(x, z) < 1 ? 1 : 0; wet[c] = T.MP && T.MP.kind === 'wake' && y < -.15 ? 1 : 0;   // v0.54 wading water: allowed (shallow bridge crossings) but costly
       const r = T.roomAt(x, z); room[c] = r ? T.ROOMS.indexOf(r) + 1 : 0;
       door[c] = r && Math.abs(x - r.xc) < 1.2 && (z - r.c) * -r.sg > 1.2 && (z - r.c) * -r.sg < 3.6 ? 1 : 0;
     }
@@ -30,8 +30,10 @@ module.exports = function makeNav(T, getH) {
     if (dh > .62) c += 5 + dh;            // climbing out of a trench / over a wall
     else if (dh < -2.5) c += 1;           // dropping down
     if (wir[b]) c *= 2.5;
+    if (wet[b]) c *= WET_K;
     return c;
   }
+  const WET_K = 8;   // a metre of wading counts as 8 m of walking: bots go round by land or take the shortest (bridge) crossing
   const NB = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [1, 1, 1], [1, -1, 1], [-1, 1, 1], [-1, -1, 1]];
   // Dijkstra from the goal over reversed edges: d[c] = cost to walk from c to the goal.
   // v0.32.1: a map-wide field is ~160k cells (about 50 ms on the 400 m map), far too long for one 50 ms tick, so it is solved
@@ -58,7 +60,7 @@ module.exports = function makeNav(T, getH) {
         if (DG[q] && (blk[vj * N + ui] || blk[uj * N + vi])) continue;   // no corner cutting past walls
         if (room[u] !== rv && !door[u] && !drv) continue;                // dugout walls (cost(u, v) inlined)
         const dh = hv - h[u]; if (dh > 3.2) continue;
-        let c = DC[q]; if (dh > .62) c += 5 + dh; else if (dh < -2.5) c += 1; if (wir[v]) c *= 2.5;
+        let c = DC[q]; if (dh > .62) c += 5 + dh; else if (dh < -2.5) c += 1; if (wir[v]) c *= 2.5; if (wet[v]) c *= WET_K;
         const nd = dv + c; if (nd < d[u]) { d[u] = nd; if (job.hn < heapB.length) hpush(u); }
       }
     }

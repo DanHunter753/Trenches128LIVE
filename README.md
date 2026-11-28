@@ -74,6 +74,11 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.54 — Magazine icons beside the ammo count, Wake bots stay out of the water
+
+- **Magazine icons:** curved magazines in the HUD's cream and black, now to the right of the ammo count instead of over the gun picture.
+- **Wake bots** treat wading water as 8 times the walk, so they go round by land or take the shortest crossing at the bridges. The shallows stay passable so they don't get stuck; deep water was already a wall.
+
 ## v0.53 — Spawn on your squad leader, night tracers, rifle smoke
 
 - **Spawn on your squad leader:** he shows on the respawn map as a triangle. You can deploy on him once every 3 minutes, as long as he's alive, on foot, not manning a gun, and has no enemy within 15 m. The cooldown shows on the map; if he can't take you, you deploy at base. He's told when you land on him.
