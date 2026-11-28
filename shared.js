@@ -522,8 +522,8 @@ function step(p, cmd, H, spdMul) {
   // second. Cancel it by standing up (release / toggle crouch), jumping (a hop out of it) or pulling back; a wall ends it too.
   const pb = p.pb || 0; p.pb = bits; if (p.sldCd > 0) p.sldCd = Math.max(0, p.sldCd - dt);
   if (p.sld > 0) { if (!(bits & 2) || (bits & 4) || f < 0) { p.sld = 0; p.sldCd = SLIDE.cd; p.sldX = 1; } }
-  else if (p.cls === 'assault' && !p.elite && (bits & 2) && !(pb & 2) && (pb & 1) && f > 0 && !chg && !(p.sldCd > 0) && p.y <= groundAt(H, p.x, p.z, p.y) + .1) { p.sld = SLIDE.t; p.sdx = mx; p.sdz = mz; p.sldX = 0; }
-  const sliding = p.sld > 0, su = sliding ? p.sld / SLIDE.t : 0;
+  else if (p.cls === 'assault' && !p.elite && (bits & 2) && !(pb & 2) && (pb & 1) && f > 0 && !chg && !(p.sldCd > 0) && p.y <= groundAt(H, p.x, p.z, p.y) + .1) { p.sld = SLIDE.t * (cun(p, 'slide') ? 1.3 : 1); p.sdx = mx; p.sdz = mz; p.sldX = 0; }
+  const sliding = p.sld > 0, su = sliding ? Math.min(1, p.sld / SLIDE.t) : 0;
   if (sliding) { mx = p.sdx; mz = p.sdz; p.sld = Math.max(0, p.sld - dt); if (p.sld <= 0) { p.sldCd = SLIDE.cd; p.sldX = 0; } }
   const sp = (sliding ? SLIDE.v1 + (SLIDE.v0 - SLIDE.v1) * su : chg ? 8.6 : (bits & 2) ? 2.2 : (bits & 32) ? 2.6 : (bits & 1) ? 7 * mud : 4.5 * (1 + mud) / 2) * spdMul * WET_SPD[wetAt(H, p.x, p.z)] * (MP.kind === 'wake' && p.y < 0 ? Math.max(.35, 1 + p.y * .55) : 1);   // v0.43 wading: knee-deep 0.8, chest-deep 0.35
   const nx = p.x + mx * sp * dt, nz = p.z + mz * sp * dt, sl = (groundAt(H, nx, nz, p.y) - groundAt(H, p.x, p.z, p.y)) / Math.max(.01, sp * dt);
@@ -800,7 +800,7 @@ function adoptTerrain(H, F) { if (!(H instanceof Float32Array) || !(F instanceof
 // the page that loads this file picks up the map it was told to build (a reload after the server changed maps)
 setMap(typeof sessionStorage !== 'undefined' ? (() => { try { return +sessionStorage.getItem('t128map') || +root.T128_MAPSEED || 0; } catch (e) { return +root.T128_MAPSEED || 0; } })() : 0);
 const CHG_MAX = 3, GRAV = 9.8;
-const chgMax = p => CHG_MAX * (p && p.cls === 'rifleman' && !p.elite ? 1.5 : 1) * (hasPk(p, 'bayonet') ? 1.15 : 1);   // v0.37: riflemen charge for longer
+const chgMax = p => CHG_MAX * (p && p.cls === 'rifleman' && !p.elite ? 1.5 : 1) * (hasPk(p, 'bayonet') ? 1.15 : 1) * (cun(p, 'bayo') ? 1.3 : 1);   // v0.37: riflemen charge for longer
 // v0.37 rifle grenades: a grenade fired from a cup on the rifle's muzzle. Same flight on server and client (the client draws
 // the predicted impact while one is fitted). Returns the impact point and the flight time.
 const RG = { v: 40, g: 14, pow: .85, fit: 1, cd: 1.2, maxT: 7 };
@@ -822,6 +822,12 @@ const WPN = {
   smg: { n: 'Submachine Gun', d: 'Automatic. Hold to fire.', dmg: 18, cd: .1, mag: 32, pel: 1, spr: .03, rng: 60, hip: .05, rl: 1.8, auto: 1, vel: 300, rcl: .011, blm: .009 },
   lmg: { n: 'Light Machine Gun', d: 'Heavy sustained fire. Strong suppression.', dmg: 24, cd: .12, mag: 45, pel: 1, spr: .035, rng: 150, hip: .06, rl: 2.8, auto: 1, vel: 400, rcl: .016, blm: .01 },
   mark: { n: 'Marksman Rifle', d: 'Long range, heavy hit, 3.5x scope. One-shot kills at 70–180 m. The scope glints.', dmg: 80, cd: 1, mag: 5, pel: 1, spr: 0, rng: 800, fo: [300, 35], hip: .035, rl: 2, auto: 0, vel: 780, rcl: .07, blm: 0, sw: [70, 180, 100], scope: 3.5 },
+  // v0.59 class unlocks (owner's art): sidegrades earned with class XP (see CUNL)
+  gew: { n: 'Gewehr 91 Carbine', d: 'Short artillery carbine: aims and cycles faster than the bolt rifle but holds 5 and falls off sooner. One-shot kills at 30–80 m. Bayonet.', dmg: 45, cd: .5, mag: 5, pel: 1, spr: 0, rng: 800, fo: [160, 15], hip: .018, rl: 1.2, auto: 0, vel: 620, rcl: .05, blm: 0, bay: 1, sw: [30, 80, 100] },
+  gews: { n: 'Gewehr 91 · 2x scope', d: 'The carbine with a 2x scope: easier hits at range, slower to aim and cycle. One-shot kills at 40–110 m. The scope glints.', dmg: 48, cd: .65, mag: 5, pel: 1, spr: 0, rng: 800, fo: [220, 18], hip: .035, rl: 1.6, auto: 0, vel: 680, rcl: .055, blm: 0, sw: [40, 110, 100], scope: 2 },
+  mp18: { n: 'MP18', d: 'Drum-fed SMG: very fast fire and 50 rounds, but lighter hits that spread quickly when you hold the trigger.', dmg: 14, cd: .075, mag: 50, pel: 1, spr: .036, rng: 55, hip: .055, rl: 2.6, auto: 1, vel: 290, rcl: .01, blm: .014 },
+  bar: { n: 'Browning M1918', d: 'Automatic rifle: harder hits, tighter and further than the LMG, but a 20-round magazine and slower fire.', dmg: 32, cd: .16, mag: 20, pel: 1, spr: .022, rng: 220, hip: .05, rl: 2.1, auto: 1, vel: 650, rcl: .022, blm: .008 },
+  fed: { n: 'Fedorov Avtomat', d: 'Early automatic rifle: steady fire out to 200 m from a 25-round magazine. Lighter hits than the carbine, tighter than an SMG.', dmg: 20, cd: .15, mag: 25, pel: 1, spr: .024, rng: 200, hip: .045, rl: 2.2, auto: 1, vel: 600, rcl: .02, blm: .008 },
   // v0.26 elite kits (Operations pickups): not in any class list, so no loadout can ask for them
   flame: { n: 'Flammenwerfer', d: 'Flamethrower. A 14 m jet that sets men and ground alight. R refuels (3 supply).', dmg: 6, cd: .1, mag: 100, pel: 1, spr: .01, rng: 14, hip: .02, rl: 4, auto: 1, vel: 30, rcl: .004, blm: 0, flame: 1, elite: 1 },
   atr: { n: 'Tankgewehr M1918', d: '13 mm anti-tank rifle: pierces tank armour, kills a man outright. Its grenades are bundle charges.', dmg: 150, cd: 2.2, mag: 1, pel: 1, spr: 0, rng: 340, hip: .09, rl: 2.8, auto: 0, vel: 780, rcl: .2, blm: 0, at: 150, elite: 1 },
@@ -829,10 +835,10 @@ const WPN = {
   sniper: { n: 'Sniper Rifle', d: '6x telescopic sight, sways while scoped: hold Shift to hold your breath. One body shot kills out to 260 m. The scope glints.', dmg: 100, cd: 1.4, mag: 5, pel: 1, spr: 0, rng: 800, fo: [260, 50], hip: .06, rl: 2.4, auto: 0, vel: 850, rcl: .085, blm: 0, sw: [90, 260, 100], scope: 6 },
 };
 const CLS = {
-  rifleman: { n: 'Rifleman', d: 'The only class with the bolt-action rifle. Works the bolt and aims faster, shrugs off suppression, and charges with the bayonet for longer. [N] fits a rifle grenade to the muzzle: lob it 30–110 m onto a machine-gun nest or a knot of men.', hp: 100, sp: 1, w: ['bolt', 'carbine'] },
-  assault: { n: 'Assault', d: 'Trench clearer. Extra health, faster on his feet, reloads 30% quicker, slides (crouch while sprinting; stand, jump or pull back to cancel). [N] morphine (2 per life): 10 s faster, takes 40% less damage, +15 HP.', hp: 125, sp: 1.1, w: ['shotgun', 'smg'] },
-  gunner: { n: 'Machine Gunner', d: 'Holds the line. Slow, with deep magazines; crouch to brace the gun (tighter, steadier fire). [N] drops an ammo box (3 supply): teammates who walk over it get a full magazine, grenades and utility back.', hp: 100, sp: .85, w: ['lmg'] },
-  medic: { n: 'Medic', d: 'Sees the health of hurt teammates within 45 m. [H] bandages the hurt man in front of him (70 HP), or himself. [N] throws a med kit up to 15 m (+60 HP to the first teammate it reaches). Hold [E] to revive the downed, then earns XP for each kill the revived man makes.', hp: 100, sp: 1, w: ['carbine', 'smg'] },
+  rifleman: { n: 'Rifleman', d: 'The only class with the bolt-action rifle. Works the bolt and aims faster, shrugs off suppression, and charges with the bayonet for longer. [N] fits a rifle grenade to the muzzle: lob it 30–110 m onto a machine-gun nest or a knot of men.', hp: 100, sp: 1, w: ['bolt', 'carbine', 'gew', 'gews'] },
+  assault: { n: 'Assault', d: 'Trench clearer. Extra health, faster on his feet, reloads 30% quicker, slides (crouch while sprinting; stand, jump or pull back to cancel). [N] morphine (2 per life): 10 s faster, takes 40% less damage, +15 HP.', hp: 125, sp: 1.1, w: ['shotgun', 'smg', 'mp18'] },
+  gunner: { n: 'Machine Gunner', d: 'Holds the line. Slow, with deep magazines; crouch to brace the gun (tighter, steadier fire). [N] drops an ammo box (3 supply): teammates who walk over it get a full magazine, grenades and utility back.', hp: 100, sp: .85, w: ['lmg', 'bar'] },
+  medic: { n: 'Medic', d: 'Sees the health of hurt teammates within 45 m. [H] bandages the hurt man in front of him (70 HP), or himself. [N] throws a med kit up to 15 m (+60 HP to the first teammate it reaches). Hold [E] to revive the downed, then earns XP for each kill the revived man makes.', hp: 100, sp: 1, w: ['carbine', 'smg', 'fed'] },
   sapper: { n: 'Sapper', d: 'Digs bigger holes. Grenades cost 1 supply. [B] builds a field post your team respawns at.', hp: 100, sp: 1, w: ['shotgun', 'carbine'] },
   recon: { n: 'Recon', d: 'Sniper and spotter. Scoped rifles; headshots with a scope kill outright. [T] spots every enemy in your sights for the whole team (and the officer).', hp: 90, sp: 1.02, w: ['sniper', 'mark', 'carbine'] },
   officer: { n: 'Officer', d: 'Command view: order squads, call in bombers, barrages and supply drops. Max 2 per team.', hp: 100, sp: 1, w: ['carbine'] },
@@ -941,16 +947,32 @@ const rankOf = xp => { let r = 0; RK.forEach((k, i) => { if (xp >= k[1]) r = i; 
 // Server-side validation of a requested loadout against rank. Returns a safe loadout.
 // own-property lookup: client strings like 'constructor' or '__proto__' must never index a table (v0.28 audit: crashed the server)
 const own = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
-function fixLoadout(xp, l) {
+// v0.59 class unlocks: earned with XP made as that class (acct.cx / p.cx). Gameplay sidegrades only; cosmetics are kept for later.
+// [class XP needed, id, name, what it does]. 'w:<key>' entries unlock a weapon from that class's list.
+const CUNL = {
+  rifleman: [[250, 'strip', 'Stripper clips', 'Reload 25% faster from an empty rifle'], [750, 'w:gew', 'Gewehr 91 Carbine', 'Faster, shorter-ranged rifle'], [1500, 'bayo', 'Long charge', 'Bayonet charge lasts 30% longer'], [3000, 'rg3', 'Third rifle grenade', '+1 grenade for the cup'], [5000, 'w:gews', 'Gewehr 91 · 2x scope', 'Scoped carbine']],
+  assault: [[250, 'nade1', 'Grenade bag', '+1 grenade'], [750, 'mph3', 'Third morphine', '+1 morphine dose'], [1500, 'w:mp18', 'MP18', 'Fast-firing drum SMG'], [3000, 'slide', 'Long slide', 'Slides go 30% further']],
+  gunner: [[250, 'box15', 'Bigger ammo box', 'Ammo boxes restock 15 men (was 10)'], [750, 'belt', 'Quick change', 'Reload 20% faster'], [1500, 'w:bar', 'Browning M1918', 'Automatic rifle'], [3000, 'boxcd', 'Ammo runner', 'Ammo box cooldown 30% shorter']],
+  medic: [[250, 'kit15', 'Quick kits', 'Med kit every 15 s (was 20)'], [750, 'revq', 'Field surgeon', 'Revive 25% faster'], [1500, 'w:fed', 'Fedorov Avtomat', 'Automatic rifle'], [3000, 'kit20', 'Long throw', 'Med kit reaches 20 m']],
+  sapper: [[250, 'dig', 'Sharp spade', 'Dig 25% faster'], [750, 'cheap', 'Thrifty builder', 'Buildings cost 20% less supply']],
+  recon: [[250, 'breath', 'Steady lungs', 'Hold your breath 30% longer'], [750, 'spot', 'Keen eye', 'Spotted enemies stay marked 50% longer']],
+  officer: [],
+};
+const cxp = (p, c) => ((p && p.cx && p.cx[c || p.cls]) | 0);
+function cun(p, id) { if (!p || p.bot || p.elite) return false; const e = (CUNL[p.cls] || []).find(q => q[1] === id); return !!e && cxp(p) >= e[0]; }
+function wUnl(cls, w, cx) { const e = (CUNL[cls] || []).find(q => q[1] === 'w:' + w); return !e || ((cx && cx[cls]) | 0) >= e[0]; }
+const fortCost = (p, D) => Math.max(1, Math.round(D.cost * (cun(p, 'cheap') ? .8 : 1)));
+function fixLoadout(xp, l, cx) {
   l = l && typeof l === 'object' ? l : {};
   const r = rankOf(xp), ok = (k, v) => r >= (REQ[k + ':' + v] || 0);
   let cls = own(CLS, l.cls) && ok('cls', l.cls) ? l.cls : 'rifleman';
-  let w = CLS[cls].w.includes(l.w) && ok('w', l.w) ? l.w : (CLS[cls].w.find(x => ok('w', x)) || CLS[cls].w[0]);
+  const okw = x => ok('w', x) && wUnl(cls, x, cx);
+  let w = CLS[cls].w.includes(l.w) && okw(l.w) ? l.w : (CLS[cls].w.find(okw) || CLS[cls].w[0]);
   let u = own(UT, l.u) && ok('u', l.u) ? l.u : 'bandage';
   return { cls, w, u };
 }
 
-const API = { rangeDmg, PERKS, PERK_SLOTS, RESPEC_XP, perkSlots, perkNorm, perkSpent, perkPts, perkBuy, perkEquip, perkActive, respecOk, hasPk, inTrench, perkSpeed, WWIRE, WTR, TRM, carveTrench, setWorld, WAKE_SEED, isSea, SEA_WADE, hmSample: (x, z) => HM ? hmSample(x, z) : 0, crawl, CRAWL, RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
+const API = { CUNL, cun, cxp, wUnl, fortCost, rangeDmg, PERKS, PERK_SLOTS, RESPEC_XP, perkSlots, perkNorm, perkSpent, perkPts, perkBuy, perkEquip, perkActive, respecOk, hasPk, inTrench, perkSpeed, WWIRE, WTR, TRM, carveTrench, setWorld, WAKE_SEED, isSea, SEA_WADE, hmSample: (x, z) => HM ? hmSample(x, z) : 0, crawl, CRAWL, RG, rgPath, chgMax, SLIDE, LIGHTS, BURN, litAt, LV_MAX, lvXp, levelOf, PHONES, phoneDist, TUNNELS, AA, AIRF, PL, flyStep, bombImpact, STRUCT, STRUCT_R, structOK, inBox, wetCell, wetAt, WET_SPD, FL, CT, GAPS, CZ0, CZ1, HOME_Z, NML, OBX, OBJ, MINES, trenchSlope, collapsed, NEST, HQS, LINES, SQUADS, ROOMS, TP, CP, FS_TOP, TR_FLOOR, trenchC, sgn, hash, tri, wireK, gen, base, makeTerrain, hAt, groundAt, roomAt, inRoof, inRoom, dig, los, step, WPN, CHG_MAX, GRAV, DEPOTS, DEP_R, VIS_R, CLS, UT, RK, REQ, rankOf, fixLoadout, climbTarget, climbAt, SB, sbHit, SB_H, FORT, fortParts, fortWorld, addFort, delFort, clearForts, fortHit, fortSeg, SBOX, FORTS, SL0, SL1, EMPL, ELITE, spOf, VEH, SHELL_G, mortarV, WXS, WX, smoothG, own, guarded, isFloor: k => !!(FLOOR && FLOOR[k]), FLOOR_GIVE, DIG_MAX, RIM_MAX, DIG_MAX, RIM_MAX, BAYS, bayOK, collapseBay, resetBays, applyEv, setMap, mapCheck, newSeed, MP, terrainFor, adoptTerrain, DEPOTS_NAMES: DEPOT_NAMES };
 for (const [k, g] of [['S', () => S], ['N', () => N], ['ST', () => ST], ['W', () => W], ['NV', () => NV]]) Object.defineProperty(API, k, { get: g, enumerable: true });   // world size can change with the map
 root.T128 = API;
 if (typeof module !== 'undefined' && module.exports) module.exports = API;

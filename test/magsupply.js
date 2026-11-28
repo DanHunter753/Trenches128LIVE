@@ -47,5 +47,11 @@ const mk = (cls, w, pk) => { const out = [], p = { id: nid++, team: 0, bot: fals
   // v0.56 XP also counts for the class it was earned with
   { const g = mk('recon', 'sniper'); g.msgs.length = 0; X.sup.addXp(g, 25); g.cls = 'medic'; X.sup.addXp(g, 5); const m = g.msgs.filter(q => q.t === 'xp').pop();
     ck('classXp', m && m.cx && m.cx.recon === 25 && m.cx.medic === 5 && X.sup.cxOf(g).recon === 25); }
+  // v0.59 class unlocks
+  { const T2 = require('../shared.js'); ck('gunLockedWithoutClassXp', T2.fixLoadout(0, { cls: 'rifleman', w: 'gew' }, {}).w === 'bolt' && T2.fixLoadout(0, { cls: 'rifleman', w: 'gew' }, { rifleman: 750 }).w === 'gew');
+    const q = mk('rifleman', 'bolt'); q.cx = { rifleman: 300 }; q.ammo = 0; q.rel = 0; q.mags = 4; X.pkt.startReload(q); const fast = q.rel; q.cx = {}; q.ammo = 0; q.rel = 0; X.pkt.startReload(q);
+    ck('stripperClips', fast > 0 && Math.abs(fast / q.rel - .75) < .01);
+    const u = mk('medic', 'smg'); u.msgs.length = 0; X.sup.cxOf(u).medic = 240; X.sup.addXp(u, 20); await sleep(900); ck('unlockAnnounced', u.msgs.some(m => m.t === 'unl' && /Quick kits/.test(m.n)));
+    for (const [cls, w] of [['assault', 'mp18'], ['gunner', 'bar'], ['medic', 'fed'], ['rifleman', 'gew'], ['rifleman', 'gews']]) { const g = mk(cls, w); g.ammo = 5; g.cd = 0; g.rel = 0; g.sprOut = 0; X.pkt.fireWeapon(g); R['fires_' + w] = g.ammo === 4; } }
   console.log(JSON.stringify(R)); const bad = Object.keys(R).filter(k => R[k] === false); console.log(bad.length ? 'FAILED: ' + bad.join(', ') : 'ALL ' + Object.keys(R).filter(k => typeof R[k] === 'boolean').length + ' CHECKS PASSED'); process.exit(bad.length ? 1 : 0);
 })().catch(e => { console.log('TEST ERROR', e); process.exit(1); });
