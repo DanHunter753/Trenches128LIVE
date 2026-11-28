@@ -30,7 +30,7 @@ const STUB = `
   await page.evaluate(() => { const t = 76, c = T.trenchC(t, -10); sendJ({ t: 'tp', x: -10, z: c }); }); await page.waitForTimeout(400);
   await page.evaluate(() => sendJ({ t: 'dmg', n: 9999 + 0, head: false })); // overkill => dies, not downed
   await page.waitForFunction(() => !me.alive, null, { timeout: 3000 }); out.overkillIsDeath = await page.evaluate(() => !me.down);
-  await page.waitForFunction(() => me.alive, null, { timeout: 9000 });
+  await page.evaluate(() => { const iv = setInterval(() => { if (me.alive) clearInterval(iv); else spDeploy(); }, 200); }); await page.waitForFunction(() => me.alive, null, { timeout: 9000 });
   await page.evaluate(() => sendJ({ t: 'dmg', n: me.hp + 10, head: false }));
   await page.waitForFunction(() => me.down === true, null, { timeout: 3000 }).then(() => out.downed = true).catch(() => out.downed = false);
   await page.waitForTimeout(250);
@@ -40,6 +40,7 @@ const STUB = `
   await page.keyboard.down('KeyE'); await page.waitForTimeout(600);
   out.stillDownBeforeHold = await page.evaluate(() => me.down === true);
   await page.waitForTimeout(1100); await page.keyboard.up('KeyE');
+  await page.evaluate(() => { const iv = setInterval(() => { if (me.alive) clearInterval(iv); else spDeploy(); }, 200); }); 
   await page.waitForFunction(() => me.alive && !me.down, null, { timeout: 8000 }).then(() => out.respawnedByHoldE = true).catch(() => out.respawnedByHoldE = false);
   out.overlayGone = await page.evaluate(() => getComputedStyle(document.getElementById('dn')).display === 'none');
   // medic-side client logic: fake a downed teammate next to us, spy on the revive act

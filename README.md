@@ -74,6 +74,22 @@ Server → client binary: **type 3 delta snapshot** every tick (36-byte own-stat
 
 # Changelog
 
+## v0.50 — Long shots register, spread ring, out-of-range notice, respawn on Deploy, fewer bot grenades
+
+- **Rifle hits register.** A player's round is now checked against where targets were *on his screen when he fired*: his lag plus the round's flight time. A long shot at a running man used to arrive after he'd moved half a metre or more and miss. Now it lands where the crosshair was, with no leading needed. In a test against a man running sideways at 6 m/s, every shot hit: bolt at 150 m, marksman at 200 m, sniper at 250 and 350 m. Bots' rounds are unchanged.
+- **Shots go where the sights are.** The recoil kick used to lift your aim *before* the firing input reached the server, so the round left along the kicked line: about 6 cm per metre high with the sniper, or roughly a metre at 20 m. That's why you had to aim at a man's feet to hit his chest. The server now gets the aim from the moment you pulled the trigger, and the kick applies from the next shot on.
+- **Spread ring:** a circle round the crosshair shows how far your shots can scatter right now. It uses the same sums as the server (hip or aimed, suppression, bloom from firing, a braced gunner, perks), and your round lands inside it. Aimed rifles have no scatter, so there's no ring and the round goes to the dot.
+- **Out of range:** if your round runs out of reach with an enemy further down the line, a notice at the top says so (e.g. "OUT OF RANGE · target about 140 m · Submachine Gun reaches 60 m").
+- **Hit markers** stay up a little longer, and every hit now plays a sharper tick.
+- **Respawn when you're ready.** After you die, the respawn map waits for you: pick a spot, change class if you like (**Change class**), then press **DEPLOY** (or Space). The respawn wait still applies; pressing Deploy early queues you for the moment it ends. Older cached pages still respawn on the timer.
+- **More time to vote:** the map vote stays open for the whole post-round (30 s, was 18 s), and the map changes 3 s after it closes.
+- **Bots throw far fewer grenades:**
+  - They pass up most chances (85%).
+  - They wait 45–75 s between throws (was 18–30 s).
+  - A fresh bot waits 15–35 s before its first.
+  - Each side throws at most 3 every 10 s.
+  - Rifle grenades come every 75–120 s (was 40–70 s).
+
 ## v0.49 — Map vote, Attrition mode, rifles reach across the map
 
 - **Map vote between rounds.** When a round ends, a vote screen shows three cards: **The Trenches · Operation**, **The Trenches · Attrition** and **Wake Atoll · Domination**. Each card shows the time of day and weather that round will have, plus live vote counts, under an 18-second countdown ring. Click a card to vote; you can change it until the timer runs out. The most votes wins (ties at random). If nobody votes, the map is picked at random between the trenches and Wake (then the mode). Esc shows the after-action report behind the vote. This is the new default (`T128_MAPS=vote`).
